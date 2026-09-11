@@ -1,0 +1,26 @@
+# Database credentials — never commit
+creds.json
+
+# Python
+__pycache__/
+*.py[cod]
+
+# Local scratch
+*.log
+.DS_Store
+
+# Downloaded FDA/reference bulk data (large, rebuildable)
+fda_raw/
+
+# ProjectPortal local state (never commit)
+.portal/
+
+# Test and type-check caches
+.coverage
+coverage.json
+.pytest_cache/
+.mypy_cache/
+*.egg-info/
+
+# Superseded probes and one-off outputs; kept on disk, out of the package
+scratch/

@@ -1,0 +1,18 @@
+# The canonical environment. This project shares the existing
+# `clinical-trials-claude` env rather than creating its own, by decision
+# (2026-09-10): the toolchain is identical and T0/T1 add no dependencies, so
+# `conda env update -f environment.yml -n clinical-trials-claude` is a no-op
+# today. That is the point — it records what the gates need without drifting.
+#
+# The env also carries requests, pymongo, beautifulsoup4, defusedxml, numpy and
+# types-requests for other projects. T0/T1 import none of them.
+name: clinical-trials-claude
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      - pytest>=8.0
+      - pytest-cov>=5.0
+      - mypy>=1.10,<3
