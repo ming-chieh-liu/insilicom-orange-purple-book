@@ -93,21 +93,3 @@ def test_openfda_of_normalises_absent_and_empty(
     the contents, and it is done once here rather than at each call site.
     """
     assert openfda_json.openfda_of(record) == expected
-
-
-@pytest.mark.parametrize(
-    ("values", "expected"),
-    [
-        (["NDA019019"], "NDA019019"),
-        (["NDA019019", "NDA019020"], "NDA019019"),
-        ([], ""),
-        (None, ""),
-        ("a string, not a list", ""),
-        ([123], "123"),
-    ],
-)
-def test_first_takes_one_value_out_of_an_openfda_array(
-    values: Any, expected: str
-) -> None:
-    """Every openFDA value is an array, including single-valued ones."""
-    assert openfda_json.first(values) == expected

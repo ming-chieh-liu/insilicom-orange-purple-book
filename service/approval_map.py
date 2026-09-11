@@ -45,8 +45,8 @@ from pathlib import Path
 from typing import NamedTuple
 
 from config.settings import RawData, TrialArchive
-from service import identity_census
-from source.openfda_json import first, openfda_of, read_results, read_shards
+from service import adjudication, identity_census
+from source.openfda_json import openfda_of, read_results, read_shards
 from source.raw_table import read_rows
 from utility import application_number as appno
 from utility import fda_date
@@ -94,6 +94,7 @@ class LinkRow(NamedTuple):
     evidence: str
     confidence: str
     has_results: str
+    polarity: str
 
 
 class MapRow(NamedTuple):
@@ -108,6 +109,7 @@ class MapRow(NamedTuple):
     sponsor: str
     has_results: str
     confidence: str
+    polarity: str
 
 
 class MapReport(NamedTuple):
@@ -127,6 +129,7 @@ class MapReport(NamedTuple):
     applications_linked: int
     generic_labels_skipped: int
     generic_applications_skipped: int
+    polarities: tuple[tuple[str, int], ...]
 
 
 # --- the approval side ------------------------------------------------------
@@ -270,8 +273,18 @@ def _archive_results(archive: TrialArchive) -> dict[str, bool]:
     return out
 
 
-def build(data: RawData, archive: TrialArchive) -> MapReport:
-    """Read everything once and return the four tables."""
+def build(
+    data: RawData,
+    archive: TrialArchive,
+    verdicts: dict[str, adjudication.Verdict] | None = None,
+) -> MapReport:
+    """Read everything once and return the four tables.
+
+    ``verdicts`` carries the section-14 polarity judgements when they exist.
+    Without them every link is ``unjudged`` and nothing is filtered — an
+    unjudged link is not a refuted one.
+    """
+    judged = verdicts or {}
     approvals, canonical_of = _approvals(data)
     representative, drug_rows = _drugs_by_application(data, canonical_of)
     bridge = _set_id_to_application(data)
@@ -294,15 +307,26 @@ def build(data: RawData, archive: TrialArchive) -> MapReport:
             continue
         section14 += 1
 
+        # openfda.application_number is an ARRAY, and 664 labels name more than
+        # one — up to nine. Rozlytrek carries NDA212725 and NDA218550 (capsule
+        # and pellet) on one label. Taking only the first silently drops the
+        # rest, so every named application is linked.
         block = openfda_of(record)
-        parsed = appno.normalize(first(block.get("application_number")))
-        if parsed.is_application:
-            application = parsed.canonical
+        applications = [
+            parsed.canonical
+            for parsed in (
+                appno.normalize(value)
+                for value in (block.get("application_number") or [])
+            )
+            if parsed.is_application
+        ]
+        if applications:
             paths[VIA_OPENFDA] += 1
         else:
-            application = bridge.get(str(record.get("set_id") or ""), "")
-            paths[VIA_NDC_SET_ID if application else VIA_NONE] += 1
-        if not application:
+            bridged = bridge.get(str(record.get("set_id") or ""), "")
+            applications = [bridged] if bridged else []
+            paths[VIA_NDC_SET_ID if applications else VIA_NONE] += 1
+        if not applications:
             continue
 
         # A generic's label reproduces the originator's section 14 verbatim, so
@@ -311,10 +335,15 @@ def build(data: RawData, archive: TrialArchive) -> MapReport:
         # assert something false. Decided 2026-09-11: branded only. An
         # application we cannot type is dropped for the same reason — we
         # cannot confirm it is branded.
-        row = approvals.get(application)
-        if row is None or row.app_type not in identity_census.BRANDED_TYPES:
+        branded = [
+            application
+            for application in applications
+            if (row := approvals.get(application)) is not None
+            and row.app_type in identity_census.BRANDED_TYPES
+        ]
+        if not branded:
             generic_rows += 1
-            generic_applications.add(application)
+            generic_applications.update(applications)
             continue
 
         for text in sections:
@@ -325,13 +354,15 @@ def build(data: RawData, archive: TrialArchive) -> MapReport:
                     continue
                 if archive_results[nct]:
                     with_results.add(nct)
-                links[(nct, application)] = LinkRow(
-                    nct_id=nct,
-                    application=application,
-                    evidence="label_section_14",
-                    confidence=FDA_STATED,
-                    has_results="true" if archive_results[nct] else "false",
-                )
+                for application in branded:
+                    links[(nct, application)] = LinkRow(
+                        nct_id=nct,
+                        application=application,
+                        evidence="label_section_14",
+                        confidence=FDA_STATED,
+                        has_results="true" if archive_results[nct] else "false",
+                        polarity=adjudication.polarity_of(nct, application, judged),
+                    )
 
     link_rows = tuple(sorted(links.values()))
     mapping = tuple(
@@ -347,8 +378,11 @@ def build(data: RawData, archive: TrialArchive) -> MapReport:
             sponsor=approvals[link.application].sponsor if link.application in approvals else "",
             has_results=link.has_results,
             confidence=link.confidence,
+            polarity=link.polarity,
         )
         for link in link_rows
+        # The headline deliverable carries only links an agent has not refuted.
+        if link.polarity in (adjudication.SUPPORTING_POLARITY, adjudication.UNJUDGED)
     )
 
     return MapReport(
@@ -366,6 +400,7 @@ def build(data: RawData, archive: TrialArchive) -> MapReport:
         applications_linked=len({link.application for link in link_rows}),
         generic_labels_skipped=generic_rows,
         generic_applications_skipped=len(generic_applications),
+        polarities=tuple(sorted(Counter(r.polarity for r in link_rows).items())),
     )
 
 
@@ -391,6 +426,11 @@ def render(report: MapReport) -> str:
         f"    of those, with posted results          {report.nct_with_results:>9,}",
         f"  matched the shape but no such study      {len(report.nct_not_in_archive):>9,}",
         f"  applications with at least one trial     {report.applications_linked:>9,}",
+        "",
+        "SECTION 14 POLARITY",
+    ] + [
+        f"  {name:<40} {count:>9,}" for name, count in report.polarities
+    ] + [
         "",
         "TABLES",
         f"  drugs.tsv                                {len(report.drugs):>9,}",

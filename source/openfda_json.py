@@ -77,22 +77,4 @@ def openfda_of(record: dict[str, Any]) -> dict[str, Any]:
     return block if isinstance(block, dict) else {}
 
 
-def first(values: Any) -> str:
-    """The first element of an openFDA array field, or ``""``.
-
-    Every openFDA value is an array, including the ones that always hold
-    exactly one element.
-
-    >>> first(["NDA019019", "NDA019020"])
-    'NDA019019'
-    >>> first([])
-    ''
-    >>> first(None)
-    ''
-    """
-    if isinstance(values, list) and values:
-        return str(values[0])
-    return ""
-
-
-__all__ = ["first", "openfda_of", "read_results", "read_shards"]
+__all__ = ["openfda_of", "read_results", "read_shards"]

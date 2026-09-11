@@ -27,3 +27,12 @@ scratch/
 
 # Generated tables; reproducible with `main.py --mode map`
 output/
+
+# Adjudication work files — derived from fda_raw/, rebuilt by
+# `main.py --mode adjudicate-prepare` and `--mode adjudicate-combine`.
+# adjudication/verdicts.jsonl and adjudication/raw/ are NOT ignored: they are
+# the curated record of what the judges actually said, and cost agent calls.
+adjudication/batches/
+adjudication/units.jsonl
+adjudication/judged.jsonl
+adjudication/tiebreak_needed.txt

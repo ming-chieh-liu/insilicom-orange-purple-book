@@ -100,6 +100,12 @@ _LABELS = [
     },
     # No section 14 at all: not counted as a section-14 label.
     {"set_id": "set-nosection", "openfda": {"application_number": ["NDA000001"]}},
+    # ONE label naming TWO applications, as Rozlytrek's does (capsule + pellet).
+    {
+        "set_id": "set-two-apps",
+        "openfda": {"application_number": ["NDA000001", "BLA000002"]},
+        "clinical_studies": ["... (NCT00000007)."],
+    },
 ]
 
 _NDC = [
@@ -108,6 +114,7 @@ _NDC = [
 ]
 
 _MANIFEST = [
+    {"nct": "NCT00000007", "has_results": True},
     {"nct": "NCT00000001", "has_results": True},
     {"nct": "NCT00000002", "has_results": False},
     {"nct": "NCT00000003", "has_results": True},
@@ -165,7 +172,7 @@ def test_a_label_naming_its_application_links_directly(
     """Path A: openfda.application_number, present on a third of real labels."""
     report = approval_map.build(*corpus)
     paths = dict(report.label_paths)
-    assert paths[approval_map.VIA_OPENFDA] == 4
+    assert paths[approval_map.VIA_OPENFDA] == 5
 
 
 def test_an_empty_openfda_block_falls_back_to_the_ndc_bridge(
@@ -201,6 +208,20 @@ def test_a_label_with_no_section_14_is_not_counted(
 
 
 # --- the branded-only rule --------------------------------------------------
+
+
+def test_a_label_naming_two_applications_links_to_both(
+    corpus: tuple[RawData, TrialArchive],
+) -> None:
+    """openfda.application_number is an ARRAY; 664 real labels name >1.
+
+    Rozlytrek carries NDA212725 and NDA218550 on one label. Taking only the
+    first silently dropped 72 branded applications from the real corpus.
+    """
+    report = approval_map.build(*corpus)
+    pairs = {(r.nct_id, r.application) for r in report.links}
+    assert ("NCT00000007", "NDA000001") in pairs
+    assert ("NCT00000007", "BLA000002") in pairs
 
 
 def test_a_generic_citing_the_brands_trials_is_not_emitted(
@@ -240,6 +261,8 @@ def test_every_nct_in_section_14_becomes_a_link(
         ("NCT00000003", "BLA000002"),
         ("NCT00000004", "BLA000002"),
         ("NCT00000005", "BLA000002"),
+        ("NCT00000007", "NDA000001"),
+        ("NCT00000007", "BLA000002"),
     }
 
 
@@ -269,7 +292,7 @@ def test_posted_results_are_carried_from_the_archive(
     by_nct = {r.nct_id: r.has_results for r in report.links}
     assert by_nct["NCT00000001"] == "true"
     assert by_nct["NCT00000002"] == "false"
-    assert report.nct_with_results == 3
+    assert report.nct_with_results == 4
 
 
 def test_every_link_is_marked_as_the_fda_saying_so(
@@ -290,7 +313,7 @@ def test_a_malformed_manifest_line_is_skipped_not_fatal(
     with caplog.at_level(logging.WARNING):
         report = approval_map.build(*corpus)
     assert "malformed manifest line" in caplog.text
-    assert len(report.links) == 5  # every good row still read
+    assert len(report.links) == 7  # every good row still read
 
 
 def test_an_application_type_the_files_never_state_is_skipped(
@@ -398,11 +421,14 @@ def test_the_mapping_reaches_the_predicted_scale(
 
     The scope artifact predicted ~2,124 trials and 1,838 with posted results
     from section 14; this reaches 2,060 and 1,803 after excluding generics.
+
+    837 applications, not 773: openfda.application_number is an array and 664
+    labels name more than one, so taking only the first dropped 64.
     """
     assert real_report.nct_distinct == 2060
     assert real_report.nct_with_results == 1803
-    assert real_report.applications_linked == 773
-    assert len(real_report.links) == 2678
+    assert real_report.applications_linked == 837
+    assert len(real_report.links) == 3050
 
 
 @pytest.mark.realdata
@@ -410,7 +436,7 @@ def test_no_generic_application_appears_in_the_mapping(
     real_report: approval_map.MapReport,
 ) -> None:
     assert all(not r.application.startswith("ANDA") for r in real_report.links)
-    assert real_report.generic_labels_skipped == 17_504
+    assert real_report.generic_labels_skipped == 17_502
 
 
 @pytest.mark.realdata
