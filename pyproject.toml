@@ -24,7 +24,7 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["config", "source", "service", "utility"]
+packages = ["config", "dao", "source", "service", "utility"]
 
 # ---------------------------------------------------------------------------
 # Testing (pytest ONLY; all test config lives here per project rules)
@@ -33,12 +33,13 @@ packages = ["config", "source", "service", "utility"]
 minversion = "8.0"
 # The packages are in testpaths so --doctest-modules collects their doctests.
 # A doctest that is never executed is documentation, not a contract.
-testpaths = ["tests", "config", "source", "service", "utility"]
+testpaths = ["tests", "config", "dao", "source", "service", "utility"]
 addopts = [
     "-ra",
     "--strict-markers",
     "--doctest-modules",
     "--cov=config",
+    "--cov=dao",
     "--cov=source",
     "--cov=service",
     "--cov=utility",

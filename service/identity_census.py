@@ -89,7 +89,7 @@ class CensusReport(NamedTuple):
     row_counts: tuple[tuple[str, int, int], ...]
 
 
-def _typed_applnos(data: RawData) -> tuple[frozenset[str], frozenset[str]]:
+def typed_applnos(data: RawData) -> tuple[frozenset[str], frozenset[str]]:
     """Every typed application number, and the NDA/BLA subset of them.
 
     Both are needed, and for different questions: the NDA/BLA set says which
@@ -108,7 +108,7 @@ def _typed_applnos(data: RawData) -> tuple[frozenset[str], frozenset[str]]:
     return frozenset(known), frozenset(branded)
 
 
-def _ingredient_names(data: RawData) -> tuple[set[str], tuple[str, ...]]:
+def ingredient_names(data: RawData) -> tuple[set[str], tuple[str, ...]]:
     """The NDA/BLA ingredient components, and the ApplNos that cannot be typed.
 
     Untypable means *no ``Applications.txt`` row at all* — 8 of them. An ANDA
@@ -116,7 +116,7 @@ def _ingredient_names(data: RawData) -> tuple[set[str], tuple[str, ...]]:
     because it is a generic copy of a drug already counted under its NDA. The
     two must not be reported as one number.
     """
-    known, branded = _typed_applnos(data)
+    known, branded = typed_applnos(data)
     names: set[str] = set()
     untypable: set[str] = set()
     for row in read_rows(data.products):
@@ -133,7 +133,7 @@ def _ingredient_names(data: RawData) -> tuple[set[str], tuple[str, ...]]:
     return names, tuple(sorted(untypable))
 
 
-def _resolve_uniis(
+def resolve_uniis(
     data: RawData, names: set[str]
 ) -> tuple[dict[str, set[str]], int]:
     """Map each wanted name to the UNIIs claiming it, streaming the registry.
@@ -156,8 +156,8 @@ def _resolve_uniis(
 
 def _identity(data: RawData) -> IdentityChain:
     """Walk the chain from ingredient strings to distinct UNII."""
-    names, untypable = _ingredient_names(data)
-    hits, ambiguous = _resolve_uniis(data, names)
+    names, untypable = ingredient_names(data)
+    hits, ambiguous = resolve_uniis(data, names)
 
     resolved = len(hits)
     unmatched = len(names) - resolved
@@ -315,6 +315,9 @@ __all__ = [
     "INGREDIENT_SEPARATOR",
     "CensusReport",
     "IdentityChain",
+    "ingredient_names",
     "render",
+    "resolve_uniis",
     "run",
+    "typed_applnos",
 ]

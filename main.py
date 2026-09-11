@@ -21,14 +21,16 @@ import logging
 import sys
 from pathlib import Path
 
-from config.settings import RawData
-from service import identity_census
+from config.settings import DEFAULT_TRIAL_ARCHIVE, RawData, TrialArchive
+from dao.tsv_repository import TsvRepository
+from service import approval_map, identity_census
 from utility.logging import configure
 
 #: Every mode this script dispatches, with the one-line help argparse shows.
 MODES: dict[str, str] = {
     "census": "print the drug-identity chain, date-shape census and "
     "application-number taxonomy measured from fda_raw/",
+    "map": "build the trial -> approval mapping and write the TSV tables",
 }
 
 
@@ -50,6 +52,16 @@ def build_parser() -> argparse.ArgumentParser:
         help="path to the FDA bulk data tree (default: fda_raw)",
     )
     parser.add_argument(
+        "--trial-archive",
+        default=str(DEFAULT_TRIAL_ARCHIVE),
+        help="ClinicalTrials.gov archive directory, used to validate NCT ids",
+    )
+    parser.add_argument(
+        "--out",
+        default="output",
+        help="directory the TSV tables are written to (default: output)",
+    )
+    parser.add_argument(
         "--verbose",
         action="store_true",
         help="log at DEBUG rather than INFO",
@@ -68,6 +80,37 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{data.root} not found — the census needs the bulk data tree")
             return 1
         print(identity_census.render(identity_census.run(data)))
+        return 0
+
+    if args.mode == "map":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the mapping needs the bulk data tree")
+            return 1
+        archive = TrialArchive(root=Path(args.trial_archive))
+        report = approval_map.build(data, archive)
+        # The repository is constructed here and injected: main is the only
+        # place that decides where output goes.
+        repository = TsvRepository(args.out)
+        repository.save("drugs", ("unii", "name"), report.drugs)
+        repository.save(
+            "approvals",
+            ("application", "app_type", "sponsor", "first_approval", "approved_pre_1982"),
+            report.approvals,
+        )
+        repository.save(
+            "links",
+            ("nct_id", "application", "evidence", "confidence", "has_results"),
+            report.links,
+        )
+        repository.save(
+            "trial_approval_map",
+            ("nct_id", "application", "app_type", "drug", "unii",
+             "first_approval", "sponsor", "has_results", "confidence"),
+            report.mapping,
+        )
+        print(approval_map.render(report))
+        print(f"\nwritten to {repository.out_dir}/")
         return 0
 
     # argparse's choices= makes this unreachable; it is here so mypy sees a

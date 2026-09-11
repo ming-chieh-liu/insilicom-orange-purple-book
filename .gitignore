@@ -24,3 +24,6 @@ coverage.json
 
 # Superseded probes and one-off outputs; kept on disk, out of the package
 scratch/
+
+# Generated tables; reproducible with `main.py --mode map`
+output/

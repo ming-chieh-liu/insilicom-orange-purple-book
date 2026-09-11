@@ -173,7 +173,7 @@ def test_an_anda_is_not_reported_as_untypable(synthetic: RawData) -> None:
 
 
 def _names_of(data: RawData) -> set[str]:
-    names, _ = identity_census._ingredient_names(data)
+    names, _ = identity_census.ingredient_names(data)
     return names
 
 

@@ -70,6 +70,18 @@ class RawData:
     ob_patent: DelimitedFile = field(init=False)
     ob_exclusivity: DelimitedFile = field(init=False)
 
+    #: The openFDA label download: 14 zips, 262,757 records. Section 14
+    #: (``clinical_studies``) is on 46,810 of them (17.8%) and is the only
+    #: place the FDA names the trials behind an approval.
+    label_shards: tuple[Path, ...] = field(init=False)
+    label_records: int = 262_757
+
+    #: The openFDA NDC download. Its ``openfda.spl_set_id`` is the bridge from
+    #: a label to an application when the label's own ``openfda`` block is
+    #: empty — 96,752 of its 137,804 records carry both.
+    ndc_json: Path = field(init=False)
+    ndc_records: int = 137_804
+
     #: The UNII registry, inside ``UNIIs.zip``. Tab-delimited and **LF-only**,
     #: unlike every FDA file above. 1,050,022 data rows; line 1 is the header.
     #: Names are stored mixed case, so matching must case-fold.
@@ -108,6 +120,17 @@ class RawData:
             DelimitedFile(orangebook / "exclusivity.txt", TILDE, 5, 2_370),
         )
         object.__setattr__(
+            self, "label_shards",
+            tuple(
+                self.root / "label" / f"drug-label-{n:04d}-of-0014.json.zip"
+                for n in range(1, 15)
+            ),
+        )
+        object.__setattr__(
+            self, "ndc_json",
+            self.root / "ndc" / "drug-ndc-0001-of-0001.json.zip",
+        )
+        object.__setattr__(
             self, "unii_names",
             DelimitedFile(unii_zip, TAB, 4, 1_050_022, self.unii_snapshot),
         )
@@ -118,4 +141,41 @@ class RawData:
         return self.root.is_dir()
 
 
-__all__ = ["TAB", "TILDE", "DelimitedFile", "RawData"]
+@dataclass(frozen=True)
+class TrialArchive:
+    """The local ClinicalTrials.gov archive, used only to validate NCT ids.
+
+    Lives outside this repo — it is the clinical-trials project's output. We
+    read **only its manifest**, which is one line per study with the id and
+    whether results were posted, so validation costs a 600,762-row scan and
+    never touches the 2 GB of study documents.
+    """
+
+    root: Path
+    manifest_name: str = "manifest.jsonl.gz"
+    studies: int = 600_762
+
+    @property
+    def manifest(self) -> Path:
+        return self.root / self.manifest_name
+
+    @property
+    def exists(self) -> bool:
+        return self.manifest.is_file()
+
+
+#: Where the trial archive sits today. Overridable on the command line, because
+#: it is another project's output directory and not part of this repo.
+DEFAULT_TRIAL_ARCHIVE = Path(
+    "/data/mliu/insilicom-clinical_trials/final/output_raw"
+)
+
+
+__all__ = [
+    "DEFAULT_TRIAL_ARCHIVE",
+    "TAB",
+    "TILDE",
+    "DelimitedFile",
+    "RawData",
+    "TrialArchive",
+]
