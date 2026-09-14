@@ -31,7 +31,15 @@ from config.settings import (
     TrialArchive,
 )
 from dao.tsv_repository import TsvRepository
-from service import adjudication, approval_map, identity_census, indications
+from source import trial_studies
+from service import (
+    adjudication,
+    approval_events,
+    approval_map,
+    attribution,
+    identity_census,
+    indications,
+)
 from utility.logging import configure
 
 #: Every mode this script dispatches, with the one-line help argparse shows.
@@ -41,6 +49,10 @@ MODES: dict[str, str] = {
     "map": "build the trial -> approval mapping and write the TSV tables",
     "indications": "code label section 1 to MeSH diseases and write "
     "indications.tsv and indication_text.tsv",
+    "approval-events": "write approval_events.tsv, one row per FDA approval "
+    "rather than one per application",
+    "attribute": "check trial_approval_map.tsv against the approval events "
+    "and write trial_approval_dated.tsv (needs --mode map first)",
     "adjudicate-prepare": "write adjudication/units.jsonl, the section-14 "
     "excerpts for agents to judge (see docs/runbooks/adjudicate-section-14.md)",
     "adjudicate-record": "validate and append judged verdicts from --from",
@@ -178,6 +190,56 @@ def main(argv: list[str] | None = None) -> int:
             indication_report.texts,
         )
         print(indications.render(indication_report))
+        print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "approval-events":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the events need the bulk data tree")
+            return 1
+        events_report = approval_events.build(data)
+        repository = TsvRepository(args.out)
+        repository.save(
+            "approval_events",
+            ("application", "app_type", "submission_type", "submission_no",
+             "submission_class", "approval_date", "indication_changing"),
+            events_report.rows,
+        )
+        print(approval_events.render(events_report))
+        print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "attribute":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — attribution needs the bulk data tree")
+            return 1
+        mapping = Path(args.out) / "trial_approval_map.tsv"
+        if not mapping.is_file():
+            print(f"{mapping} not found — run --mode map first")
+            return 1
+        archive = TrialArchive(root=Path(args.trial_archive))
+        if not archive.study_shards:
+            print(
+                f"{archive.root} has no {archive.study_glob} — attribution needs "
+                "study start dates, which are not in the manifest"
+            )
+            return 1
+        with mapping.open(encoding="utf-8") as handle:
+            map_rows = list(csv.DictReader(handle, delimiter="\t"))
+        events = approval_events.indication_changing_dates(approval_events.build(data))
+        starts = trial_studies.read_start_dates(archive)
+        attribution_report = attribution.attribute(map_rows, events, starts)
+        repository = TsvRepository(args.out)
+        repository.save(
+            "trial_approval_dated",
+            ("nct_id", "application", "app_type", "drug", "unii", "sponsor",
+             "has_results", "polarity", "stamped_approval", "trial_start",
+             "attribution", "approval_date", "candidate_approvals"),
+            attribution_report.rows,
+        )
+        print(attribution.render(attribution_report))
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 

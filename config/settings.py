@@ -61,6 +61,11 @@ class RawData:
     applications: DelimitedFile = field(init=False)
     products: DelimitedFile = field(init=False)
     submissions: DelimitedFile = field(init=False)
+    #: ``SubmissionClassCodeID`` → description. Needed to tell an Efficacy
+    #: supplement, which can change an indication, from a Labeling or CMC one,
+    #: which cannot. The code ids are not stable across releases; the
+    #: descriptions in this table are what the corpus states.
+    submission_class_lookup: DelimitedFile = field(init=False)
 
     #: The Orange Book text files, already unzipped under ``orangebook/x/``.
     #: Tilde-delimited, CRLF, header present. ``products.txt`` has **no
@@ -106,6 +111,10 @@ class RawData:
         object.__setattr__(
             self, "submissions",
             DelimitedFile(drugsfda_zip, TAB, 8, 193_687, "Submissions.txt"),
+        )
+        object.__setattr__(
+            self, "submission_class_lookup",
+            DelimitedFile(drugsfda_zip, TAB, 3, 28, "SubmissionClass_Lookup.txt"),
         )
         object.__setattr__(
             self, "ob_products",
@@ -155,9 +164,19 @@ class TrialArchive:
     manifest_name: str = "manifest.jsonl.gz"
     studies: int = 600_762
 
+    #: The study documents themselves, one JSON object per line per shard.
+    #: Read **only** when a start date is needed — the manifest carries the id
+    #: and whether results were posted, but no dates, and these shards are 2 GB.
+    study_glob: str = "studies-*.jsonl.gz"
+
     @property
     def manifest(self) -> Path:
         return self.root / self.manifest_name
+
+    @property
+    def study_shards(self) -> tuple[Path, ...]:
+        """Every study shard, in name order. Empty when the archive is absent."""
+        return tuple(sorted(self.root.glob(self.study_glob)))
 
     @property
     def exists(self) -> bool:
