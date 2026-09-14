@@ -135,7 +135,9 @@ class MapReport(NamedTuple):
 # --- the approval side ------------------------------------------------------
 
 
-def _approvals(data: RawData) -> tuple[dict[str, ApprovalRow], dict[str, str]]:
+def approvals_by_application(
+    data: RawData,
+) -> tuple[dict[str, ApprovalRow], dict[str, str]]:
     """Every application, and the digits→canonical index everything else joins on.
 
     The approval date is the ``ORIG`` submission's, not the application's:
@@ -180,8 +182,8 @@ def _approvals(data: RawData) -> tuple[dict[str, ApprovalRow], dict[str, str]]:
     return out, canonical_of
 
 
-def _drugs_by_application(
-    data: RawData, canonical_of: dict[str, str]
+def drugs_by_application(
+    data: RawData, canonical_of: dict[str, str], *, branded_only: bool = True
 ) -> tuple[dict[str, tuple[str, str]], tuple[DrugRow, ...]]:
     """Map each application to one representative (name, UNII) for the map table.
 
@@ -191,8 +193,16 @@ def _drugs_by_application(
 
     Keyed by **canonical application**, so the map joins on the same string
     ``approvals.tsv`` and ``links.tsv`` use.
+
+    ``branded_only`` is the default because the trial map emits branded rows
+    only — an ANDA is approved on bioequivalence, not on the brand's trials.
+    :mod:`service.indications` passes ``False``: a generic really is indicated
+    for its disease, and leaving its ingredient blank would empty the drug
+    column on 83% of that table's rows.
     """
-    _known, branded = identity_census.typed_applnos(data)
+    known, branded = identity_census.typed_applnos(data)
+    if not branded_only:
+        branded = known
     per_application: dict[str, set[str]] = {}
     for row in read_rows(data.products):
         digits = appno.pad(row["ApplNo"])
@@ -231,7 +241,7 @@ def _drugs_by_application(
 # --- the label side ---------------------------------------------------------
 
 
-def _set_id_to_application(data: RawData) -> dict[str, str]:
+def set_id_to_application(data: RawData) -> dict[str, str]:
     """The NDC bridge: SPL set id → canonical application number.
 
     Needed because the label's own ``openfda`` block is empty on 66.7% of
@@ -285,9 +295,9 @@ def build(
     unjudged link is not a refuted one.
     """
     judged = verdicts or {}
-    approvals, canonical_of = _approvals(data)
-    representative, drug_rows = _drugs_by_application(data, canonical_of)
-    bridge = _set_id_to_application(data)
+    approvals, canonical_of = approvals_by_application(data)
+    representative, drug_rows = drugs_by_application(data, canonical_of)
+    bridge = set_id_to_application(data)
     archive_results = _archive_results(archive)
 
     paths: Counter[str] = Counter()

@@ -164,6 +164,37 @@ class TrialArchive:
         return self.manifest.is_file()
 
 
+@dataclass(frozen=True)
+class MeshVocabulary:
+    """The MeSH descriptor file, used to code label indications to a disease id.
+
+    Lives outside this repo, like :class:`TrialArchive` — it is a MeSH release,
+    not FDA bulk data, and it is shared with other projects on this machine.
+
+    **The XML is parsed rather than a neighbouring project's derived JSON.**
+    A sibling pipeline keeps a ``mesh_info.json`` of disease synonyms, and
+    reusing it would inherit that project's decisions about which branches and
+    which term types count as a disease. Those decisions belong to this
+    project, so the authoritative release file is read here and the subsetting
+    is done in :mod:`source.mesh_descriptors` where it can be tested.
+    """
+
+    descriptors: Path
+    #: Descriptors in the 2026 release. Checked, not assumed.
+    records: int = 31_108
+
+    @property
+    def exists(self) -> bool:
+        return self.descriptors.is_file()
+
+
+#: Where the MeSH release sits today. Overridable on the command line for the
+#: same reason the trial archive is: it is not part of this repo.
+DEFAULT_MESH_DESCRIPTORS = Path(
+    "/data/mliu/ontology_normalization_tp/external_data/MeSH/desc2026.xml"
+)
+
+
 #: Where the trial archive sits today. Overridable on the command line, because
 #: it is another project's output directory and not part of this repo.
 DEFAULT_TRIAL_ARCHIVE = Path(
@@ -172,10 +203,12 @@ DEFAULT_TRIAL_ARCHIVE = Path(
 
 
 __all__ = [
+    "DEFAULT_MESH_DESCRIPTORS",
     "DEFAULT_TRIAL_ARCHIVE",
     "TAB",
     "TILDE",
     "DelimitedFile",
+    "MeshVocabulary",
     "RawData",
     "TrialArchive",
 ]

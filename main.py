@@ -23,9 +23,15 @@ import logging
 import sys
 from pathlib import Path
 
-from config.settings import DEFAULT_TRIAL_ARCHIVE, RawData, TrialArchive
+from config.settings import (
+    DEFAULT_MESH_DESCRIPTORS,
+    DEFAULT_TRIAL_ARCHIVE,
+    MeshVocabulary,
+    RawData,
+    TrialArchive,
+)
 from dao.tsv_repository import TsvRepository
-from service import adjudication, approval_map, identity_census
+from service import adjudication, approval_map, identity_census, indications
 from utility.logging import configure
 
 #: Every mode this script dispatches, with the one-line help argparse shows.
@@ -33,6 +39,8 @@ MODES: dict[str, str] = {
     "census": "print the drug-identity chain, date-shape census and "
     "application-number taxonomy measured from fda_raw/",
     "map": "build the trial -> approval mapping and write the TSV tables",
+    "indications": "code label section 1 to MeSH diseases and write "
+    "indications.tsv and indication_text.tsv",
     "adjudicate-prepare": "write adjudication/units.jsonl, the section-14 "
     "excerpts for agents to judge (see docs/runbooks/adjudicate-section-14.md)",
     "adjudicate-record": "validate and append judged verdicts from --from",
@@ -62,6 +70,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--trial-archive",
         default=str(DEFAULT_TRIAL_ARCHIVE),
         help="ClinicalTrials.gov archive directory, used to validate NCT ids",
+    )
+    parser.add_argument(
+        "--mesh",
+        default=str(DEFAULT_MESH_DESCRIPTORS),
+        help="MeSH descriptor XML, the disease vocabulary indications code to",
     )
     parser.add_argument(
         "--out",
@@ -139,6 +152,32 @@ def main(argv: list[str] | None = None) -> int:
             report.mapping,
         )
         print(approval_map.render(report))
+        print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "indications":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the indications need the bulk data tree")
+            return 1
+        vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
+        if not vocabulary.exists:
+            print(f"{vocabulary.descriptors} not found — pass --mesh")
+            return 1
+        indication_report = indications.build(data, vocabulary)
+        repository = TsvRepository(args.out)
+        repository.save(
+            "indications",
+            ("application", "app_type", "drug", "unii", "mesh_id", "mesh_term",
+             "evidence"),
+            indication_report.rows,
+        )
+        repository.save(
+            "indication_text",
+            ("application", "effective_time", "n_diseases", "text"),
+            indication_report.texts,
+        )
+        print(indications.render(indication_report))
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 
