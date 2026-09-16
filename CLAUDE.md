@@ -148,6 +148,13 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - `placebo` → `MESH:D010919`; exclude from intervention matching.
 - **Label PDFs: use `https://` and follow redirects.** The `http://` URLs in `ApplicationDocs.txt`
   return nothing.
+- **The registry's condition and the label's indication disagree, so condition must RANK and never
+  FILTER.** CHECKMATE-648 is `NCT03143153`, enrollment 970 — exactly what the Opdivo label states —
+  and it registers its condition as *Various Advanced Cancer*, which maps to no indication at all.
+  Drug and date left a pool of 1,055 containing it; intersecting on Esophageal Neoplasms left 2 and
+  discarded it. Drug and date are hard facts; condition is two vocabularies describing one disease
+  differently. When a pool exceeds the cap it is ordered — condition matches first, then nearest to
+  the patient count the label states — and truncated, never intersected.
 - **Section 14 is cumulative, so a trial recurs on every later label.** 772 of 3,007
   (application, trial) groups span more than one submission, covering 2,728 units. Judge the
   earliest only — see D16 — or spend 39% of the agent budget re-deriving answers and then assert

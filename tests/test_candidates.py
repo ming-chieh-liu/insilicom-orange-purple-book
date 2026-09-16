@@ -194,8 +194,9 @@ def test_the_condition_does_not_narrow_a_judgeable_list(
     assert len(got) == 4
 
 
-def test_the_condition_narrows_a_list_too_long_to_judge() -> None:
-    """Only when there is something to narrow."""
+def test_a_long_list_is_ranked_not_cut() -> None:
+    """Condition matches sort first, but the list is filled to the cap rather
+    than intersected down — intersecting is what lost CHECKMATE-648."""
     studies = {
         f"NCT{n}": _candidate(f"NCT{n}") for n in range(candidates.CANDIDATE_CAP + 10)
     }
@@ -204,7 +205,32 @@ def test_the_condition_narrows_a_list_too_long_to_judge() -> None:
     got = candidates.shortlist(
         {"MESH:C582435"}, "MESH:D002289", "", studies, by_drug, by_condition
     )
-    assert {c.nct_id for c in got} == {"NCT1", "NCT2"}
+    assert len(got) == candidates.CANDIDATE_CAP
+    assert {"NCT1", "NCT2"} <= {c.nct_id for c in got}
+
+
+def test_the_stated_count_ranks_a_long_list() -> None:
+    """The label says 970 and the registry says 970 for exactly one study, so
+    it survives a cut that the condition filter would have thrown it out of.
+    Ranking orders the list; it never decides — that is P4's job."""
+    studies = {
+        f"NCT{n:04d}": _candidate(f"NCT{n:04d}", n="100")
+        for n in range(candidates.CANDIDATE_CAP + 50)
+    }
+    studies["NCT9999"] = _candidate("NCT9999", n="970")
+    by_drug = {"MESH:D1": set(studies)}
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "", studies, by_drug, {}, "970"
+    )
+    assert "NCT9999" in {c.nct_id for c in got}
+
+
+def test_a_list_inside_the_cap_is_never_ranked_away() -> None:
+    studies = {f"NCT{n}": _candidate(f"NCT{n}") for n in range(5)}
+    got = candidates.shortlist(
+        {"MESH:D1"}, "MESH:D002289", "", studies, {"MESH:D1": set(studies)}, {}
+    )
+    assert len(got) == 5
 
 
 def test_a_condition_matching_nothing_does_not_empty_the_pool(

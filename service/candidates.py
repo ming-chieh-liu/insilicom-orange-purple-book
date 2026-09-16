@@ -265,12 +265,28 @@ def shortlist(
     studies: dict[str, Candidate],
     by_drug: dict[str, set[str]],
     by_condition: dict[str, set[str]],
+    stated_enrollment: str = "",
 ) -> tuple[Candidate, ...]:
     """The studies that could have supported this approval.
 
-    Intersected on drug, bounded by the date — the one hard fact, since a trial
-    cannot have supported an approval granted before it began — and narrowed by
-    condition only when the result would otherwise be too long to judge.
+    Two hard filters and then a ranking. Drug is hard: the approval is for that
+    molecule. Date is hard: a trial cannot have supported an approval granted
+    before it began.
+
+    **Condition is not hard, and treating it as a filter loses real answers.**
+    CHECKMATE-648 is in the registry as ``NCT03143153``, enrollment 970,
+    exactly the number the Opdivo label states — and it registers its condition
+    as *Various Advanced Cancer*, which maps to no indication at all. Drug and
+    date left a pool of 1,055 containing it; intersecting on Esophageal
+    Neoplasms left 2 and threw it away. A registry condition and a label
+    heading are two vocabularies describing the same disease differently, and
+    that disagreement is the norm, not an edge case.
+
+    So when the pool is longer than a judge can read, it is **ranked** rather
+    than cut: condition matches first, then whatever is closest to the patient
+    count the label states. Ranking cannot lose the answer the way filtering
+    can — the worst it does is place it lower. The count is used only to order
+    the list; deciding remains P4's job, on the evidence the judge reads.
     """
     pool: set[str] = set()
     for mesh in drug_mesh:
@@ -284,20 +300,19 @@ def shortlist(
             if not studies[nct].start_date
             or studies[nct].start_date <= approval_date
         }
-    # Condition LAST, and only when the list is otherwise too long to judge.
-    #
-    # Applying it eagerly costs real answers. CHECKMATE-648 is in the registry
-    # as NCT03143153 with enrollment 970, exactly what the Opdivo label states,
-    # and it was filtered out: the trial registers its condition as esophageal
-    # squamous cell carcinoma where the label heading codes to something else,
-    # so the intersection kept two unrelated studies and dropped the right one.
-    # The drug and the date are hard facts; the condition is a coding agreement
-    # between two vocabularies that often disagree. So it narrows only when
-    # there is something to narrow, and never below a judgeable list.
-    if indication_mesh and len(pool) > CANDIDATE_CAP:
-        narrowed = pool & by_condition.get(indication_mesh, set())
-        if narrowed:
-            pool = narrowed
+    if len(pool) > CANDIDATE_CAP:
+        matching = by_condition.get(indication_mesh, set()) if indication_mesh else set()
+        target = int(stated_enrollment) if stated_enrollment.isdigit() else None
+
+        def rank(nct: str) -> tuple[int, int, str]:
+            enrolled = studies[nct].enrollment
+            if target is None or not enrolled.isdigit():
+                distance = 10**9
+            else:
+                distance = abs(int(enrolled) - target)
+            return (0 if nct in matching else 1, distance, nct)
+
+        pool = set(sorted(pool, key=rank)[:CANDIDATE_CAP])
     return tuple(sorted((studies[nct] for nct in pool), key=lambda c: c.nct_id))
 
 
@@ -388,6 +403,7 @@ def build(
                 studies,
                 by_drug,
                 by_condition,
+                row.get("enrollment", ""),
             )
         stated = row.get("nct_id", "")
         if stated:
