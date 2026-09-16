@@ -26,6 +26,7 @@ from typing import Any
 
 from config.settings import (
     DEFAULT_MESH_DESCRIPTORS,
+    DEFAULT_MOIETY_EXTRACT,
     DEFAULT_TRIAL_ARCHIVE,
     BiokdeConnection,
     MeshVocabulary,
@@ -34,7 +35,7 @@ from config.settings import (
 )
 from dao.biokde import BiokdeRepository, connection_uri
 from dao.tsv_repository import TsvRepository
-from source import mesh_descriptors, trial_studies
+from source import mesh_descriptors, moiety, trial_studies
 from service import (
     adjudication,
     candidates,
@@ -121,6 +122,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--adjudication",
         default="adjudication",
         help="directory holding units.jsonl and the curated verdicts.jsonl",
+    )
+    parser.add_argument(
+        "--moiety",
+        default=str(DEFAULT_MOIETY_EXTRACT),
+        help="structured label extract, for salt -> active moiety",
     )
     parser.add_argument(
         "--label-cache",
@@ -344,8 +350,9 @@ def main(argv: list[str] | None = None) -> int:
             graph = BiokdeRepository(client, connection)
             concepts = mesh_descriptors.concept_to_descriptor(vocabulary)
             archive = TrialArchive(root=Path(args.trial_archive))
+            folded = moiety.read(Path(args.moiety))
             normalize_report = normalize.build(
-                data, archive, graph, concepts, indication_ids
+                data, archive, graph, concepts, indication_ids, folded
             )
         finally:
             client.close()

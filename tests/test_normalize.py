@@ -10,6 +10,7 @@ import pytest
 
 from config.settings import BiokdeConnection, RawData, TrialArchive
 from dao.biokde import BiokdeRepository, Entity
+from source.moiety import Moiety
 from service import normalize
 
 # "Gastric Cancer" is a MeSH *concept*; "Stomach Neoplasms" is the *descriptor*
@@ -517,3 +518,79 @@ def test_an_indication_gets_an_internal_id_too(
         _CONCEPTS, ["D002289"],
     )
     assert report.indications[0].biokdeid == "bk-MESH:D002289"
+
+
+# ---------------------------------------------------------------------------
+# Salt to moiety folding
+# ---------------------------------------------------------------------------
+
+
+def _moiety(salt: str, name: str) -> Moiety:
+    return Moiety(salt=salt, moiety=name, salt_unii="U1", moiety_unii="M1")
+
+
+def test_a_salt_resolves_through_its_moiety() -> None:
+    """The FDA writes the salt, a trial writes the moiety. Where the graph
+    gives them different ids the drug matches no trials at all, silently."""
+    entities = {
+        "ESOMEPRAZOLE MAGNESIUM": (
+            Entity("PubChem:CID130564", "bk1", "x", "Chemical", "Drug"),
+        ),
+        "ESOMEPRAZOLE": (
+            Entity("MESH:D009853", "bk2", "Esomeprazole", "Chemical", "Drug"),
+        ),
+    }
+    mapped, _ = normalize.normalise(
+        ["ESOMEPRAZOLE MAGNESIUM"],
+        _repository(entities=entities),
+        {},
+        "drugs",
+        "Chemical",
+        {"ESOMEPRAZOLE MAGNESIUM": _moiety("ESOMEPRAZOLE MAGNESIUM", "ESOMEPRAZOLE")},
+    )
+    assert mapped["ESOMEPRAZOLE MAGNESIUM"].mesh_id == "MESH:D009853"
+    assert mapped["ESOMEPRAZOLE MAGNESIUM"].basis == "moiety"
+
+
+def test_the_salt_still_wins_when_it_is_better_vocabularied() -> None:
+    """The moiety is a second thing to ask about, not an override."""
+    entities = {
+        "SALT FORM": (Entity("MESH:D000001", "bk1", "Salt", "Chemical", "Drug"),),
+        "MOIETY": (Entity("PubChem:CID1", "bk2", "Moiety", "Chemical", "Drug"),),
+    }
+    mapped, _ = normalize.normalise(
+        ["SALT FORM"],
+        _repository(entities=entities),
+        {},
+        "drugs",
+        "Chemical",
+        {"SALT FORM": _moiety("SALT FORM", "MOIETY")},
+    )
+    assert mapped["SALT FORM"].mesh_id == "MESH:D000001"
+    assert mapped["SALT FORM"].basis == "exact"
+
+
+def test_a_name_with_no_moiety_entry_is_unaffected() -> None:
+    entities = {"CARBOPLATIN": (Entity("MESH:D016190", "bk", "C", "Chemical", "Drug"),)}
+    mapped, _ = normalize.normalise(
+        ["CARBOPLATIN"], _repository(entities=entities), {}, "drugs", "Chemical", {}
+    )
+    assert mapped["CARBOPLATIN"].basis == "exact"
+
+
+def test_an_unresolvable_salt_is_rescued_by_its_moiety() -> None:
+    """54 of the 402 names P1 could not resolve are salts whose moiety the
+    graph does know."""
+    entities = {
+        "ACORAMIDIS HYDROCHLORIDE": (),
+        "ACORAMIDIS": (Entity("MESH:C000001", "bk", "Acoramidis", "Chemical", "Drug"),),
+    }
+    mapped, _ = normalize.normalise(
+        ["ACORAMIDIS HYDROCHLORIDE"],
+        _repository(entities=entities),
+        {},
+        "drugs",
+        "Chemical",
+        {"ACORAMIDIS HYDROCHLORIDE": _moiety("ACORAMIDIS HYDROCHLORIDE", "ACORAMIDIS")},
+    )
+    assert mapped["ACORAMIDIS HYDROCHLORIDE"].mesh_id == "MESH:C000001"

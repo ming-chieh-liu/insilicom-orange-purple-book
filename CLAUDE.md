@@ -94,6 +94,7 @@ unlinked event — this is what keeps recall auditable).
 | Orange Book | `fda_raw/orangebook/EOBZIP.zip` |
 | UNII | `fda_raw/unii/UNIIs.zip` |
 | MeSH | `/data/mliu/ontology_normalization_tp/external_data/MeSH/desc2026.xml` |
+| Moiety extract | `/space/feng/share/drug_label/drug_indication_market.csv.gz` (another team's; current labels only) |
 | CT.gov archive | `/data/mliu/insilicom-clinical_trials/final/output_raw` (manifest + 25 shards) |
 | Insilicom KG | `mongodb://galaxy3:27017`, db `biokde`, creds in `creds.json` (gitignored) |
 
@@ -116,6 +117,17 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - **Code names are separate concepts:** `MK-3475` → `MESH:M0586474`, not pembrolizumab's
   `MESH:C582435`. Fold code names in explicitly.
 - **Not everything has a MeSH descriptor:** semaglutide/Ozempic → `PubChem:CID56843331` only.
+- **The FDA names the salt, a trial names the moiety.** 723 of 2,270 resolved drugs are salts of a
+  different moiety, and where the graph gives the two different ids the drug matches *no* trials —
+  silently, because zero candidates looks like a drug whose trials were never registered.
+  `source/moiety.py` folds them. **Use only single-ingredient rows of the extract:** the
+  `active_ingredients` and `moiety_names` lists are semicolon-joined and do **not** correspond
+  positionally — zipping them pairs `.ALPHA.-LIPOIC ACID` with `.ALPHA.-KETOGLUTARIC ACID` and
+  makes 1,350 salts claim several moieties. **Never fold a biosimilar suffix** (the extract maps
+  `USTEKINUMAB-AEKN` → `USTEKINUMAB`, which would merge a biosimilar into its reference product).
+- **The MeSH term sweep does not understand negation.** `Non-Small Cell Lung Cancer` coded to
+  `D055752 Small Cell Lung Carcinoma` — the opposite disease — because `[a-z0-9]+` drops the `non-`
+  and MeSH writes *carcinoma* where labels write *cancer*. `indications.NEGATORS` guards it.
 - **`NA` is a literal placeholder id in the graph, not an identifier.** 90 FDA ingredients
   (acoltremon, acoramidis hydrochloride, anacaulase-bcdb…) all "resolve" to it. Keyed on that,
   every unidentified drug is the same drug — it inflated trial-intervention matches from 7,585 to

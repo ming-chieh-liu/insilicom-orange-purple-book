@@ -223,7 +223,9 @@ Supporting tables: `approval_events.tsv` (spine) · `label_trials.tsv` · the fo
 | Δ8 | §14 names trials by prose, not NCT | **OPEN — core problem** | 1/6 originals; 0.9% corpus-wide |
 | Δ9 | Narrow 600,762 trials to a judgeable set | **SOLVED** | 10–33 candidates |
 | Δ10 | Disambiguate within that set | **LIKELY SOLVED** | Enrollment distinct 5/5, zero collisions |
-| Δ11 | §14 states the enrollment count | **PARTIAL** | 7/11 with a crude regex |
+| Δ11 | §14 states the enrollment count | **MEASURED (P2)** | 9,697 of 22,666 descriptions state one |
+| Δ20 | FDA names the salt, trials name the moiety | **SOLVED (P1)** | `source/moiety.py`; 580 drugs now resolve via the moiety |
+| Δ21 | The term sweep inverts negated diseases | **SOLVED (P3)** | `indications.NEGATORS`; SCLC rows 155 → 21 |
 | Δ12 | Drug → MeSH across brand/INN/code | **SOLVED (P1)** | Synonym expansion folds them: `Keytruda`, `MK3475`, `PEMBROLIZUMAB` all → `MESH:C582435` |
 | Δ13 | Condition → MeSH | **SOLVED (P1)** | `M`→`D` rollup from `desc2026.xml`; `Gastric Cancer` and `Stomach Neoplasms` both → `MESH:D013274` |
 | Δ14 | Drugs with no MeSH descriptor | **HANDLED (P1)** | Kept under their own vocabulary, prefix and all — 1,341 of 2,270. Both sides use the same id, so the join still fires |

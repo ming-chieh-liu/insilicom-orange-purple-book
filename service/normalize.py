@@ -45,6 +45,7 @@ from config.settings import RawData, TrialArchive
 from dao.biokde import BiokdeRepository, Entity
 from service import approval_events, identity_census
 from source import trial_studies
+from source.moiety import Moiety
 from source.raw_table import read_rows
 from utility import application_number as appno
 from utility.logging import get_logger
@@ -220,19 +221,40 @@ def normalise(
     concepts: dict[str, str],
     label: str,
     entity_type: str = "",
+    moieties: dict[str, Moiety] | None = None,
 ) -> tuple[dict[str, Mapping], Coverage]:
     """Resolve ``names`` to one entity each, rolling MeSH concepts up.
 
     ``entity_type`` restricts which kind of entity may answer — passing
     ``Disease`` stops a condition matching a chemical of the same name, which
     the graph is full of.
+
+    ``moieties`` adds the active moiety as a second thing to ask about. The FDA
+    writes the salt it formulates — ``ESOMEPRAZOLE MAGNESIUM`` — and a trial
+    writes ``esomeprazole``; where the graph gives those different ids, the
+    drug matches no trials at all, and does so silently. Both spellings are
+    asked for and :func:`preferred` picks between the answers, so the moiety
+    wins only when it is the better-vocabularied of the two.
     """
-    resolved = repository.resolve(names)
+    folded = moieties or {}
+    queries = list(names)
+    moiety_of: dict[str, str] = {}
+    for name in names:
+        record = folded.get(name.upper())
+        if record is not None:
+            moiety_of[name] = record.moiety
+            queries.append(record.moiety)
+    resolved = repository.resolve(queries)
     out: dict[str, Mapping] = {}
     rolled_up = non_mesh = 0
     for name in dict.fromkeys(names):
         candidates = tuple(
-            e for e in resolved.get(name, ()) if is_identifier(e.id)
+            e
+            for e in (
+                resolved.get(name, ())
+                + resolved.get(moiety_of.get(name, ""), ())
+            )
+            if is_identifier(e.id)
         )
         if entity_type:
             candidates = tuple(e for e in candidates if e.type == entity_type)
@@ -244,13 +266,20 @@ def normalise(
             rolled_up += 1
         if not rolled.startswith("MESH:"):
             non_mesh += 1
+        via_moiety = best in resolved.get(moiety_of.get(name, ""), ())
         out[name] = Mapping(
             name=name,
             mesh_id=rolled,
             biokdeid=best.biokdeid,
             official_name=best.official_name,
             entity_type=best.type,
-            basis="rolled-up" if rolled != best.id else "exact",
+            basis=(
+                "moiety"
+                if via_moiety
+                else "rolled-up"
+                if rolled != best.id
+                else "exact"
+            ),
         )
     asked = len(dict.fromkeys(names))
     coverage = Coverage(
@@ -412,6 +441,7 @@ def build(
     repository: BiokdeRepository,
     concepts: dict[str, str],
     indication_ids: list[str],
+    moieties: dict[str, Moiety] | None = None,
 ) -> NormalizeReport:
     """Run all four normalisation passes and report what each covered."""
     spine = approval_events.build(data)
@@ -421,7 +451,12 @@ def build(
     by_application = ingredients_of(data, applications)
     names = sorted({name for names in by_application.values() for name in names})
     drugs, drug_coverage = normalise(
-        names, repository, concepts, "FDA drug (active ingredient)", "Chemical"
+        names,
+        repository,
+        concepts,
+        "FDA drug (active ingredient)",
+        "Chemical",
+        moieties,
     )
     unresolved_applications = sum(
         1

@@ -287,6 +287,15 @@ DEFAULT_MESH_DESCRIPTORS = Path(
 )
 
 
+#: The structured label extract another team maintains: one row per label,
+#: carrying ``active_ingredients`` beside ``moiety_names`` and both their
+#: UNIIs. Used only to map a salt to the moiety a trial would name. Current
+#: labels only, so it says nothing about what any past submission approved.
+DEFAULT_MOIETY_EXTRACT = Path(
+    "/space/feng/share/drug_label/drug_indication_market.csv.gz"
+)
+
+
 #: Where the trial archive sits today. Overridable on the command line, because
 #: it is another project's output directory and not part of this repo.
 DEFAULT_TRIAL_ARCHIVE = Path(
@@ -296,6 +305,7 @@ DEFAULT_TRIAL_ARCHIVE = Path(
 
 __all__ = [
     "DEFAULT_MESH_DESCRIPTORS",
+    "DEFAULT_MOIETY_EXTRACT",
     "BiokdeConnection",
     "DEFAULT_TRIAL_ARCHIVE",
     "TAB",
