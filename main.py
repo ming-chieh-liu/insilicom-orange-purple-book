@@ -38,6 +38,7 @@ from dao.tsv_repository import TsvRepository
 from source import mesh_descriptors, moiety, trial_studies
 from service import (
     adjudication,
+    assemble,
     candidates,
     approval_events,
     approval_map,
@@ -77,6 +78,8 @@ MODES: dict[str, str] = {
     "identify-combine": "pair the judges' answer files in "
     "adjudication/identify_raw/ and report what needs a tiebreak",
     "identify-record": "validate and append judged identifications from --from",
+    "assemble": "join the units, the verdicts and the spine into "
+    "trial_submission_map.tsv and unlinked_submissions.tsv",
 }
 
 
@@ -255,6 +258,31 @@ def main(argv: list[str] | None = None) -> int:
             events_report.rows,
         )
         print(approval_events.render(events_report))
+        print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "assemble":
+        out_dir = Path(args.out)
+        if not (out_dir / "candidates.jsonl").is_file():
+            print(f"{out_dir / 'candidates.jsonl'} not found — run --mode candidates")
+            return 1
+        assemble_report = assemble.build(out_dir, Path(args.adjudication))
+        repository = TsvRepository(args.out)
+        repository.save(
+            "trial_submission_map",
+            ("nct_id", "application", "submission_type", "submission_no",
+             "approval_date", "action_type", "indication_mesh", "indication_term",
+             "drug_mesh", "trial_name", "label_enrollment", "registry_enrollment",
+             "evidence_tier", "evidence_source", "count_check"),
+            assemble_report.links,
+        )
+        repository.save(
+            "unlinked_submissions",
+            ("application", "submission_type", "submission_no", "approval_date",
+             "trial_name", "reason"),
+            assemble_report.unlinked,
+        )
+        print(assemble.render(assemble_report))
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 

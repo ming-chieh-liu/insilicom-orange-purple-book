@@ -151,8 +151,11 @@ reused unchanged.
 → `adjudication/verdicts.jsonl`, append-only and git-tracked. **Gate:** 200-unit pilot,
 disagreement <25%.
 
-**P5 — assembly.** Extend `service/approval_map.py` and `service/attribution.py`.
-→ `trial_submission_map.tsv` plus supporting tables. Every unlinked event gets a `reason`.
+**P5 — assembly.** *New: `service/assemble.py`.*
+→ `trial_submission_map.tsv` (2,477 links: 2,473 tier A, 4 tier B) plus
+`unlinked_submissions.tsv` (16,311 rows, every one with a `reason`).
+**Built 2026-09-16.** Coverage is 14.7% of trial-relevant submissions and rises as P4 completes —
+5,317 of the unlinked are simply `not_yet_judged`.
 
 **P6 — validation.** Score against the 2,209 label-cited NCT links.
 **Gate:** tier-A precision ≥90%.

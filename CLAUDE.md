@@ -47,11 +47,18 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
 - **D14 — the Insilicom KG is a cross-check and recall backstop**, not a required path.
+- **D17 — the tier is the count.** A judged link reaches tier A only when the label's patient count
+  and the registry's agree within 15%; otherwise tier B, with both counts in the row. A label that
+  states its own NCT id is tier A outright — the FDA said it, there is nothing to corroborate. This
+  exists because a unit keyed `TABLE 3` carried a label "count" of 3 (a table number the extractor
+  read as an enrollment) and its row was indistinguishable from CHECKMATE-648's 970 against 970.
 - **D16 — a trial is attributed to the EARLIEST submission whose label carries it.** Section 14 is
   cumulative: a subsection is added at the approval it supported and then never removed.
   KEYNOTE-087 appears on **37** separate Keytruda submissions, 2017-05-10 through 2026-07-10; it
   supported the first (classical Hodgkin lymphoma). Attributing it to all 37 would make the
   deliverable's central claim 36 times wrongly. Later appearances are context, not evidence.
+  **This applies to label-stated ids too, not only judged ones** — missing that branch linked
+  KEYNOTE-189 to supplements four years after the one it supported, 3,123 rows of it.
 
 ## Hard constraints
 
