@@ -76,6 +76,17 @@ class StudyFacts(NamedTuple):
     enrollment: str
     interventions: tuple[str, ...]
     conditions: tuple[str, ...]
+    #: MeSH ids ClinicalTrials.gov itself assigned, from
+    #: ``derivedSection.interventionBrowseModule.meshes`` — NLM's curation
+    #: rather than a name match, and present on 46% of studies. Prefixed here
+    #: (``MESH:D004837``) to match the id space the FDA side uses.
+    #:
+    #: **``ancestors`` is deliberately not read.** It walks the MeSH hierarchy
+    #: to the root — an epinephrine trial carries ``Hydrocarbons`` and a
+    #: polycystic-ovary trial carries ``Neoplasms`` — so matching on it joins a
+    #: drug to everything sharing a benzene ring. See D22.
+    derived_drug_mesh: tuple[str, ...] = ()
+    derived_condition_mesh: tuple[str, ...] = ()
 
 
 def _facts_of(document: dict[str, object]) -> StudyFacts | None:
@@ -113,6 +124,8 @@ def _facts_of(document: dict[str, object]) -> StudyFacts | None:
     )
     phases = design.get("phases")
     status = section("statusModule").get("startDateStruct")
+    derived = document.get("derivedSection")
+    derived = derived if isinstance(derived, dict) else {}
     return StudyFacts(
         nct_id=nct,
         brief_title=str(identification.get("briefTitle") or ""),
@@ -123,6 +136,30 @@ def _facts_of(document: dict[str, object]) -> StudyFacts | None:
         enrollment=count,
         interventions=interventions,
         conditions=conditions,
+        derived_drug_mesh=_browse_meshes(derived, "interventionBrowseModule"),
+        derived_condition_mesh=_browse_meshes(derived, "conditionBrowseModule"),
+    )
+
+
+def _browse_meshes(derived: dict[str, object], module: str) -> tuple[str, ...]:
+    """The ``meshes`` of one browse module, prefixed. ``ancestors`` is ignored.
+
+    >>> _browse_meshes({"m": {"meshes": [{"id": "D004837", "term": "x"}],
+    ...                       "ancestors": [{"id": "D006838", "term": "y"}]}}, "m")
+    ('MESH:D004837',)
+    >>> _browse_meshes({}, "m")
+    ()
+    """
+    block = derived.get(module)
+    if not isinstance(block, dict):
+        return ()
+    meshes = block.get("meshes")
+    if not isinstance(meshes, list):
+        return ()
+    return tuple(
+        f"MESH:{identifier}"
+        for item in meshes
+        if isinstance(item, dict) and (identifier := str(item.get("id") or ""))
     )
 
 

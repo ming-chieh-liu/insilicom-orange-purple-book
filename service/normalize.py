@@ -52,6 +52,31 @@ from utility.logging import get_logger
 
 _log = get_logger(__name__)
 
+#: Study-design vocabulary that is never the drug under test, however the
+#: graph has it indexed. These reach the synonym index because biokde is built
+#: by entity recognition over PubMed and the model occasionally tags an
+#: ordinary word as a chemical: ``Control`` is a synonym of
+#: ``MESH:D002707 Chlordiazepoxide`` with ``cnt=2``, against
+#: ``Chlordiazepoxide`` itself at 5,419. One such entry pulls every
+#: control-armed trial in the registry onto one drug.
+#:
+#: Only the **fallback** path needs this. The primary trial-side mapping is
+#: ClinicalTrials.gov's own ``derivedSection`` (D21), where NLM does not tag a
+#: control arm as a chemical. This guards the 54% of studies that have no
+#: derived MeSH and still go through the synonym index.
+DESIGN_WORDS: frozenset[str] = frozenset(
+    {
+        "control", "controls", "placebo", "placebos", "standard", "standards",
+        "test", "tests", "normal", "usual care", "standard of care",
+        "standard care", "best supportive care", "comparator", "active",
+        "active comparator", "vehicle", "sham", "dummy", "blank", "baseline",
+        "intervention", "treatment", "therapy", "drug", "study drug",
+        "study medication", "medication", "none", "no intervention",
+        "observation", "routine care", "conventional", "conventional therapy",
+        "saline", "carrier", "urine", "water",
+    }
+)
+
 #: Shortest synonym that may be matched. Below this the graph's abbreviations
 #: collide with arm labels, units and initials.
 MIN_SYNONYM_LENGTH: int = 4
@@ -331,18 +356,24 @@ def synonym_index(
         [identifier for identifier in mesh_ids if is_identifier(identifier)]
     )
     claims: dict[str, set[str]] = {}
+    dropped_design = 0
     for mesh_id, names in expanded.items():
         rolled = roll_up(mesh_id, concepts)
         for name in names:
+            folded = name.casefold()
+            if folded in DESIGN_WORDS:
+                dropped_design += 1
+                continue
             if len(name) >= MIN_SYNONYM_LENGTH:
-                claims.setdefault(name.casefold(), set()).add(rolled)
+                claims.setdefault(folded, set()).add(rolled)
     index = {name: next(iter(ids)) for name, ids in claims.items() if len(ids) == 1}
     dropped = len(claims) - len(index)
     _log.info(
-        "%d synonyms over %d ids (%d dropped as ambiguous)",
+        "%d synonyms over %d ids (%d ambiguous, %d study-design words dropped)",
         len(index),
         len(expanded),
         dropped,
+        dropped_design,
     )
     return index
 
@@ -605,6 +636,7 @@ def counted(mappings: dict[str, Mapping]) -> tuple[tuple[str, int], ...]:
 
 
 __all__ = [
+    "DESIGN_WORDS",
     "MIN_SYNONYM_LENGTH",
     "PLACEHOLDER_IDS",
     "PREFERRED_SUBTYPE",

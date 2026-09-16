@@ -453,3 +453,92 @@ def test_the_pass_shortlists_and_counts(
 
 def test_a_missing_input_file_yields_no_rows(tmp_path: Path) -> None:
     assert list(candidates._read_tsv(tmp_path / "absent.tsv")) == []
+
+
+# ---------------------------------------------------------------------------
+# Two sources for the trial side, in order
+# ---------------------------------------------------------------------------
+
+
+def _facts_with_derived(
+    nct: str,
+    interventions: tuple[str, ...] = (),
+    conditions: tuple[str, ...] = (),
+    drug_mesh: tuple[str, ...] = (),
+    condition_mesh: tuple[str, ...] = (),
+) -> trial_studies.StudyFacts:
+    return trial_studies.StudyFacts(
+        nct_id=nct, brief_title="t", org_study_id="", acronym="",
+        start_date="2015-01-01", phases=("PHASE3",), enrollment="100",
+        interventions=interventions, conditions=conditions,
+        derived_drug_mesh=drug_mesh, derived_condition_mesh=condition_mesh,
+    )
+
+
+def test_ctgov_own_mesh_is_used_when_present(patched_archive: None) -> None:
+    """NLM curated it; no name matching needed."""
+    archive = _Archive(
+        [_facts_with_derived("NCT1", drug_mesh=("MESH:D004837",))]
+    )
+    _, by_drug, _ = candidates.index_studies(archive, {}, {})  # type: ignore[arg-type]
+    assert by_drug["MESH:D004837"] == {"NCT1"}
+
+
+def test_the_synonym_index_covers_studies_with_no_derived_mesh(
+    patched_archive: None,
+) -> None:
+    """46% of studies have derived intervention MeSH, so the fallback carries
+    the majority."""
+    archive = _Archive([_facts_with_derived("NCT1", interventions=("Keytruda",))])
+    _, by_drug, _ = candidates.index_studies(
+        archive, {"keytruda": "MESH:C582435"}, {}  # type: ignore[arg-type]
+    )
+    assert by_drug["MESH:C582435"] == {"NCT1"}
+
+
+def test_both_sources_apply_to_the_same_study(patched_archive: None) -> None:
+    """Neither subsumes the other. CT.gov assigns MeSH; half the FDA side is
+    keyed on PubChem and can only be reached through the synonym index. Making
+    derived MeSH *replace* the fallback cut absolute recall from 2,604 to
+    2,253 while the rate appeared to rise, because the denominator shrank."""
+    archive = _Archive(
+        [
+            _facts_with_derived(
+                "NCT1",
+                interventions=("Somedrug",),
+                drug_mesh=("MESH:D004837",),
+            )
+        ]
+    )
+    _, by_drug, _ = candidates.index_studies(
+        archive, {"somedrug": "PubChem:CID1"}, {}  # type: ignore[arg-type]
+    )
+    assert by_drug["MESH:D004837"] == {"NCT1"}
+    assert by_drug["PubChem:CID1"] == {"NCT1"}
+
+
+def test_both_sources_feed_the_same_postings(patched_archive: None) -> None:
+    archive = _Archive(
+        [
+            _facts_with_derived("NCT1", drug_mesh=("MESH:C582435",)),
+            _facts_with_derived("NCT2", interventions=("Keytruda",)),
+        ]
+    )
+    _, by_drug, _ = candidates.index_studies(
+        archive, {"keytruda": "MESH:C582435"}, {}  # type: ignore[arg-type]
+    )
+    assert by_drug["MESH:C582435"] == {"NCT1", "NCT2"}
+
+
+def test_conditions_follow_the_same_rule(patched_archive: None) -> None:
+    archive = _Archive(
+        [
+            _facts_with_derived("NCT1", condition_mesh=("MESH:D002386",)),
+            _facts_with_derived("NCT2", conditions=("NSCLC",)),
+        ]
+    )
+    _, _, by_condition = candidates.index_studies(
+        archive, {}, {"nsclc": "MESH:D002289"}  # type: ignore[arg-type]
+    )
+    assert by_condition["MESH:D002386"] == {"NCT1"}
+    assert by_condition["MESH:D002289"] == {"NCT2"}

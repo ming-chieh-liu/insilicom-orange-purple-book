@@ -594,3 +594,47 @@ def test_an_unresolvable_salt_is_rescued_by_its_moiety() -> None:
         {"ACORAMIDIS HYDROCHLORIDE": _moiety("ACORAMIDIS HYDROCHLORIDE", "ACORAMIDIS")},
     )
     assert mapped["ACORAMIDIS HYDROCHLORIDE"].mesh_id == "MESH:C000001"
+
+
+# ---------------------------------------------------------------------------
+# The fallback path still needs a stop-list
+# ---------------------------------------------------------------------------
+
+
+def test_a_study_design_word_never_enters_the_synonym_index() -> None:
+    """biokde has `Control` as a synonym of MESH:D002707 Chlordiazepoxide with
+    cnt=2, against Chlordiazepoxide itself at 5,419 — an NER artefact. One such
+    entry pulls every control-armed trial in the registry onto one drug."""
+    repository = _FakeRepository(
+        synonyms={"MESH:D002707": frozenset({"Chlordiazepoxide", "Control", "Librium"})}
+    )
+    index = normalize.synonym_index(
+        ["MESH:D002707"], repository, {}  # type: ignore[arg-type]
+    )
+    assert "control" not in index
+    assert index["chlordiazepoxide"] == "MESH:D002707"
+    assert index["librium"] == "MESH:D002707"
+
+
+@pytest.mark.parametrize(
+    "word", ["control", "Placebo", "STANDARD", "usual care", "sham", "vehicle"]
+)
+def test_the_design_words_are_matched_case_insensitively(word: str) -> None:
+    repository = _FakeRepository(synonyms={"MESH:D1": frozenset({word, "Realdrug"})})
+    index = normalize.synonym_index(
+        ["MESH:D1"], repository, {}  # type: ignore[arg-type]
+    )
+    assert word.casefold() not in index
+    assert "realdrug" in index
+
+
+def test_a_real_drug_whose_name_merely_contains_a_design_word_survives() -> None:
+    """The list matches whole names, not substrings: 'Controlled-release
+    morphine' is a real formulation."""
+    repository = _FakeRepository(
+        synonyms={"MESH:D1": frozenset({"Controlled-release morphine"})}
+    )
+    index = normalize.synonym_index(
+        ["MESH:D1"], repository, {}  # type: ignore[arg-type]
+    )
+    assert "controlled-release morphine" in index

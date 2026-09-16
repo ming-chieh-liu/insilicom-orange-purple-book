@@ -225,7 +225,19 @@ answer is not in the candidate list. P4 cannot find what P3 did not offer, so ev
 ~6,700 remaining agent calls is spent against that ceiling. **All four fixes are in P1. None is in
 P4.** Ordered by leverage, with what each is expected to move.
 
-### 1 — Trial side reads `derivedSection`, not the biokde synonym index · **P1**
+### 1 — Trial side reads `derivedSection` **as well as** the biokde index · **P1** · DONE 2026-09-16
+
+**Result: shortlist recall 54.1% → 66.9%**, and 2,604 → 3,224 answers shortlisted.
+
+Written as *derivedSection instead of* the synonym index first, which lost ground: absolute hits
+fell to 2,253 while the rate appeared to rise to 62%, because units with no candidates drop out of
+the denominator. CT.gov assigns MeSH ids; half the FDA side is keyed on PubChem because the graph
+has no MeSH record for those drugs (F-P1-5), and those can only ever be reached through the synonym
+index. Both sources now index the same study, guarded by `DESIGN_WORDS` on the inferred one.
+
+---
+
+### 1 (original framing) — trial side reads `derivedSection`
 
 `source/trial_studies.py` currently parses only `protocolSection`. Add
 `derivedSection.interventionBrowseModule.meshes` and `conditionBrowseModule.meshes`, and make them

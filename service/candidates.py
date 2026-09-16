@@ -223,6 +223,14 @@ def index_studies(
     Returned as postings lists rather than a scan: 22,666 descriptions against
     600,762 studies is 13 billion comparisons done naively, and a dict of sets
     turns it into a set intersection per unit.
+
+    **Two sources, both applied.** ``derivedSection`` is ClinicalTrials.gov's
+    own MeSH assignment, curated by NLM and present on 46% of interventions and
+    79% of conditions. The biokde synonym index covers the rest *and* the
+    PubChem-keyed half of the FDA side, which no MeSH id can reach. Neither
+    subsumes the other, so a study is indexed under both. The synonym path is
+    guarded by :data:`service.normalize.DESIGN_WORDS`, because it is inferred
+    from entity recognition and has ``Control`` indexed as a chlordiazepoxide.
     """
     studies: dict[str, Candidate] = {}
     by_drug: dict[str, set[str]] = {}
@@ -241,14 +249,32 @@ def index_studies(
             conditions=";".join(facts.conditions)[:300],
             interventions=";".join(facts.interventions)[:300],
         )
+        # CT.gov's own curation first, the synonym index only where it is
+        # absent. NLM assigns MeSH to 46% of studies' interventions and 79% of
+        # their conditions, and does not tag a control arm as a chemical; the
+        # synonym index is inferred from PubMed entity recognition and does.
+        # See D21. Both feed the same postings lists, so a study indexed either
+        # way is retrievable the same way.
+        # BOTH sources, not either/or. Making derived MeSH *replace* the
+        # synonym index was tried and lost ground: CT.gov assigns MeSH ids,
+        # while half the FDA side is keyed on PubChem because the graph has no
+        # MeSH record for those drugs (F-P1-5). A PubChem-keyed drug can only
+        # ever be reached through the synonym index, so dropping it there cut
+        # absolute recall from 2,604 to 2,253 even as the rate appeared to
+        # rise. Indexing under both ids costs nothing and loses nothing --
+        # a study is retrievable by whichever vocabulary its drug resolved to.
+        for mesh in facts.derived_drug_mesh:
+            by_drug.setdefault(mesh, set()).add(facts.nct_id)
         for name in facts.interventions:
-            mesh = drug_of.get(name.casefold())
-            if mesh:
-                by_drug.setdefault(mesh, set()).add(facts.nct_id)
+            mesh_id = drug_of.get(name.casefold())
+            if mesh_id:
+                by_drug.setdefault(mesh_id, set()).add(facts.nct_id)
+        for mesh in facts.derived_condition_mesh:
+            by_condition.setdefault(mesh, set()).add(facts.nct_id)
         for name in facts.conditions:
-            mesh = condition_of.get(name.casefold())
-            if mesh:
-                by_condition.setdefault(mesh, set()).add(facts.nct_id)
+            mesh_id = condition_of.get(name.casefold())
+            if mesh_id:
+                by_condition.setdefault(mesh_id, set()).add(facts.nct_id)
     _log.info(
         "%d studies indexed; %d drug keys, %d condition keys",
         len(studies),
