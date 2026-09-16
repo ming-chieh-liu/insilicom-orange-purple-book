@@ -286,6 +286,12 @@ _PROPERTY = [
     "\tSubmissionPropertyTypeID",
     "125514\tORIG      \t1\tNull\t0",
 ]
+_PRODUCTS = [
+    "ApplNo\tProductNo\tForm\tStrength\tReferenceDrug\tDrugName"
+    "\tActiveIngredient\tReferenceStandard",
+    "125514\t001\tINJECTION\t100MG/4ML\t0\tKEYTRUDA\tPEMBROLIZUMAB\t0",
+]
+
 _APP_DOCS = [
     "ApplicationDocsID\tApplicationDocsTypeID\tApplNo\tSubmissionType"
     "\tSubmissionNo\tApplicationDocsTitle\tApplicationDocsURL\tApplicationDocsDate",
@@ -300,6 +306,7 @@ def corpus(tmp_path: Path) -> RawData:
     (root / "drugsfda").mkdir(parents=True)
     members = {
         "Applications.txt": _APPLICATIONS,
+        "Products.txt": _PRODUCTS,
         "Submissions.txt": _SUBMISSIONS,
         "SubmissionClass_Lookup.txt": _CLASS,
         "ActionTypes_Lookup.txt": _ACTIONS,
@@ -393,3 +400,90 @@ def test_the_limit_takes_the_newest_not_the_first(
     labels — a pilot that way reported 16.7% against a 90% gate."""
     report = section14.build(corpus, tmp_path / "cache", limit=1, parsers=1)
     assert report.submissions == 1
+
+
+# ---------------------------------------------------------------------------
+# The drug's own name is not a trial name
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("acronym", "own", "expected"),
+    [
+        ("ABILIFY 15", {"ABILIFY"}, True),
+        ("ALOXI 189", {"ALOXI"}, True),
+        ("KEYTRUDA 200", {"KEYTRUDA"}, True),
+        # A real trial name survives even when the drug is in the set.
+        ("KEYNOTE-189", {"KEYTRUDA"}, False),
+        ("CHECKMATE 227", {"OPDIVO"}, False),
+        # Nothing to compare against.
+        ("ABILIFY 15", set(), False),
+    ],
+)
+def test_an_acronym_starting_with_the_drugs_own_name_is_rejected(
+    acronym: str, own: set[str], expected: bool
+) -> None:
+    """Section 14 is full of dose-arm tables, and PDF extraction runs the brand
+    name into the numbers beside it. 51% of extracted trial names were this
+    shape before the guard."""
+    assert section14.is_own_drug_name(acronym, frozenset(own)) is expected
+
+
+def test_describe_trials_drops_the_drugs_own_name() -> None:
+    got = section14.describe_trials(
+        "NDA1",
+        "ORIG",
+        "1",
+        "14.1 Schizophrenia\nPatients on ABILIFY 15 and ABILIFY 30 were "
+        "compared in 400 patients.",
+        frozenset({"ABILIFY"}),
+    )
+    assert all(d.acronym == "" for d in got)
+
+
+def test_describe_trials_keeps_a_real_name_alongside(
+    ) -> None:
+    got = section14.describe_trials(
+        "NDA1",
+        "ORIG",
+        "1",
+        "14.1 Melanoma\nDRUGX was studied in KEYNOTE-006, enrolling 834 patients.",
+        frozenset({"DRUGX"}),
+    )
+    assert got[0].acronym == "KEYNOTE-006"
+
+
+def test_read_label_passes_the_own_names_through() -> None:
+    reading = section14.read_label(
+        "k",
+        "NDA1",
+        "ORIG",
+        "1",
+        "14 CLINICAL STUDIES\n14.1 Schizophrenia\nABILIFY 15 was given to "
+        "400 patients.\n16 HOW SUPPLIED\nx",
+        frozenset({"ABILIFY"}),
+    )
+    assert all(d.acronym == "" for d in reading.descriptions)
+
+
+def test_the_pass_collects_each_applications_own_names(
+    corpus: RawData, tmp_path: Path, stub_network: dict[str, str]
+) -> None:
+    """Read from Products.txt, both the brand name and the ingredient, so a
+    label writing either one in a table column is covered.
+
+    The filler is not decoration: a text shorter than
+    ``label_pdf.MIN_TEXT_CHARS`` is classified as a scan and never parsed, so
+    a terse fixture silently tests nothing.
+    """
+    stub_network["http://x/125514s000lbl.pdf"] = (
+        "1 INDICATIONS AND USAGE\nKEYTRUDA is indicated for melanoma.\n"
+        "2 DOSAGE AND ADMINISTRATION\n" + "Filler prose. " * 40 + "\n"
+        "14 CLINICAL STUDIES\n14.1 Melanoma\n"
+        "KEYTRUDA 200 was compared with KEYNOTE-006 in 834 patients.\n"
+        "16 HOW SUPPLIED\nx\n"
+    )
+    report = section14.build(corpus, tmp_path / "cache", parsers=1)
+    names = {d.acronym for d in report.descriptions}
+    assert "KEYNOTE-006" in names
+    assert "KEYTRUDA 200" not in names
