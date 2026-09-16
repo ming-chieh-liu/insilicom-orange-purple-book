@@ -12,19 +12,19 @@ from config.settings import BiokdeConnection
 from dao import biokde
 
 _ROWS: list[dict[str, str]] = [
-    {"name": "Keytruda", "id": "MESH:C582435", "official name": "Pembrolizumab",
+    {"name": "Keytruda", "id": "MESH:C582435", "biokdeid": "1", "official name": "Pembrolizumab",
      "type": "Chemical", "subtype": "Drug"},
-    {"name": "MK3475", "id": "MESH:C582435", "official name": "Pembrolizumab",
+    {"name": "MK3475", "id": "MESH:C582435", "biokdeid": "1", "official name": "Pembrolizumab",
      "type": "Chemical", "subtype": "Drug"},
-    {"name": "Keytruda", "id": "PubChem:SID187051801", "official name": "GTPL7499",
+    {"name": "Keytruda", "id": "PubChem:SID187051801", "biokdeid": "1", "official name": "GTPL7499",
      "type": "Chemical", "subtype": "Drug"},
     {"name": "Carboplatin", "id": "MESH:D016190", "biokdeid": "9999",
      "official name": "Carboplatin", "type": "Chemical", "subtype": "Drug"},
     # An id-less row, which the graph writes as the literal string "NA".
-    {"name": "Acoltremon", "id": "NA", "official name": "Acoltremon",
+    {"name": "Acoltremon", "id": "NA", "biokdeid": "1", "official name": "Acoltremon",
      "type": "Chemical", "subtype": "NA"},
     # A row with no id at all: must not be yielded as an entity.
-    {"name": "Broken", "id": "", "official name": "", "type": "Chemical",
+    {"name": "Broken", "id": "", "biokdeid": "1", "official name": "", "type": "Chemical",
      "subtype": "NA"},
 ]
 
@@ -221,3 +221,41 @@ def test_the_internal_node_id_is_retained(
     from a drug to its supporting literature must resolve the entity again."""
     got = repository.resolve(["Carboplatin"])
     assert got["Carboplatin"][0].biokdeid == "9999"
+
+
+def test_internal_ids_resolve_by_external_id(
+    repository: biokde.BiokdeRepository,
+) -> None:
+    """Indications arrive already coded to MeSH, so they never pass through a
+    name lookup and have no other route to the graph's internal id."""
+    assert repository.internal_ids(["MESH:D016190"]) == {"MESH:D016190": "9999"}
+
+
+def test_an_entity_with_no_internal_id_is_absent(
+    repository: biokde.BiokdeRepository,
+) -> None:
+    """Twenty of 1,259 indications are diseases the graph does not hold."""
+    assert repository.internal_ids(["MESH:D999999"]) == {}
+
+
+def test_a_placeholder_internal_id_is_not_invented(
+    collection: _Collection, repository: biokde.BiokdeRepository
+) -> None:
+    collection.rows.append(
+        {"name": "Odd", "id": "MESH:D000111", "biokdeid": "",
+         "official name": "Odd", "type": "Chemical", "subtype": "NA"}
+    )
+    assert "MESH:D000111" not in repository.internal_ids(["MESH:D000111"])
+
+
+def test_internal_ids_are_batched(collection: _Collection) -> None:
+    repository = biokde.BiokdeRepository(_Root(collection), BiokdeConnection())
+    repository.internal_ids([f"MESH:D{n:06d}" for n in range(biokde.BATCH + 3)])
+    assert len(collection.queries) == 2
+
+
+def test_blank_ids_are_not_asked_for(
+    collection: _Collection, repository: biokde.BiokdeRepository
+) -> None:
+    repository.internal_ids(["", "MESH:D016190"])
+    assert collection.queries[0]["id"]["$in"] == ["MESH:D016190"]
