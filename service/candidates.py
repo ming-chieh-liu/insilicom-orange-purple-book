@@ -40,6 +40,7 @@ NCT id are set aside as needing no judgement at all.
 from __future__ import annotations
 
 import csv
+from collections import Counter
 from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
@@ -54,6 +55,10 @@ _log = get_logger(__name__)
 #: Above this many candidates a unit is emitted but flagged: the shortlist is
 #: too long to be a comparison, and P4 should treat it as weak evidence.
 CANDIDATE_CAP: int = 40
+
+#: Where :func:`collapse` records the name it keyed on, so ``build`` and the
+#: P4 reader use the same one rather than each deriving it again.
+TRIAL_KEY: str = "trial_key"
 
 #: Trial phases that can support an approval. Phase 1 and 2 trials do support
 #: accelerated approvals, so nothing is excluded by phase alone — the field is
@@ -155,6 +160,7 @@ def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     where any sentence gave one — is what makes the unit judgeable.
     """
     best: dict[tuple[str, ...], dict[str, str]] = {}
+    seen_unnamed: Counter[tuple[str, str, str]] = Counter()
     for row in rows:
         # Acronym first, not the NCT id. A label names a trial by acronym in
         # every sentence that mentions it but gives the registry id in at most
@@ -162,6 +168,26 @@ def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
         # unit without the id then goes to a judge to identify a trial the
         # label had already identified.
         name = row.get("acronym") or row.get("nct_id") or row.get("heading") or ""
+        if not name:
+            # Neither a name nor a subsection heading: a pre-PLR label, or one
+            # whose Clinical Studies section is a single unnumbered block.
+            # Falling through to an empty key merges every such trial in the
+            # submission into one unit -- measured at 2,381 rows collapsing
+            # into 1,032, one of them swallowing eighteen distinct trials and
+            # keeping a single excerpt. The enrollment count separates them
+            # where the label states one, and a sequence number where it does
+            # not, so each description stays its own judgement.
+            submission = (
+                row["application"],
+                row["submission_type"],
+                row["submission_no"],
+            )
+            stated = row.get("enrollment") or ""
+            if stated:
+                name = f"n={stated}"
+            else:
+                seen_unnamed[submission] += 1
+                name = f"#{seen_unnamed[submission]}"
         key = (
             row["application"],
             row["submission_type"],
@@ -170,7 +196,10 @@ def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
         )
         held = best.get(key)
         if held is None:
-            best[key] = dict(row)
+            # The resolved name is written onto the row: build() and
+            # identification.read_units() both key on it, and recomputing it
+            # independently let two distinct units share a unit_id.
+            best[key] = {**row, TRIAL_KEY: name}
             continue
         # Prefer a stated NCT id, then a stated enrollment, then a longer
         # excerpt — in that order, because that is the order a judge needs them.
@@ -266,6 +295,7 @@ def shortlist(
 
 __all__ = [
     "CANDIDATE_CAP",
+    "TRIAL_KEY",
     "PHASES_KEPT",
     "Candidate",
     "CandidatesReport",
@@ -360,7 +390,7 @@ def build(
             sizes.append(len(shortlisted))
             if len(shortlisted) > CANDIDATE_CAP:
                 over_cap += 1
-        name = stated or row.get("acronym", "") or heading
+        name = row.get(TRIAL_KEY) or stated or row.get("acronym", "") or heading
         units.append(
             Unit(
                 unit_id=f"{key}|{name}"[:200],

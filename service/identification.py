@@ -117,9 +117,13 @@ def read_units(path: Path) -> list[dict[str, object]]:
         if not isinstance(candidates, list) or not candidates:
             continue
         seen += 1
+        # The same key P3 collapsed on, taken from the unit rather than
+        # rebuilt: an unnamed trial falls back to its enrollment count or a
+        # sequence number, and rederiving that here would merge distinct
+        # trials back together.
         key = (
             str(row.get("application") or ""),
-            str(row.get("acronym") or row.get("heading") or ""),
+            str(row.get("unit_id") or "").rsplit("|", 1)[-1],
         )
         held = by_trial.get(key)
         if held is None or str(row.get("approval_date") or "") < str(
