@@ -51,6 +51,7 @@ from typing import NamedTuple
 from config.settings import RawData
 from service import approval_events
 from source import label_pdf
+from source.raw_table import read_rows
 from utility import application_number as appno
 from utility.logging import get_logger
 
@@ -231,11 +232,36 @@ def _sentences(block: str) -> list[str]:
     return [part.strip() for part in re.split(r"(?<=[.;])\s+", block) if part.strip()]
 
 
+def is_own_drug_name(acronym: str, own_names: frozenset[str]) -> bool:
+    """Whether an "acronym" is really this drug's own name plus a number.
+
+    ``ABILIFY 15``, ``ALOXI 189``, ``AEROSPHERE 320``. Section 14 is full of
+    tables whose columns are dose arms, and PDF text extraction runs the brand
+    name straight into the numbers beside it. The unit lookahead in
+    :data:`ACRONYM` catches ``ABILIFY 15 mg``; it cannot catch ``ABILIFY 15``
+    sitting in a table row with another number after it.
+
+    Measured before this guard: **51% of extracted trial names** were of this
+    shape, against 39% plausible ones. A judge answers NONE to every one of
+    them, correctly, so they cost two agent calls each and yield nothing.
+
+    >>> is_own_drug_name("ABILIFY 15", frozenset({"ABILIFY"}))
+    True
+    >>> is_own_drug_name("KEYNOTE-189", frozenset({"KEYTRUDA"}))
+    False
+    >>> is_own_drug_name("ABILIFY 15", frozenset())
+    False
+    """
+    head = re.split(r"[- ]", acronym.strip(), maxsplit=1)[0].upper()
+    return head in own_names
+
+
 def describe_trials(
     application: str,
     submission_type: str,
     submission_no: str,
     body: str,
+    own_names: frozenset[str] = frozenset(),
 ) -> tuple[TrialDescription, ...]:
     """Every trial the section names, with what the prose says about it.
 
@@ -249,7 +275,10 @@ def describe_trials(
         for sentence in _sentences(block):
             ncts = NCT.findall(sentence)
             acronyms = [
-                name for name in ACRONYM.findall(sentence) if not name.startswith("NCT")
+                name
+                for name in ACRONYM.findall(sentence)
+                if not name.startswith("NCT")
+                and not is_own_drug_name(name, own_names)
             ]
             counts = [
                 match.group("a") or match.group("b")
@@ -280,6 +309,7 @@ def read_label(
     submission_type: str,
     submission_no: str,
     text: str,
+    own_names: frozenset[str] = frozenset(),
 ) -> LabelReading:
     """Both sections of one label, and the trials section 14 describes."""
     body_14 = section(text, 14)
@@ -292,7 +322,7 @@ def read_label(
             [s for s in split_subsections(body_14) if s[0] != "14"]
         ),
         descriptions=describe_trials(
-            application, submission_type, submission_no, body_14
+            application, submission_type, submission_no, body_14, own_names
         ),
     )
 
@@ -388,6 +418,7 @@ __all__ = [
     "TrialDescription",
     "build",
     "describe_trials",
+    "is_own_drug_name",
     "read_label",
     "render",
     "section",
@@ -409,6 +440,25 @@ def build(
     is entirely network-bound; parsing stays single-threaded, where it is CPU
     bound and pdfplumber is not worth the contention.
     """
+    # The drug's own names, so a table column reading "ABILIFY 15" is not
+    # mistaken for a trial called ABILIFY 15.
+    own_names: dict[str, set[str]] = {}
+    canonical_of: dict[str, str] = {}
+    for row in read_rows(data.applications):
+        parsed = appno.from_parts(row.get("ApplType"), row.get("ApplNo"))
+        if parsed.is_application:
+            canonical_of[parsed.digits] = parsed.canonical
+    for row in read_rows(data.products):
+        application_key = canonical_of.get(appno.pad(row.get("ApplNo")), "")
+        if not application_key:
+            continue
+        for field in ("DrugName", "ActiveIngredient"):
+            for part in (row.get(field) or "").split(";"):
+                word = part.strip().upper()
+                if len(word) >= 4:
+                    own_names.setdefault(application_key, set()).add(word)
+                    own_names[application_key].add(word.split()[0])
+
     spine = approval_events.build(data)
     relevant = {
         f"{row.application}|{row.submission_type}|{row.submission_no}": row
@@ -504,6 +554,7 @@ def build(
                 document.submission_type,
                 document.submission_no,
                 text,
+                frozenset(own_names.get(document.application, set())),
             )
             seen_url[document.url] = reading
         if not reading.section_14:

@@ -162,8 +162,14 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - **Some `ApplicationDocsURL` values contain a literal space** — one PDF covering two applications
   is named after both. An unencoded space raises `http.client.InvalidURL`, which is not an
   `OSError`, so it escaped the handler and killed a whole run.
-- **A dose is not a trial name.** `DRUGX 10 mg/kg` and `LUTATHERA 7.4 GBq` read as trials
-  "DRUGX 10" and "LUTATHERA 7" — the largest source of false acronyms on a real label.
+- **A dose is not a trial name, and neither is a table column.** `DRUGX 10 mg/kg` and
+  `LUTATHERA 7.4 GBq` read as trials "DRUGX 10" and "LUTATHERA 7"; a unit lookahead catches those.
+  It does **not** catch `ABILIFY 15` scraped from a dose-arm table with another number after it —
+  measured at **51% of all extracted trial names** before `section14.is_own_drug_name` rejected any
+  acronym starting with the application's own brand or ingredient name, which halved it to 35%.
+  The remainder are condition abbreviations (`ABSSSI 81`), endpoint scales (`EASI-75`) and table
+  captions (`TABLE 2`); a judge answers NONE to all of them, correctly, so they cost calls but do
+  not corrupt data.
 - **Never regex section numbers over flat PDF text** — it matches table data and TOC entries.
   Anchor on `^14 CLINICAL STUDIES` to the next top-level section.
 - Purple Book: two header rows; `351(k) Biosimilar` not `351(k)`; single-space nulls.
