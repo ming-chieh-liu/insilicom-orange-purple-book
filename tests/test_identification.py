@@ -306,3 +306,20 @@ def test_the_unit_id_shape() -> None:
         identification.unit_id_for("BLA125514", "SUPPL", "35", "KEYNOTE-189")
         == "BLA125514|SUPPL|35|KEYNOTE-189"
     )
+
+
+def test_a_unit_id_containing_an_equals_sign_still_parses(tmp_path: Path) -> None:
+    """A trial the label did not name is keyed on its enrollment count, so the
+    unit id itself contains '='. Splitting on the first one yields a truncated
+    id and an unparseable answer, and the unit vanishes without a warning —
+    thirteen of sixty did, in the first real run."""
+    path = tmp_path / "batch-001-A.txt"
+    path.write_text(
+        "BLA125516|ORIG|1|n=226 = NCT00026312\n"
+        "NDA019941|SUPPL|11|n=200 = NONE\n",
+        encoding="utf-8",
+    )
+    assert identification.read_judge_file(path) == {
+        "BLA125516|ORIG|1|n=226": "NCT00026312",
+        "NDA019941|SUPPL|11|n=200": "NONE",
+    }

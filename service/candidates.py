@@ -268,21 +268,15 @@ def shortlist(
 ) -> tuple[Candidate, ...]:
     """The studies that could have supported this approval.
 
-    Intersected on drug, narrowed by condition **only when that leaves
-    anything** — a heading coded to a parent concept would otherwise empty a
-    shortlist that the drug filter had got right — and bounded by the date,
-    which is the one hard fact: a trial cannot have supported an approval
-    granted before it began.
+    Intersected on drug, bounded by the date — the one hard fact, since a trial
+    cannot have supported an approval granted before it began — and narrowed by
+    condition only when the result would otherwise be too long to judge.
     """
     pool: set[str] = set()
     for mesh in drug_mesh:
         pool |= by_drug.get(mesh, set())
     if not pool:
         return ()
-    if indication_mesh:
-        narrowed = pool & by_condition.get(indication_mesh, set())
-        if narrowed:
-            pool = narrowed
     if approval_date:
         pool = {
             nct
@@ -290,6 +284,20 @@ def shortlist(
             if not studies[nct].start_date
             or studies[nct].start_date <= approval_date
         }
+    # Condition LAST, and only when the list is otherwise too long to judge.
+    #
+    # Applying it eagerly costs real answers. CHECKMATE-648 is in the registry
+    # as NCT03143153 with enrollment 970, exactly what the Opdivo label states,
+    # and it was filtered out: the trial registers its condition as esophageal
+    # squamous cell carcinoma where the label heading codes to something else,
+    # so the intersection kept two unrelated studies and dropped the right one.
+    # The drug and the date are hard facts; the condition is a coding agreement
+    # between two vocabularies that often disagree. So it narrows only when
+    # there is something to narrow, and never below a judgeable list.
+    if indication_mesh and len(pool) > CANDIDATE_CAP:
+        narrowed = pool & by_condition.get(indication_mesh, set())
+        if narrowed:
+            pool = narrowed
     return tuple(sorted((studies[nct] for nct in pool), key=lambda c: c.nct_id))
 
 

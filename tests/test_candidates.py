@@ -179,8 +179,28 @@ def test_a_study_with_no_start_date_is_kept(registry: _Registry) -> None:
     assert "NCT4" in {c.nct_id for c in got}
 
 
-def test_the_condition_narrows_the_pool(registry: _Registry) -> None:
+def test_the_condition_does_not_narrow_a_judgeable_list(
+    registry: _Registry,
+) -> None:
+    """CHECKMATE-648 is in the registry with the exact enrollment the label
+    states, and the condition filter dropped it: the trial registers
+    esophageal squamous cell carcinoma where the label heading codes to
+    something else. Drug and date are hard facts; the condition is an
+    agreement between two vocabularies that often disagree."""
     studies, by_drug, by_condition = registry
+    got = candidates.shortlist(
+        {"MESH:C582435"}, "MESH:D002289", "", studies, by_drug, by_condition
+    )
+    assert len(got) == 4
+
+
+def test_the_condition_narrows_a_list_too_long_to_judge() -> None:
+    """Only when there is something to narrow."""
+    studies = {
+        f"NCT{n}": _candidate(f"NCT{n}") for n in range(candidates.CANDIDATE_CAP + 10)
+    }
+    by_drug = {"MESH:C582435": set(studies)}
+    by_condition = {"MESH:D002289": {"NCT1", "NCT2"}}
     got = candidates.shortlist(
         {"MESH:C582435"}, "MESH:D002289", "", studies, by_drug, by_condition
     )

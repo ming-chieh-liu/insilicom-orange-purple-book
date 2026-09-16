@@ -345,7 +345,12 @@ def read_judge_file(path: Path) -> dict[str, str]:
     for line in path.read_text(encoding="utf-8").splitlines():
         if "=" not in line:
             continue
-        unit_id, _, answer = line.partition("=")
+        # Split on the LAST '=', not the first. A unit whose label gave no
+        # trial name is keyed on its enrollment count -- BLA125516|ORIG|1|n=226
+        # -- so partitioning on the first '=' yields unit_id "…|n" and answer
+        # "226 = NCT00026312", which fails validation and drops the unit
+        # silently. Thirteen of sixty went missing that way before this.
+        unit_id, _, answer = line.rpartition("=")
         unit_id, answer = unit_id.strip(), answer.strip()
         if unit_id and ANSWER.match(answer):
             out[unit_id] = answer

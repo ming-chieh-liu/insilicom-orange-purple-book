@@ -1,20 +1,57 @@
-{"unit_id": "NDA212516|ORIG|1|DPNP-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "BLA125277|ORIG|1|KALBITOR 27", "judge_a": "NCT00262080", "judge_b": "NCT00262080", "tiebreak": null, "final": "NCT00262080", "prompt_version": 1}
-{"unit_id": "NDA021227|SUPPL|12|TABLE 2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA022406|ORIG|1|RECORD 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA206088|ORIG|1|PSOR-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "BLA103846|SUPPL|5190|MYOBLOC 2", "judge_a": "NCT01994109", "judge_b": "NCT01994109", "tiebreak": null, "final": "NCT01994109", "prompt_version": 1}
-{"unit_id": "BLA103846|SUPPL|5190|MYOBLOC 400", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA202258|ORIG|1|SPRINT-2", "judge_a": "NCT00705432", "judge_b": "NCT00705432", "tiebreak": null, "final": "NCT00705432", "prompt_version": 1}
-{"unit_id": "NDA209394|ORIG|1|EXPEDITION-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA209394|SUPPL|19|EXPEDITION-8", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA215110|ORIG|1|EXPEDITION-8", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA217389|ORIG|1|ENHANCE-2", "judge_a": "NCT04542057", "judge_b": "NCT04542057", "tiebreak": null, "final": "NCT04542057", "prompt_version": 1}
-{"unit_id": "NDA220073|ORIG|1|ADVANCE-3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "BLA125514|SUPPL|16|KEYNOTE-087", "judge_a": "NCT02453594", "judge_b": "NCT02453594", "tiebreak": null, "final": "NCT02453594", "prompt_version": 1}
-{"unit_id": "NDA210238|ORIG|1|ADAPT-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA220305|ORIG|1|KOMET-001", "judge_a": "NCT04067336", "judge_b": "NCT04067336", "tiebreak": null, "final": "NCT04067336", "prompt_version": 1}
-{"unit_id": "NDA021368|ORIG|1|CIALIS 10", "judge_a": "NCT00547508", "judge_b": "NCT00547508", "tiebreak": null, "final": "NCT00547508", "prompt_version": 1}
-{"unit_id": "NDA218436|ORIG|1|REMIX-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA213137|ORIG|1|OXBRYTA 1", "judge_a": "NCT03036813", "judge_b": "NCT03036813", "tiebreak": null, "final": "NCT03036813", "prompt_version": 1}
-{"unit_id": "BLA761180|ORIG|1|EASI-75", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA205437|SUPPL|7|PSOR-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761044|ORIG|1|STUDY 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125514|SUPPL|30|KEYNOTE-170", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA022434|ORIG|1|STUDY 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA022485|ORIG|1|STUDY 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA201743|ORIG|1|STUDY 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA205098|ORIG|1|VANISH-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA208798|ORIG|1|RESPICLICK 113", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA208799|ORIG|1|RESPICLICK 232", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA219696|ORIG|1|ADAPT-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125554|SUPPL|106|CHECKMATE-648", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020969|ORIG|1|CTCL 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020969|ORIG|1|CTCL 3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA021345|SUPPL|4|VTE2 423", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA021345|SUPPL|4|VTE2 433", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA208401|ORIG|1|GISSI-3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125261|ORIG|1|STUDY 1", "judge_a": "NCT00267969", "judge_b": "NCT00267969", "tiebreak": null, "final": "NCT00267969", "prompt_version": 1}
+{"unit_id": "NDA021361|SUPPL|12|TARGET 3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA022516|ORIG|1|DPNP-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA202155|SUPPL|6|ADVANCE-3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA103909|SUPPL|5197|ASSENT-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA215431|ORIG|1|ICHD-3", "judge_a": "NCT03896009", "judge_b": "NCT03896009", "tiebreak": null, "final": "NCT03896009", "prompt_version": 1}
+{"unit_id": "BLA125514|SUPPL|170|FIGO 2014", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761467|ORIG|1|KEYNOTE-859", "judge_a": "NCT03675737", "judge_b": "NCT03675737", "tiebreak": null, "final": "NCT03675737", "prompt_version": 1}
+{"unit_id": "NDA206352|ORIG|1|AI424-397", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761055|SUPPL|40|SINUS-52", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020262|SUPPL|24|CA139-174", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020262|SUPPL|24|CA139-281", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA215256|ORIG|1|SUSTAIN 6", "judge_a": "NCT01720446", "judge_b": "NCT01720446", "tiebreak": null, "final": "NCT01720446", "prompt_version": 1}
+{"unit_id": "NDA216579|ORIG|1|AEROSPHERE 320", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA213978|ORIG|1|ONSET-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA213978|ORIG|1|ONSET-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125514|SUPPL|132|KEYNOTE-051", "judge_a": "NCT02332668", "judge_b": "NCT02332668", "tiebreak": null, "final": "NCT02332668", "prompt_version": 1}
+{"unit_id": "BLA761467|ORIG|1|KEYNOTE-051", "judge_a": "NCT02332668", "judge_b": "NCT02332668", "tiebreak": null, "final": "NCT02332668", "prompt_version": 1}
+{"unit_id": "BLA022458|ORIG|1|Study 1: Trial of ELELYSO as Initial Therapy", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125476|ORIG|1|Clinical Studies in Ulcerative Colitis", "judge_a": "NCT00783718", "judge_b": "NCT00783718", "tiebreak": null, "final": "NCT00783718", "prompt_version": 1}
+{"unit_id": "BLA125504|SUPPL|1|Psoriatic Arthritis", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125521|SUPPL|19|Adult Plaque Psoriasis", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125521|SUPPL|4|Plaque Psoriasis", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761125|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (AMD)", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761143|ORIG|1|n=30", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761143|ORIG|1|n=84", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA019941|SUPPL|11|TABLE 2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA019941|SUPPL|11|n=200", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA019941|SUPPL|11|n=320", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA019941|SUPPL|11|n=44", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA019941|SUPPL|11|n=72", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA019941|SUPPL|11|n=80", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020220|SUPPL|54|Intra-Arterial Studies", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020220|SUPPL|54|Intravenous Studies", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020220|SUPPL|54|RADS 3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020757|SUPPL|21|n=1715", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020757|SUPPL|21|n=1915", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020838|ORIG|1|n=2350", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020908|ORIG|1|n=159", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA020908|ORIG|1|n=230", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
