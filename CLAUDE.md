@@ -125,6 +125,18 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - `placebo` → `MESH:D010919`; exclude from intervention matching.
 - **Label PDFs: use `https://` and follow redirects.** The `http://` URLs in `ApplicationDocs.txt`
   return nothing.
+- **Not every label has a section 14, and that is not a bug.** 90.5% of labels for 2008+ approvals
+  carry one; 59.0% for 2000-2007 and 42.3% for pre-2000. The rest head `CLINICAL PHARMACOLOGY` or
+  `NONCLINICAL TOXICOLOGY` instead — pharmacology, not efficacy trials. Corpus-wide the rate is
+  84.0%.
+- **Section boundaries need three capital letters, not four.** Section 16 is `HOW SUPPLIED/STORAGE
+  AND HANDLING` and section 8 is `USE IN SPECIFIC POPULATIONS`; requiring four let section 14 run
+  on into 15, 16 and 17.
+- **Some `ApplicationDocsURL` values contain a literal space** — one PDF covering two applications
+  is named after both. An unencoded space raises `http.client.InvalidURL`, which is not an
+  `OSError`, so it escaped the handler and killed a whole run.
+- **A dose is not a trial name.** `DRUGX 10 mg/kg` and `LUTATHERA 7.4 GBq` read as trials
+  "DRUGX 10" and "LUTATHERA 7" — the largest source of false acronyms on a real label.
 - **Never regex section numbers over flat PDF text** — it matches table data and TOC entries.
   Anchor on `^14 CLINICAL STUDIES` to the next top-level section.
 - Purple Book: two header rows; `351(k) Biosimilar` not `351(k)`; single-space nulls.

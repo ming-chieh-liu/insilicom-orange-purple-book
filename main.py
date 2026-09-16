@@ -43,6 +43,7 @@ from service import (
     identity_census,
     indications,
     normalize,
+    section14,
 )
 from utility.logging import configure
 
@@ -64,6 +65,8 @@ MODES: dict[str, str] = {
     "and report what still needs a tiebreak",
     "normalize": "map FDA drugs and indications, and the trial side, onto "
     "MeSH descriptors via the Insilicom graph",
+    "labels": "fetch each trial-relevant submission's archived label and read "
+    "its section 14 into trial descriptions",
 }
 
 
@@ -103,7 +106,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--limit",
         type=int,
         default=None,
-        help="adjudicate-prepare: only emit this many undecided units (pilot)",
+        help="adjudicate-prepare / labels: cap the units or submissions processed (pilot)",
     )
     parser.add_argument(
         "--from",
@@ -115,6 +118,23 @@ def build_parser() -> argparse.ArgumentParser:
         "--adjudication",
         default="adjudication",
         help="directory holding units.jsonl and the curated verdicts.jsonl",
+    )
+    parser.add_argument(
+        "--label-cache",
+        default="fda_raw/label_pdf",
+        help="where archived label PDFs are cached (gitignored, rebuildable)",
+    )
+    parser.add_argument(
+        "--workers",
+        type=int,
+        default=6,
+        help="labels: concurrent downloads (network-bound; parsing stays serial)",
+    )
+    parser.add_argument(
+        "--parsers",
+        type=int,
+        default=16,
+        help="labels: parallel PDF parsers (CPU-bound, so processes not threads)",
     )
     parser.add_argument(
         "--creds",
@@ -220,6 +240,34 @@ def main(argv: list[str] | None = None) -> int:
             events_report.rows,
         )
         print(approval_events.render(events_report))
+        print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "labels":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the labels need the bulk data tree")
+            return 1
+        labels_report = section14.build(
+            data,
+            Path(args.label_cache),
+            limit=args.limit,
+            workers=args.workers,
+            parsers=args.parsers
+        )
+        repository = TsvRepository(args.out)
+        repository.save(
+            "label_trials",
+            ("application", "submission_type", "submission_no", "section",
+             "heading", "nct_id", "acronym", "enrollment", "design", "excerpt"),
+            labels_report.descriptions,
+        )
+        repository.save(
+            "submission_indication_text",
+            ("application", "submission_type", "submission_no", "text"),
+            labels_report.indications,
+        )
+        print(section14.render(labels_report))
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 
