@@ -60,6 +60,14 @@ class Descriptor(NamedTuple):
     #: Positions in the hierarchy, e.g. ``("C04.588.180",)``. A descriptor may
     #: sit in several places; each is a full dotted path from a branch root.
     tree_numbers: tuple[str, ...]
+    #: The ``M``-prefixed concept ids this descriptor owns. MeSH numbers a
+    #: *concept* separately from the *descriptor* that heads it, and other
+    #: vocabularies cite either — biokde answers "Stomach Neoplasms" with
+    #: ``MESH:D013274`` but "Gastric Cancer" with ``MESH:M0333444``. Without
+    #: this, the same disease arrives under two ids and the join silently
+    #: fails. Last field, and defaulted, so positional construction keeps
+    #: working.
+    concept_uis: tuple[str, ...] = ()
 
     @property
     def is_disease(self) -> bool:
@@ -131,10 +139,31 @@ def read(vocabulary: MeshVocabulary) -> Iterator[Descriptor]:
                     for number in element.iter("TreeNumber")
                     if (number.text or "").strip()
                 ),
+                concept_uis=tuple(
+                    text
+                    for concept in element.findall("./ConceptList/Concept")
+                    if (text := (concept.findtext("ConceptUI") or "").strip())
+                ),
             )
         # iterparse builds the whole tree otherwise; 313 MB does not need to be
         # resident to read one record at a time.
         element.clear()
+
+
+def concept_to_descriptor(vocabulary: MeshVocabulary) -> dict[str, str]:
+    """Every ``M``-prefixed concept id → the ``D`` descriptor that heads it.
+
+    The rollup that makes two spellings of one disease join. A descriptor's own
+    ``D`` id maps to itself, so a caller can pass any MeSH id through this and
+    get a descriptor back or nothing.
+    """
+    out: dict[str, str] = {}
+    for descriptor in read(vocabulary):
+        out[descriptor.ui] = descriptor.ui
+        for concept in descriptor.concept_uis:
+            out[concept] = descriptor.ui
+    _log.info("%d MeSH ids roll up to a descriptor", len(out))
+    return out
 
 
 def diseases(vocabulary: MeshVocabulary) -> list[Descriptor]:
@@ -149,6 +178,7 @@ __all__ = [
     "MIN_TERM_LENGTH",
     "TERM_PATH",
     "Descriptor",
+    "concept_to_descriptor",
     "diseases",
     "read",
 ]

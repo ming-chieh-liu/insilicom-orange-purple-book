@@ -20,7 +20,9 @@ from __future__ import annotations
 
 import gzip
 import json
+from collections.abc import Iterator
 from pathlib import Path
+from typing import NamedTuple
 
 from config.settings import TrialArchive
 from utility.logging import get_logger
@@ -50,6 +52,110 @@ def _start_of(document: dict[str, object]) -> tuple[str, str]:
         if isinstance(struct, dict):
             start = str(struct.get("date") or "")
     return nct, start
+
+
+class StudyFacts(NamedTuple):
+    """The facts a section-14 trial description is matched against.
+
+    ``enrollment`` is the load-bearing one. Section 14 states a patient count
+    almost always — "conducted in 616 patients" — and within a candidate set
+    already narrowed by drug, condition, phase and date, that count is close to
+    unique: across five drug+condition sets spanning oncology and
+    non-oncology, every candidate had a distinct enrollment, with no
+    collisions. It is the field that turns a search into a comparison.
+    """
+
+    nct_id: str
+    brief_title: str
+    #: The sponsor's own protocol id, e.g. ``KEYNOTE-189``. Section 14 names
+    #: trials this way far more often than it gives an NCT id.
+    org_study_id: str
+    acronym: str
+    start_date: str
+    phases: tuple[str, ...]
+    enrollment: str
+    interventions: tuple[str, ...]
+    conditions: tuple[str, ...]
+
+
+def _facts_of(document: dict[str, object]) -> StudyFacts | None:
+    """One study's matchable facts, or ``None`` when it has no id."""
+    protocol = document.get("protocolSection")
+    if not isinstance(protocol, dict):
+        return None
+
+    def section(name: str) -> dict[str, object]:
+        value = protocol.get(name)
+        return value if isinstance(value, dict) else {}
+
+    identification = section("identificationModule")
+    nct = str(identification.get("nctId") or "")
+    if not nct:
+        return None
+    org = identification.get("orgStudyIdInfo")
+    design = section("designModule")
+    enrollment_info = design.get("enrollmentInfo")
+    count = ""
+    if isinstance(enrollment_info, dict) and enrollment_info.get("count") is not None:
+        count = str(enrollment_info["count"])
+    arms = section("armsInterventionsModule")
+    raw_interventions = arms.get("interventions")
+    interventions = tuple(
+        str(item.get("name") or "")
+        for item in (raw_interventions if isinstance(raw_interventions, list) else [])
+        if isinstance(item, dict) and item.get("name")
+    )
+    raw_conditions = section("conditionsModule").get("conditions")
+    conditions = tuple(
+        str(item)
+        for item in (raw_conditions if isinstance(raw_conditions, list) else [])
+        if item
+    )
+    phases = design.get("phases")
+    status = section("statusModule").get("startDateStruct")
+    return StudyFacts(
+        nct_id=nct,
+        brief_title=str(identification.get("briefTitle") or ""),
+        org_study_id=str(org.get("id") or "") if isinstance(org, dict) else "",
+        acronym=str(identification.get("acronym") or ""),
+        start_date=str(status.get("date") or "") if isinstance(status, dict) else "",
+        phases=tuple(str(p) for p in (phases if isinstance(phases, list) else [])),
+        enrollment=count,
+        interventions=interventions,
+        conditions=conditions,
+    )
+
+
+def read_study_facts(archive: TrialArchive) -> Iterator[StudyFacts]:
+    """Stream every study's matchable facts. A missing archive is silent.
+
+    Streamed rather than returned whole: 600,762 studies is more than any
+    caller needs resident, and every caller so far either indexes a projection
+    or filters on the way past.
+    """
+    shards = archive.study_shards
+    if not shards:
+        _log.warning("%s: no study shards (%s)", archive.root, archive.study_glob)
+        return
+    seen = 0
+    for shard in shards:
+        with gzip.open(shard, "rt", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    document = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(document, dict):
+                    continue
+                facts = _facts_of(document)
+                if facts is not None:
+                    seen += 1
+                    yield facts
+        _log.debug("%s: %d studies so far", shard.name, seen)
+    _log.info("%d studies from %d shards", seen, len(shards))
 
 
 def read_start_dates(archive: TrialArchive) -> dict[str, str]:
@@ -85,4 +191,4 @@ def read_start_dates(archive: TrialArchive) -> dict[str, str]:
     return dates
 
 
-__all__ = ["read_start_dates"]
+__all__ = ["StudyFacts", "read_start_dates", "read_study_facts"]

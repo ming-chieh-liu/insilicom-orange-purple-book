@@ -189,6 +189,41 @@ class RawData:
 
 
 @dataclass(frozen=True)
+class BiokdeConnection:
+    """How to reach the Insilicom knowledge graph. No client is built here.
+
+    ``pubmedEntitiesFlat`` is the synonym dictionary this project normalises
+    against: one row per (name, entity), carrying the entity's ``id`` — a
+    ``MESH:``, ``PubChem:`` or other prefixed identifier — its official name
+    and its type. Lookups on ``name`` are **case-sensitive** by default, which
+    silently loses ``keytruda``; the collection carries a case-insensitive
+    index under the collation below, and every name query must pass it.
+
+    Credentials live in a gitignored file rather than here. The file in this
+    repo names ``localhost`` but authenticates against the host below, so the
+    host is taken from this record and only the user and password from the file.
+    """
+
+    host: str = "galaxy3"
+    port: int = 27017
+    database: str = "biokde"
+    auth_source: str = "admin"
+    credentials: Path = Path("creds.json")
+    #: The collection holding one row per (synonym, entity).
+    entities: str = "pubmedEntitiesFlat"
+    #: Matches the ``name_1_type_1_ci`` index: strength 2 is case- and
+    #: accent-insensitive. A query without it does not use that index.
+    collation: tuple[str, int] = ("en", 2)
+    #: Seconds before a lookup gives up. The graph is another team's server.
+    timeout_ms: int = 8_000
+
+    @property
+    def has_credentials(self) -> bool:
+        """Whether the credentials file is present. It is gitignored."""
+        return self.credentials.is_file()
+
+
+@dataclass(frozen=True)
 class TrialArchive:
     """The local ClinicalTrials.gov archive, used only to validate NCT ids.
 
@@ -261,6 +296,7 @@ DEFAULT_TRIAL_ARCHIVE = Path(
 
 __all__ = [
     "DEFAULT_MESH_DESCRIPTORS",
+    "BiokdeConnection",
     "DEFAULT_TRIAL_ARCHIVE",
     "TAB",
     "TILDE",

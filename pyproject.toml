@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 # T0/T1 are stdlib-only: csv, re, datetime, zipfile, io, json, dataclasses.
 # Nothing is added without asking; the later parquet and Postgres sources
 # (Open Targets, DrugCentral) will need dependencies this env does not have.
-dependencies = []
+dependencies = ["pymongo>=4.6"]
 
 [project.optional-dependencies]
 # Mirrored from environment.yml's pip block so `pip install -e .[dev]`

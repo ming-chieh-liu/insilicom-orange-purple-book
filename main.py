@@ -22,16 +22,19 @@ import json
 import logging
 import sys
 from pathlib import Path
+from typing import Any
 
 from config.settings import (
     DEFAULT_MESH_DESCRIPTORS,
     DEFAULT_TRIAL_ARCHIVE,
+    BiokdeConnection,
     MeshVocabulary,
     RawData,
     TrialArchive,
 )
+from dao.biokde import BiokdeRepository, connection_uri
 from dao.tsv_repository import TsvRepository
-from source import trial_studies
+from source import mesh_descriptors, trial_studies
 from service import (
     adjudication,
     approval_events,
@@ -39,6 +42,7 @@ from service import (
     attribution,
     identity_census,
     indications,
+    normalize,
 )
 from utility.logging import configure
 
@@ -58,6 +62,8 @@ MODES: dict[str, str] = {
     "adjudicate-record": "validate and append judged verdicts from --from",
     "adjudicate-combine": "pair the judges' answer files in adjudication/raw/ "
     "and report what still needs a tiebreak",
+    "normalize": "map FDA drugs and indications, and the trial side, onto "
+    "MeSH descriptors via the Insilicom graph",
 }
 
 
@@ -109,6 +115,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--adjudication",
         default="adjudication",
         help="directory holding units.jsonl and the curated verdicts.jsonl",
+    )
+    parser.add_argument(
+        "--creds",
+        default="creds.json",
+        help="credentials file for the Insilicom graph (gitignored)",
     )
     parser.add_argument(
         "--verbose",
@@ -210,6 +221,58 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(approval_events.render(events_report))
         print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "normalize":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — normalisation needs the bulk data tree")
+            return 1
+        connection = BiokdeConnection(credentials=Path(args.creds))
+        if not connection.has_credentials:
+            print(f"{connection.credentials} not found — pass --creds")
+            return 1
+        vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
+        if not vocabulary.exists:
+            print(f"{vocabulary.descriptors} not found — pass --mesh")
+            return 1
+        indications_tsv = Path(args.out) / "indications.tsv"
+        if not indications_tsv.is_file():
+            print(f"{indications_tsv} not found — run --mode indications first")
+            return 1
+        with indications_tsv.open(encoding="utf-8") as handle:
+            indication_ids = [
+                row["mesh_id"]
+                for row in csv.DictReader(handle, delimiter="\t")
+                if row.get("mesh_id")
+            ]
+        # One client per process: MongoClient is the pool. It is built here and
+        # injected, so nothing under service/ knows a host or a credential.
+        import pymongo
+
+        client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
+            connection_uri(connection),
+            serverSelectionTimeoutMS=connection.timeout_ms,
+        )
+        try:
+            graph = BiokdeRepository(client, connection)
+            concepts = mesh_descriptors.concept_to_descriptor(vocabulary)
+            archive = TrialArchive(root=Path(args.trial_archive))
+            normalize_report = normalize.build(
+                data, archive, graph, concepts, indication_ids
+            )
+        finally:
+            client.close()
+        repository_out = TsvRepository(args.out)
+        columns = ("name", "mesh_id", "official_name", "entity_type", "basis")
+        repository_out.save("drug_map", columns, normalize_report.drugs)
+        repository_out.save("indication_map", columns, normalize_report.indications)
+        repository_out.save("trial_drug_map", columns, normalize_report.trial_drugs)
+        repository_out.save(
+            "trial_condition_map", columns, normalize_report.trial_conditions
+        )
+        print(normalize.render(normalize_report))
+        print(f"\nwritten to {repository_out.out_dir}/")
         return 0
 
     if args.mode == "attribute":

@@ -110,6 +110,18 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - **Code names are separate concepts:** `MK-3475` → `MESH:M0586474`, not pembrolizumab's
   `MESH:C582435`. Fold code names in explicitly.
 - **Not everything has a MeSH descriptor:** semaglutide/Ozempic → `PubChem:CID56843331` only.
+- **`NA` is a literal placeholder id in the graph, not an identifier.** 90 FDA ingredients
+  (acoltremon, acoramidis hydrochloride, anacaulase-bcdb…) all "resolve" to it. Keyed on that,
+  every unidentified drug is the same drug — it inflated trial-intervention matches from 7,585 to
+  44,874 before it was caught. Newer drugs are exactly the ones lacking an id, so this is not a
+  rare corner. `service.normalize.PLACEHOLDER_IDS`.
+- **The graph's `name` lookups are case-sensitive by default** — `keytruda` returns nothing while
+  `Keytruda` returns the drug. Every query must pass the `{en, strength 2}` collation, which is
+  also what makes it use the `name_1_type_1_ci` index.
+- **`indications.tsv` stores bare MeSH ids** (`D002137`); the graph stores them prefixed
+  (`MESH:D002137`). Asking with the bare form matches nothing and reports honest-looking zeros.
+- **`Products.txt` carries no `ApplType`**, so its rows cannot be keyed on their own — only
+  `Applications.txt` says whether 000001 is an NDA or an ANDA.
 - `placebo` → `MESH:D010919`; exclude from intervention matching.
 - **Label PDFs: use `https://` and follow redirects.** The `http://` URLs in `ApplicationDocs.txt`
   return nothing.

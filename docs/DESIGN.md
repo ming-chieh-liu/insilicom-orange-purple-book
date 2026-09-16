@@ -128,8 +128,9 @@ pooled, constructed once in `main.py`, injected. Build four mappings, each with 
 Resolve three measured traps: `M` concept ids must roll up to `D` descriptors; drugs with no MeSH
 descriptor need a fallback key (semaglutide → PubChem only); code names are separate concepts
 (`MK-3475` ≠ pembrolizumab's id). Exclude `placebo`.
-→ `drug_map.tsv`, `indication_map.tsv`, `trial_drug_map.tsv`, `trial_condition_map.tsv`,
-`normalization_coverage.tsv`. **Gate:** ≥80% of the 7,921 events resolve a drug; report the rest.
+→ `drug_map.tsv` (2,270), `indication_map.tsv` (1,259), `trial_drug_map.tsv` (7,585),
+`trial_condition_map.tsv` (13,824). **Gate:** ≥80% of trial-relevant applications resolve a drug —
+**met 2026-09-16 at 92.3%** (5,370 of 5,821).
 
 **P2 — label acquisition and §14 extraction.** *New: `source/label_pdf.py`,
 `service/section14.py`.* Download and cache type-2 PDFs; never refetch. Detect scans by `prntlbl`
@@ -223,9 +224,10 @@ Supporting tables: `approval_events.tsv` (spine) · `label_trials.tsv` · the fo
 | Δ9 | Narrow 600,762 trials to a judgeable set | **SOLVED** | 10–33 candidates |
 | Δ10 | Disambiguate within that set | **LIKELY SOLVED** | Enrollment distinct 5/5, zero collisions |
 | Δ11 | §14 states the enrollment count | **PARTIAL** | 7/11 with a crude regex |
-| Δ12 | Drug → MeSH across brand/INN/code | **PARTIAL** | Code names map to separate ids |
-| Δ13 | Condition → MeSH | **PARTIAL** | `M` ids must roll up to `D` |
-| Δ14 | Drugs with no MeSH descriptor | **OPEN** | semaglutide → PubChem only |
+| Δ12 | Drug → MeSH across brand/INN/code | **SOLVED (P1)** | Synonym expansion folds them: `Keytruda`, `MK3475`, `PEMBROLIZUMAB` all → `MESH:C582435` |
+| Δ13 | Condition → MeSH | **SOLVED (P1)** | `M`→`D` rollup from `desc2026.xml`; `Gastric Cancer` and `Stomach Neoplasms` both → `MESH:D013274` |
+| Δ14 | Drugs with no MeSH descriptor | **HANDLED (P1)** | Kept under their own vocabulary, prefix and all — 1,341 of 2,270. Both sides use the same id, so the join still fires |
+| Δ19 | `NA` is a placeholder id, not an identifier | **SOLVED (P1)** | Excluded by `PLACEHOLDER_IDS`; it had inflated trial matches 7,585 → 44,874 |
 | Δ15 | Enrollment semantics: analyzed vs enrolled | **OPEN** | Not yet measured |
 | Δ16 | A wrong identification fabricates an edge | **OPEN — design constraint** | Two judges + blameless `NONE` |
 | Δ17 | Pre-2005 trials unregistered | **WON'T FIX** | Hard ceiling |

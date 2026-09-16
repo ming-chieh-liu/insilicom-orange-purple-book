@@ -8,6 +8,7 @@ from pathlib import Path
 import pytest
 
 from config.settings import MeshVocabulary
+from source import mesh_descriptors
 from source.mesh_descriptors import (
     DISEASE_BRANCHES,
     MIN_TERM_LENGTH,
@@ -27,6 +28,7 @@ _XML = """<?xml version="1.0"?>
     <TreeNumberList><TreeNumber>C08.127.108</TreeNumber>
       <TreeNumber>C20.543.480.680.095</TreeNumber></TreeNumberList>
     <ConceptList><Concept>
+      <ConceptUI>M0001393</ConceptUI>
       <TermList>
         <Term><String>Asthma</String></Term>
         <Term><String>Bronchial Asthma</String></Term>
@@ -39,6 +41,7 @@ _XML = """<?xml version="1.0"?>
     <DescriptorName><String>Bipolar Disorder</String></DescriptorName>
     <TreeNumberList><TreeNumber>F03.084.100</TreeNumber></TreeNumberList>
     <ConceptList><Concept>
+      <ConceptUI>M0002344</ConceptUI>
       <TermList>
         <Term><String>Bipolar Disorder</String></Term>
         <Term><String>Manic Depression</String></Term>
@@ -179,3 +182,38 @@ def test_allowable_qualifiers_are_not_entry_terms(tmp_path: Path) -> None:
     assert terms == ("abdomen, acute", "acute abdomen")
     assert "drug therapy" not in terms
     assert "diagnosis" not in terms
+
+
+def test_concept_ids_are_read(vocabulary: MeshVocabulary) -> None:
+    """MeSH numbers a concept separately from the descriptor heading it, and
+    other vocabularies cite either."""
+    by_ui = {d.ui: d for d in mesh_descriptors.read(vocabulary)}
+    assert by_ui["D001249"].concept_uis == ("M0001393",)
+
+
+def test_a_descriptor_with_no_concept_ui_has_none(
+    vocabulary: MeshVocabulary,
+) -> None:
+    by_ui = {d.ui: d for d in mesh_descriptors.read(vocabulary)}
+    assert by_ui["D000068579"].concept_uis == ()
+
+
+def test_the_rollup_maps_concepts_to_their_descriptor(
+    vocabulary: MeshVocabulary,
+) -> None:
+    rollup = mesh_descriptors.concept_to_descriptor(vocabulary)
+    assert rollup["M0001393"] == "D001249"
+    assert rollup["M0002344"] == "D001714"
+
+
+def test_a_descriptor_maps_to_itself(vocabulary: MeshVocabulary) -> None:
+    """So a caller can pass any MeSH id through and get a descriptor or
+    nothing, without first asking which kind it holds."""
+    rollup = mesh_descriptors.concept_to_descriptor(vocabulary)
+    assert rollup["D001249"] == "D001249"
+
+
+def test_an_unknown_id_is_absent_from_the_rollup(
+    vocabulary: MeshVocabulary,
+) -> None:
+    assert "M9999999" not in mesh_descriptors.concept_to_descriptor(vocabulary)
