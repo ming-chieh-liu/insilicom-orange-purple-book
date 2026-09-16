@@ -34,6 +34,7 @@ from config.settings import (
     TrialArchive,
 )
 from dao.biokde import BiokdeRepository, connection_uri
+from dao.graph_evidence import GraphEvidenceRepository
 from dao.tsv_repository import TsvRepository
 from source import mesh_descriptors, moiety, trial_studies
 from service import (
@@ -46,6 +47,7 @@ from service import (
     identity_census,
     identification,
     indications,
+    graph_links,
     normalize,
     section14,
     validate,
@@ -83,6 +85,8 @@ MODES: dict[str, str] = {
     "trial_submission_map.tsv and unlinked_submissions.tsv",
     "validate": "score the map against the links the FDA states outright: "
     "shortlist recall now, judge precision with --limit",
+    "graph-links": "tier C: gather literature candidates from the Insilicom "
+    "graph for approvals the label route could not serve",
 }
 
 
@@ -262,6 +266,77 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(approval_events.render(events_report))
         print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "graph-links":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — tier C needs the bulk data tree")
+            return 1
+        out_dir = Path(args.out)
+        unlinked_path = out_dir / "unlinked_submissions.tsv"
+        if not unlinked_path.is_file():
+            print(f"{unlinked_path} not found — run --mode assemble first")
+            return 1
+        connection = BiokdeConnection(credentials=Path(args.creds))
+        if not connection.has_credentials:
+            print(f"{connection.credentials} not found — pass --creds")
+            return 1
+        # Exactly what tiers A and B left behind, read rather than recomputed.
+        with unlinked_path.open(encoding="utf-8") as handle:
+            unserved = {
+                f"{row['application']}|{row['submission_type']}"
+                f"|{row['submission_no']}"
+                for row in csv.DictReader(handle, delimiter="\t")
+            }
+        archive = TrialArchive(root=Path(args.trial_archive))
+        studies = {
+            facts.nct_id: (facts.start_date, facts.enrollment, ";".join(facts.phases))
+            for facts in trial_studies.read_study_facts(archive)
+        }
+        spine_rows = approval_events.build(data)
+        ingredients = normalize.ingredients_of(
+            data,
+            frozenset(
+                row.application
+                for row in spine_rows.rows
+                if row.trial_relevant == "true"
+            ),
+        )
+        import pymongo
+
+        graph_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
+            connection_uri(connection),
+            serverSelectionTimeoutMS=connection.timeout_ms,
+        )
+        try:
+            graph_report = graph_links.build(
+                out_dir,
+                GraphEvidenceRepository(graph_client, connection),
+                studies,
+                unserved,
+                ingredients,
+                limit=args.limit,
+            )
+        finally:
+            graph_client.close()
+        units_path = Path(args.adjudication) / "graph_units.jsonl"
+        units_path.parent.mkdir(parents=True, exist_ok=True)
+        with units_path.open("w", encoding="utf-8") as handle:
+            for graph_unit in graph_report.units:
+                handle.write(
+                    json.dumps(
+                        {
+                            **graph_unit._asdict(),
+                            "candidates": [
+                                c._asdict() for c in graph_unit.candidates
+                            ],
+                        }
+                    )
+                    + "\n"
+                )
+        print(graph_links.render(graph_report))
+        print(f"\nwritten to {units_path}")
         return 0
 
     if args.mode == "validate":

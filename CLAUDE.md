@@ -46,7 +46,13 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 - **D10 — every row carries an evidence tier** (A/B/C).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
-- **D14 — the Insilicom KG is a cross-check and recall backstop**, not a required path.
+- **D14 — the Insilicom KG is tier C, and it is NOT optional.** It was scoped as "not a required
+  path" and therefore skipped, which was wrong: **4,539 trial-relevant approvals — every one before
+  2008, 57% of the set — have zero links from any other source.** Measured on 150 pre-2008
+  submissions: 95% resolve a drug id, only **31%** a disease id (the bottleneck is indication
+  coverage, not the graph), 29% have an edge and 16% yield a registry id, median 2 candidates.
+  A tier-C link is never promoted above C however confident the judges are — the question they
+  answer ("is this plausibly the evidence") is weaker than P4's.
 - **D18 — shortlist recall is the ceiling, and is measured separately from judge precision.**
   Currently **54.1%**: 2,209 of 4,813 known answers are not in their own shortlist, so no judge can
   ever find them. A shortlist failure looks exactly like a judging failure in the output —
@@ -88,6 +94,9 @@ P3 candidates   CT.gov (600,762) filtered by drug-MeSH + condition-MeSH + phase
                 + start < approval_date  -> 10-40 candidates
 P4 agents       4a identify (new) · 4b polarity (ALREADY BUILT)
 P5 assemble     tier A/B/C -> trial_submission_map.tsv + unlinked_submissions.tsv
+PC tier C       biokde edge -> pubmedRelations.locations -> pubmedDocs abstracts
+                -> regex NCT -> [AGENT] is any of these the evidence?
+                for the 4,539 pre-2008 approvals the label cannot serve
 P6 validate     against the 4,813 units whose label states its own NCT id:
                 shortlist recall (P3's ceiling, free) and judge precision (P4's score)
 ```

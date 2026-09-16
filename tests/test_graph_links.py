@@ -1,0 +1,402 @@
+"""Tests for tier C: literature candidates where the label serves nothing."""
+
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any
+
+import pytest
+
+from dao import graph_evidence
+from service import graph_links
+
+
+def _mention(nct: str, pmid: str, kinds: tuple[str, ...] = ()) -> graph_evidence.Mention:
+    return graph_evidence.Mention(
+        nct_id=nct, pmid=pmid, title=f"Paper {pmid}", publication_types=kinds
+    )
+
+
+# ---------------------------------------------------------------------------
+# Reading the edge
+# ---------------------------------------------------------------------------
+
+
+class _Collection:
+    def __init__(self, rows: list[dict[str, Any]]) -> None:
+        self.rows = rows
+        self.queries: list[dict[str, Any]] = []
+
+    def find(
+        self, query: dict[str, Any], _projection: dict[str, int] | None = None
+    ) -> list[dict[str, Any]]:
+        self.queries.append(query)
+        if "$or" in query:
+            wanted = {
+                (c["node_one_id"], c["node_two_id"]) for c in query["$or"]
+            }
+            return [
+                r
+                for r in self.rows
+                if (r["node_one_id"], r["node_two_id"]) in wanted
+            ]
+        return list(self.rows)
+
+    def find_one(
+        self, query: dict[str, Any], _projection: dict[str, int]
+    ) -> dict[str, Any] | None:
+        for row in self.rows:
+            if row.get("pmid") == query.get("pmid"):
+                return row
+        return None
+
+
+class _Database:
+    def __init__(self, relations: _Collection, documents: _Collection) -> None:
+        self._map = {"pubmedRelations": relations, "pubmedDocs": documents}
+
+    def __getitem__(self, name: str) -> _Collection:
+        return self._map[name]
+
+
+class _Client:
+    def __init__(self, database: _Database) -> None:
+        self._database = database
+
+    def __getitem__(self, _name: str) -> _Database:
+        return self._database
+
+
+def _repository(
+    relations: list[dict[str, Any]], documents: list[dict[str, Any]]
+) -> graph_evidence.GraphEvidenceRepository:
+    from config.settings import BiokdeConnection
+
+    return graph_evidence.GraphEvidenceRepository(
+        _Client(_Database(_Collection(relations), _Collection(documents))),
+        BiokdeConnection(),
+    )
+
+
+def test_pmids_come_from_locations_not_context() -> None:
+    """`context` holds co-occurring entities and `contList` their ids; only
+    `locations` carries the PMIDs, formatted '<pmid>.<node_two>.<node_one>'."""
+    repo = _repository(
+        [
+            {
+                "node_one_id": "6308113",
+                "node_two_id": "55633",
+                "context": {"2765": {"contextInfo": ["99999999"]}},
+                "contList": ["2765"],
+                "locations": [["40419140.55633.6308113", 0.8]],
+            }
+        ],
+        [],
+    )
+    assert repo.pmids_for("6308113", "55633") == ["40419140"]
+
+
+def test_both_orientations_of_the_edge_are_asked_for() -> None:
+    """The graph does not guarantee which node is stored first."""
+    repo = _repository(
+        [
+            {
+                "node_one_id": "55633",
+                "node_two_id": "6308113",
+                "locations": [["12345678.6308113.55633", 0.9]],
+            }
+        ],
+        [],
+    )
+    assert repo.pmids_for("6308113", "55633") == ["12345678"]
+
+
+def test_an_edge_with_no_locations_yields_nothing() -> None:
+    repo = _repository(
+        [{"node_one_id": "a", "node_two_id": "b", "locations": []}], []
+    )
+    assert repo.pmids_for("a", "b") == []
+
+
+def test_registry_ids_are_mined_from_the_abstract() -> None:
+    """pubmedDocs carries no DataBankList, so the id has to come from prose."""
+    repo = _repository(
+        [],
+        [
+            {
+                "pmid": "1",
+                "abstract": "A randomized trial (NCT00000123) of the drug.",
+                "articleTitle": "A study",
+                "publicationType": ["randomized controlled trial"],
+            }
+        ],
+    )
+    found = repo.mentions_in(["1"])
+    assert [m.nct_id for m in found] == ["NCT00000123"]
+
+
+def test_a_missing_document_is_skipped_not_fatal() -> None:
+    repo = _repository([], [])
+    assert repo.mentions_in(["1", "2"]) == []
+
+
+@pytest.mark.parametrize(
+    ("kinds", "expected"),
+    [
+        (("randomized controlled trial",), True),
+        (("Clinical Trial, Phase III",), True),
+        (("review",), False),
+        (("case reports",), False),
+        ((), False),
+    ],
+)
+def test_publication_type_is_matched_case_insensitively(
+    kinds: tuple[str, ...], expected: bool
+) -> None:
+    """The graph lower-cases them, which a case-sensitive check silently
+    misses — it reported zero trial reports the first time."""
+    assert _mention("NCT1", "1", kinds).is_trial_report is expected
+
+
+# ---------------------------------------------------------------------------
+# Ranking
+# ---------------------------------------------------------------------------
+
+
+def test_a_trial_report_outranks_a_review() -> None:
+    ranked = graph_links.rank(
+        [
+            _mention("NCT2", "2", ("review",)),
+            _mention("NCT1", "1", ("randomized controlled trial",)),
+        ]
+    )
+    assert ranked[0].nct_id == "NCT1"
+
+
+def test_more_mentions_break_the_tie() -> None:
+    ranked = graph_links.rank(
+        [_mention("NCT1", "1"), _mention("NCT2", "2"), _mention("NCT2", "3")]
+    )
+    assert ranked[0].nct_id == "NCT2"
+    assert ranked[0].mentions == 2
+
+
+def test_mentions_of_one_trial_collapse_to_one_candidate() -> None:
+    ranked = graph_links.rank([_mention("NCT1", "1"), _mention("NCT1", "2")])
+    assert len(ranked) == 1
+
+
+def test_ranking_is_deterministic() -> None:
+    forward = graph_links.rank([_mention("NCT2", "1"), _mention("NCT1", "2")])
+    backward = graph_links.rank([_mention("NCT1", "2"), _mention("NCT2", "1")])
+    assert [c.nct_id for c in forward] == [c.nct_id for c in backward]
+
+
+# ---------------------------------------------------------------------------
+# The date bound
+# ---------------------------------------------------------------------------
+
+
+def _candidate(nct: str, start: str) -> graph_links.GraphCandidate:
+    return graph_links.GraphCandidate(
+        nct_id=nct, mentions=1, trial_report=True, example_pmid="1",
+        example_title="t", start_date=start, enrollment="100", phases="PHASE3",
+    )
+
+
+def test_a_trial_starting_after_the_approval_is_dropped() -> None:
+    """A trial cannot have supported an approval granted before it began."""
+    kept = graph_links.within_date(
+        [_candidate("NCT1", "2001-01-01"), _candidate("NCT2", "2009-01-01")],
+        "2004-05-01",
+    )
+    assert [c.nct_id for c in kept] == ["NCT1"]
+
+
+def test_a_candidate_with_no_start_date_is_kept() -> None:
+    """Missing data must not hide a real answer."""
+    kept = graph_links.within_date([_candidate("NCT1", "")], "2004-05-01")
+    assert len(kept) == 1
+
+
+def test_no_approval_date_bounds_nothing() -> None:
+    kept = graph_links.within_date([_candidate("NCT1", "2009-01-01")], "")
+    assert len(kept) == 1
+
+
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+
+
+def test_the_yield_rate() -> None:
+    assert graph_links.GraphReport((), 150, 142, 47, 43, 24, ()).yield_rate == 0.16
+
+
+def test_the_yield_rate_of_nothing_is_zero() -> None:
+    assert graph_links.GraphReport((), 0, 0, 0, 0, 0, ()).yield_rate == 0.0
+
+
+def test_the_report_shows_where_units_are_lost() -> None:
+    """Drug, disease and edge separately: on the pre-2008 sample 95% had a drug
+    id and only 31% a disease id, so the bottleneck is indication coverage
+    rather than the graph."""
+    rendered = graph_links.render(
+        graph_links.GraphReport((), 300, 258, 234, 200, 132, ((1, 13), (2, 21)))
+    )
+    assert "with a drug id" in rendered
+    assert "with a disease id" in rendered
+    assert "YIELDING CANDIDATES" in rendered
+
+
+# ---------------------------------------------------------------------------
+# The whole pass
+# ---------------------------------------------------------------------------
+
+
+_SPINE = (
+    "application\tapp_type\tsubmission_type\tsubmission_no\tsubmission_class"
+    "\taction_type\tapproval_date\tera\treview_priority\torphan"
+    "\tindication_changing\ttrial_relevant\n"
+    "NDA019640\tNDA\tSUPPL\t58\tEfficacy\tEfficacy-New Indication\t2006-11-01"
+    "\t2000-2007\t\tfalse\ttrue\ttrue\n"
+    "NDA000002\tNDA\tORIG\t1\tEfficacy\t\t2005-01-01\t2000-2007\t\tfalse"
+    "\ttrue\ttrue\n"
+)
+_DRUGS = (
+    "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
+    "SOMATROPIN\tMESH:D000068840\t6308113\tSomatropin\tChemical\texact\n"
+)
+_INDICATION_MAP = (
+    "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
+    "Turner Syndrome\tMESH:D014424\t55633\tTurner Syndrome\tDisease\texact\n"
+)
+_INDICATIONS = (
+    "application\tapp_type\tdrug\tunii\tmesh_id\tmesh_term\tevidence\n"
+    "NDA019640\tNDA\tSOMATROPIN\tX\tD014424\tTurner Syndrome\tlabel_section_1\n"
+)
+
+
+@pytest.fixture
+def workspace(tmp_path: Path) -> Path:
+    out = tmp_path / "output"
+    out.mkdir()
+    (out / "approval_events.tsv").write_text(_SPINE, encoding="utf-8")
+    (out / "drug_map.tsv").write_text(_DRUGS, encoding="utf-8")
+    (out / "indication_map.tsv").write_text(_INDICATION_MAP, encoding="utf-8")
+    (out / "indications.tsv").write_text(_INDICATIONS, encoding="utf-8")
+    return out
+
+
+def _graph(
+    relations: list[dict[str, Any]], documents: list[dict[str, Any]]
+) -> graph_evidence.GraphEvidenceRepository:
+    return _repository(relations, documents)
+
+
+def test_the_pass_gathers_candidates_for_an_unserved_approval(workspace: Path) -> None:
+    repo = _graph(
+        [
+            {
+                "node_one_id": "6308113",
+                "node_two_id": "55633",
+                "locations": [["1.55633.6308113", 0.9]],
+            }
+        ],
+        [
+            {
+                "pmid": "1",
+                "abstract": "A randomized trial NCT00000123 in Turner syndrome.",
+                "articleTitle": "Growth hormone trial",
+                "publicationType": ["randomized controlled trial"],
+            }
+        ],
+    )
+    report = graph_links.build(
+        workspace,
+        repo,
+        {"NCT00000123": ("2001-01-01", "540", "PHASE3")},
+        {"NDA019640|SUPPL|58"},
+        {"NDA019640": frozenset({"SOMATROPIN"})},
+    )
+    assert report.with_candidates == 1
+    unit = report.units[0]
+    assert unit.indication_term == "Turner Syndrome"
+    assert [c.nct_id for c in unit.candidates] == ["NCT00000123"]
+    assert unit.candidates[0].enrollment == "540"
+
+
+def test_only_the_unserved_are_considered(workspace: Path) -> None:
+    """Tier C works on exactly what tiers A and B left behind, read from
+    unlinked_submissions rather than recomputed, so it cannot quietly disagree
+    with them."""
+    repo = _graph([], [])
+    report = graph_links.build(
+        workspace, repo, {}, set(), {"NDA019640": frozenset({"SOMATROPIN"})}
+    )
+    assert report.events_considered == 0
+
+
+def test_an_approval_with_no_disease_id_is_counted_not_judged(workspace: Path) -> None:
+    """The measured bottleneck: 95% of pre-2008 approvals resolve a drug and
+    only 31% a disease."""
+    repo = _graph([], [])
+    report = graph_links.build(
+        workspace, repo, {}, {"NDA000002|ORIG|1"},
+        {"NDA000002": frozenset({"SOMATROPIN"})},
+    )
+    assert report.with_drug == 1
+    assert report.with_disease == 0
+    assert report.with_candidates == 0
+
+
+def test_a_candidate_starting_after_the_approval_never_reaches_a_judge(
+    workspace: Path,
+) -> None:
+    repo = _graph(
+        [
+            {
+                "node_one_id": "6308113",
+                "node_two_id": "55633",
+                "locations": [["1.55633.6308113", 0.9]],
+            }
+        ],
+        [
+            {
+                "pmid": "1",
+                "abstract": "Trial NCT00000999 began later.",
+                "articleTitle": "t",
+                "publicationType": ["randomized controlled trial"],
+            }
+        ],
+    )
+    report = graph_links.build(
+        workspace,
+        repo,
+        {"NCT00000999": ("2012-01-01", "100", "PHASE3")},
+        {"NDA019640|SUPPL|58"},
+        {"NDA019640": frozenset({"SOMATROPIN"})},
+    )
+    assert report.with_edge == 1
+    assert report.with_candidates == 0
+
+
+def test_the_abstract_budget_bounds_the_read(workspace: Path) -> None:
+    """The median edge cites 461 PMIDs and the largest 6,187, so a pass without
+    a budget is dominated by a handful of mega-drugs."""
+    repo = _graph(
+        [
+            {
+                "node_one_id": "6308113",
+                "node_two_id": "55633",
+                "locations": [[f"{n}.55633.6308113", 0.9] for n in range(50)],
+            }
+        ],
+        [],
+    )
+    report = graph_links.build(
+        workspace, repo, {}, {"NDA019640|SUPPL|58"},
+        {"NDA019640": frozenset({"SOMATROPIN"})}, budget=5,
+    )
+    assert report.units == ()
+    assert report.with_edge == 1
