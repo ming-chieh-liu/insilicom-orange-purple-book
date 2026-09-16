@@ -36,3 +36,8 @@ adjudication/batches/
 adjudication/units.jsonl
 adjudication/judged.jsonl
 adjudication/tiebreak_needed.txt
+
+# P4 judging units: rebuilt by --mode identify-prepare, not curated
+adjudication/identify_units.jsonl
+adjudication/identify_judged.jsonl
+adjudication/identify_tiebreak_needed.txt

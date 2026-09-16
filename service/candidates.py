@@ -294,19 +294,20 @@ def build(
     # spells them: case-folded, because a trial writes "Keytruda" where the
     # FDA writes "PEMBROLIZUMAB".
     drug_of = {
-        row["name"].casefold(): row["mesh_id"]
+        row["source_name"].casefold(): row["mesh_id"]
         for row in _read_tsv(out_dir / "trial_drug_map.tsv")
     }
     condition_of = {
-        row["name"].casefold(): row["mesh_id"]
+        row["source_name"].casefold(): row["mesh_id"]
         for row in _read_tsv(out_dir / "trial_condition_map.tsv")
     }
     exact_condition = {
-        row["name"].casefold(): row["mesh_id"]
+        row["source_name"].casefold(): row["mesh_id"]
         for row in _read_tsv(out_dir / "trial_condition_map.tsv")
     }
     fda_drug = {
-        row["name"]: row["mesh_id"] for row in _read_tsv(out_dir / "drug_map.tsv")
+        row["source_name"]: row["mesh_id"]
+        for row in _read_tsv(out_dir / "drug_map.tsv")
     }
 
     spine = approval_events.build(data)

@@ -92,14 +92,23 @@ def is_identifier(mesh_id: str) -> bool:
 
 
 class Mapping(NamedTuple):
-    """One source string and the entity it normalises to."""
+    """One source string and the entity it normalises to.
 
+    Written out as ``source_name, mesh_id, biokdeid, preferred_name,
+    entity_type, basis`` — three identifiers and two names in one row, so the
+    columns are named for what they hold rather than generically.
+    """
+
+    #: The string as the source wrote it: an FDA ingredient, a trial
+    #: intervention, or a MeSH preferred term for an indication.
     name: str
+    #: The external vocabulary id — ``MESH:``, ``PubChem:`` and others.
     mesh_id: str
     #: The graph's internal node id — the key ``pubmedRelations`` uses. Carried
     #: so P5 can walk drug → disease edges → supporting PMIDs without resolving
     #: every entity a second time.
     biokdeid: str
+    #: The entity's canonical name, for a human reading the table.
     official_name: str
     entity_type: str
     #: ``exact`` when the graph answered directly, ``rolled-up`` when a MeSH
@@ -396,6 +405,7 @@ def _match_trial_strings(
     index: dict[str, str],
     label: str,
     biokdeids: dict[str, str] | None = None,
+    names: dict[str, str] | None = None,
 ) -> tuple[tuple[Mapping, ...], Coverage]:
     """Map distinct trial strings through a synonym index.
 
@@ -418,7 +428,10 @@ def _match_trial_strings(
                     name=value,
                     mesh_id=mesh_id,
                     biokdeid=(biokdeids or {}).get(mesh_id, ""),
-                    official_name="",
+                    # Inherited from the FDA-side row that resolved this id: a
+                    # synonym-index row never went through a name lookup, so
+                    # without this the column is blank on every trial row.
+                    official_name=(names or {}).get(mesh_id, ""),
                     entity_type="",
                     basis="synonym",
                 )
@@ -442,6 +455,7 @@ def build(
     concepts: dict[str, str],
     indication_ids: list[str],
     moieties: dict[str, Moiety] | None = None,
+    descriptor_names: dict[str, str] | None = None,
 ) -> NormalizeReport:
     """Run all four normalisation passes and report what each covered."""
     spine = approval_events.build(data)
@@ -467,12 +481,20 @@ def build(
     indication_internal = repository.internal_ids(
         [roll_up(as_graph_id(i), concepts) for i in indication_ids]
     )
+    # An indication arrives as an id, never as a name, so without the MeSH
+    # preferred term both the name and official_name columns would hold the id
+    # back again and the table would be unreadable by a human.
+    titles = descriptor_names or {}
+
+    def _title(mesh_id: str) -> str:
+        return titles.get(mesh_id.removeprefix("MESH:"), "")
+
     rolled_indications = {
         mesh_id: Mapping(
-            name=mesh_id,
+            name=_title(roll_up(mesh_id, concepts)) or mesh_id,
             mesh_id=roll_up(mesh_id, concepts),
             biokdeid=indication_internal.get(roll_up(mesh_id, concepts), ""),
-            official_name="",
+            official_name=_title(roll_up(mesh_id, concepts)),
             entity_type="Disease",
             basis="rolled-up" if roll_up(mesh_id, concepts) != mesh_id else "exact",
         )
@@ -505,14 +527,26 @@ def build(
     # The graph's internal id, keyed by the external one, so a trial-side row
     # inherits the biokdeid its FDA-side counterpart already resolved.
     drug_biokdeids = {m.mesh_id: m.biokdeid for m in drugs.values() if m.biokdeid}
+    drug_names = {
+        m.mesh_id: m.official_name for m in drugs.values() if m.official_name
+    }
     trial_drugs, trial_drug_coverage = _match_trial_strings(
-        interventions, drug_index, "trial intervention", drug_biokdeids
+        interventions, drug_index, "trial intervention", drug_biokdeids, drug_names
     )
     condition_biokdeids = {
         m.mesh_id: m.biokdeid for m in rolled_indications.values() if m.biokdeid
     }
+    condition_names = {
+        m.mesh_id: m.official_name
+        for m in rolled_indications.values()
+        if m.official_name
+    }
     trial_conditions, trial_condition_coverage = _match_trial_strings(
-        conditions, condition_index, "trial condition", condition_biokdeids
+        conditions,
+        condition_index,
+        "trial condition",
+        condition_biokdeids,
+        condition_names,
     )
     return NormalizeReport(
         drugs=tuple(sorted(drugs.values())),

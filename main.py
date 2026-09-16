@@ -43,6 +43,7 @@ from service import (
     approval_map,
     attribution,
     identity_census,
+    identification,
     indications,
     normalize,
     section14,
@@ -71,6 +72,11 @@ MODES: dict[str, str] = {
     "its section 14 into trial descriptions",
     "candidates": "narrow the trial registry to a judgeable shortlist per "
     "section-14 description (needs --mode labels and --mode normalize first)",
+    "identify-prepare": "write adjudication/identify_units.jsonl, the trial "
+    "descriptions and their shortlists (see docs/runbooks/identify-trial.md)",
+    "identify-combine": "pair the judges' answer files in "
+    "adjudication/identify_raw/ and report what needs a tiebreak",
+    "identify-record": "validate and append judged identifications from --from",
 }
 
 
@@ -252,6 +258,85 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 
+    if args.mode == "identify-prepare":
+        out_dir = Path(args.out)
+        adjudication_dir = Path(args.adjudication)
+        units_source = out_dir / "candidates.jsonl"
+        if not units_source.is_file():
+            print(f"{units_source} not found — run --mode candidates first")
+            return 1
+        id_decided = identification.read_verdicts(
+            adjudication_dir / "identify_verdicts.jsonl"
+        )
+        id_prepare_pending = [
+            unit
+            for unit in identification.read_units(units_source)
+            if unit["unit_id"] not in id_decided
+        ]
+        id_chosen = identification.prioritise(id_prepare_pending, args.limit)
+        id_written = identification.write_units(
+            id_chosen, adjudication_dir / "identify_units.jsonl"
+        )
+        print(
+            f"{len(id_prepare_pending):,} undecided units; wrote {id_written:,} to "
+            f"{adjudication_dir / 'identify_units.jsonl'}\n"
+            f"next: follow docs/runbooks/identify-trial.md"
+        )
+        return 0
+
+    if args.mode == "identify-combine":
+        id_raw = Path(args.adjudication) / "identify_raw"
+        id_tiebreaks: dict[str, str] = {}
+        id_tie_file = id_raw / "id_tiebreaks.txt"
+        if id_tie_file.is_file():
+            id_tiebreaks = identification.read_judge_file(id_tie_file)
+        id_agreed: list[dict[str, object]] = []
+        id_pending: list[str] = []
+        id_absent: list[str] = []
+        for id_a_file in sorted(id_raw.glob("batch-*-A.txt")):
+            id_b_file = id_raw / id_a_file.name.replace("-A.txt", "-B.txt")
+            id_rows, id_needs, id_missing = identification.combine(
+                identification.read_judge_file(id_a_file),
+                identification.read_judge_file(id_b_file),
+                id_tiebreaks,
+            )
+            id_agreed.extend(id_rows)
+            id_pending.extend(id_needs)
+            id_absent.extend(id_missing)
+        id_out = Path(args.adjudication) / "identify_judged.jsonl"
+        with id_out.open("w", encoding="utf-8") as id_handle:
+            for id_row in id_agreed:
+                id_handle.write(json.dumps(id_row) + "\n")
+        print(f"paired {len(id_agreed):,} units -> {id_out}")
+        print(f"  needing a third judge  {len(id_pending):,}")
+        print(f"  answered by one judge  {len(id_absent):,}")
+        if id_pending:
+            id_listing = Path(args.adjudication) / "identify_tiebreak_needed.txt"
+            id_listing.write_text("\n".join(id_pending) + "\n", encoding="utf-8")
+            print(f"  -> {id_listing}")
+        return 0
+
+    if args.mode == "identify-record":
+        if not args.from_file:
+            print("--from is required: the JSONL of judged units")
+            return 1
+        adjudication_dir = Path(args.adjudication)
+        allowed = identification.candidate_ids_by_unit(
+            adjudication_dir / "identify_units.jsonl"
+        )
+        judged = identification.iter_json_lines(Path(args.from_file))
+        id_rec_written, id_rec_refused = identification.record_verdicts(
+            judged, adjudication_dir / "identify_verdicts.jsonl", allowed
+        )
+        print(f"recorded {id_rec_written:,} verdicts, refused {id_rec_refused:,}")
+        for name, count in identification.summarise(
+            identification.read_verdicts(
+                adjudication_dir / "identify_verdicts.jsonl"
+            )
+        ):
+            print(f"  {name:<20} {count:>7,}")
+        return 1 if id_rec_refused and not id_rec_written else 0
+
     if args.mode == "candidates":
         data = RawData(root=Path(args.fda_raw))
         if not data.exists:
@@ -348,17 +433,32 @@ def main(argv: list[str] | None = None) -> int:
         )
         try:
             graph = BiokdeRepository(client, connection)
-            concepts = mesh_descriptors.concept_to_descriptor(vocabulary)
+            concepts, descriptor_names = mesh_descriptors.rollup_and_names(
+                vocabulary
+            )
             archive = TrialArchive(root=Path(args.trial_archive))
             folded = moiety.read(Path(args.moiety))
             normalize_report = normalize.build(
-                data, archive, graph, concepts, indication_ids, folded
+                data,
+                archive,
+                graph,
+                concepts,
+                indication_ids,
+                folded,
+                descriptor_names,
             )
         finally:
             client.close()
         repository_out = TsvRepository(args.out)
+        # Named so a reader cannot mistake one column for another: the row
+        # holds three different identifiers plus two names, and an empty
+        # official_name once made 11542 look like the entity's name.
         columns = (
-            "name", "mesh_id", "biokdeid", "official_name", "entity_type",
+            "source_name",      # the string the source wrote
+            "mesh_id",          # external vocabulary id: MESH:/PubChem:/...
+            "biokdeid",         # the graph's INTERNAL node id, for edges
+            "preferred_name",   # the entity's canonical name
+            "entity_type",
             "basis",
         )
         repository_out.save("drug_map", columns, normalize_report.drugs)

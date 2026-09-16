@@ -166,6 +166,25 @@ def concept_to_descriptor(vocabulary: MeshVocabulary) -> dict[str, str]:
     return out
 
 
+def rollup_and_names(
+    vocabulary: MeshVocabulary,
+) -> tuple[dict[str, str], dict[str, str]]:
+    """``(concept -> descriptor, descriptor -> preferred name)`` in one pass.
+
+    Both are wanted together and the release is a 313 MB document, so reading
+    it twice to get them separately is a minute of nothing.
+    """
+    rollup: dict[str, str] = {}
+    names: dict[str, str] = {}
+    for descriptor in read(vocabulary):
+        rollup[descriptor.ui] = descriptor.ui
+        names[descriptor.ui] = descriptor.name
+        for concept in descriptor.concept_uis:
+            rollup[concept] = descriptor.ui
+    _log.info("%d MeSH ids roll up; %d descriptor names", len(rollup), len(names))
+    return rollup, names
+
+
 def diseases(vocabulary: MeshVocabulary) -> list[Descriptor]:
     """Every disease descriptor, in file order."""
     found = [descriptor for descriptor in read(vocabulary) if descriptor.is_disease]
@@ -180,5 +199,6 @@ __all__ = [
     "Descriptor",
     "concept_to_descriptor",
     "diseases",
+    "rollup_and_names",
     "read",
 ]
