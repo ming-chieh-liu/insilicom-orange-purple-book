@@ -347,13 +347,13 @@ def test_the_pass_shortlists_and_counts(
     )
     for name in ("trial_drug_map", "trial_condition_map"):
         (out / f"{name}.tsv").write_text(
-            "name\tmesh_id\tbiokdeid\tofficial_name\tentity_type\tbasis\n"
+            "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
             "Keytruda\tMESH:C582435\t6308113\t\t\tsynonym\n"
             "NSCLC\tMESH:D002289\t55633\t\t\tsynonym\n",
             encoding="utf-8",
         )
     (out / "drug_map.tsv").write_text(
-        "name\tmesh_id\tbiokdeid\tofficial_name\tentity_type\tbasis\n"
+        "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
         "PEMBROLIZUMAB\tMESH:C582435\t6308113\tPembrolizumab\tChemical\texact\n",
         encoding="utf-8",
     )
