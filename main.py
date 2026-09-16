@@ -48,6 +48,7 @@ from service import (
     indications,
     normalize,
     section14,
+    validate,
 )
 from utility.logging import configure
 
@@ -80,6 +81,8 @@ MODES: dict[str, str] = {
     "identify-record": "validate and append judged identifications from --from",
     "assemble": "join the units, the verdicts and the spine into "
     "trial_submission_map.tsv and unlinked_submissions.tsv",
+    "validate": "score the map against the links the FDA states outright: "
+    "shortlist recall now, judge precision with --limit",
 }
 
 
@@ -259,6 +262,45 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(approval_events.render(events_report))
         print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "validate":
+        out_dir = Path(args.out)
+        units_path = out_dir / "candidates.jsonl"
+        if not units_path.is_file():
+            print(f"{units_path} not found — run --mode candidates first")
+            return 1
+        recall = validate.shortlist_recall(units_path)
+        tiers = validate.tier_breakdown(out_dir / "trial_submission_map.tsv")
+        print(validate.render(recall, tiers))
+        if args.limit:
+            adjudication_dir = Path(args.adjudication)
+            truth = validate.withhold(
+                units_path,
+                adjudication_dir / "validate_units.jsonl",
+                args.limit,
+            )
+            truth_path = adjudication_dir / "validate_truth.json"
+            truth_path.write_text(json.dumps(truth, indent=2), encoding="utf-8")
+            precision, _ = validate.score(
+                truth, adjudication_dir / "identify_verdicts.jsonl"
+            )
+            print()
+            print(f"  withheld-answer units written to {truth_path.parent}")
+            print(f"    units                                  {len(truth):>9,}")
+            print(f"    judged so far                          {precision.scored:>9,}")
+            if precision.scored:
+                print(
+                    f"    correct                                "
+                    f"{precision.correct:>9,}  ({100 * precision.rate:.1f}% of "
+                    f"answers given)"
+                )
+                print(f"    wrong                                  {precision.wrong:>9,}")
+                print(
+                    f"    abstained                              "
+                    f"{precision.abstained:>9,}  "
+                    f"({100 * precision.abstention_rate:.1f}%)"
+                )
         return 0
 
     if args.mode == "assemble":

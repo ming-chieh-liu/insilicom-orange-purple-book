@@ -47,6 +47,11 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
 - **D14 — the Insilicom KG is a cross-check and recall backstop**, not a required path.
+- **D18 — shortlist recall is the ceiling, and is measured separately from judge precision.**
+  Currently **54.1%**: 2,209 of 4,813 known answers are not in their own shortlist, so no judge can
+  ever find them. A shortlist failure looks exactly like a judging failure in the output —
+  CHECKMATE-648 hid as one for two commits — so they are scored apart. Matching the label's trial
+  name against the registry's acronym recovers only 170 of the 2,209, so the gap is elsewhere.
 - **D17 — the tier is the count.** A judged link reaches tier A only when the label's patient count
   and the registry's agree within 15%; otherwise tier B, with both counts in the row. A label that
   states its own NCT id is tier A outright — the FDA said it, there is nothing to corroborate. This
@@ -83,7 +88,8 @@ P3 candidates   CT.gov (600,762) filtered by drug-MeSH + condition-MeSH + phase
                 + start < approval_date  -> 10-40 candidates
 P4 agents       4a identify (new) · 4b polarity (ALREADY BUILT)
 P5 assemble     tier A/B/C -> trial_submission_map.tsv + unlinked_submissions.tsv
-P6 validate     against the 2,209 label-cited NCT links
+P6 validate     against the 4,813 units whose label states its own NCT id:
+                shortlist recall (P3's ceiling, free) and judge precision (P4's score)
 ```
 
 **Why it works:** §14 rarely names an NCT but always describes the trial — design, population, and

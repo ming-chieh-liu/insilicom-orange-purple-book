@@ -157,8 +157,10 @@ disagreement <25%.
 **Built 2026-09-16.** Coverage is 14.7% of trial-relevant submissions and rises as P4 completes —
 5,317 of the unlinked are simply `not_yet_judged`.
 
-**P6 — validation.** Score against the 2,209 label-cited NCT links.
-**Gate:** tier-A precision ≥90%.
+**P6 — validation.** *New: `service/validate.py`.* Two numbers, scored apart because they fail
+differently: **shortlist recall** (P3's ceiling, free to compute — currently **54.1%**, 2,604 of
+4,813) and **judge precision** (P4's score, needs `--limit` to withhold answers and run judges).
+**Built 2026-09-16.** **Gate:** tier-A precision ≥90%, still to measure.
 
 ---
 
