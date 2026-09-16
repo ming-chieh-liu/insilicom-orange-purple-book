@@ -91,21 +91,47 @@ def unit_id_for(
 
 
 def read_units(path: Path) -> list[dict[str, object]]:
-    """Every unit P3 wrote that still needs a judge.
+    """Every unit P3 wrote that still needs a judge, one per trial.
 
-    A unit whose label stated its own NCT id is skipped here rather than
-    filtered later: sending it would spend two judge calls confirming something
-    the label already said.
+    A unit whose label stated its own NCT id is skipped: sending it would spend
+    two judge calls confirming what the label already said.
+
+    **And only the earliest submission carrying a trial is judged.** Section 14
+    is cumulative — a subsection is added at the approval it supported and then
+    never removed — so KEYNOTE-087 appears on 37 separate Keytruda submissions,
+    from 2017-05-10 through 2026-07-10. It supported the first of those, the
+    classical Hodgkin lymphoma approval; the other 36 carry it because the
+    label kept it, not because it was evidence for them.
+
+    Judging all 37 would spend 74 agent calls to reach one answer and then
+    assert that one trial supported 37 distinct approvals, which is the
+    deliverable's central claim made 36 times wrongly. Taking the earliest
+    drops 4,963 units to 3,007 and is the more defensible attribution: see D16.
     """
-    units: list[dict[str, object]] = []
+    by_trial: dict[tuple[str, str], dict[str, object]] = {}
+    seen = 0
     for row in iter_json_lines(path):
         if row.get("stated_nct"):
             continue
         candidates = row.get("candidates")
         if not isinstance(candidates, list) or not candidates:
             continue
-        units.append(row)
-    _log.info("%d units need a judge", len(units))
+        seen += 1
+        key = (
+            str(row.get("application") or ""),
+            str(row.get("acronym") or row.get("heading") or ""),
+        )
+        held = by_trial.get(key)
+        if held is None or str(row.get("approval_date") or "") < str(
+            held.get("approval_date") or ""
+        ):
+            by_trial[key] = row
+    units = list(by_trial.values())
+    _log.info(
+        "%d units carry a trial; %d distinct (application, trial) need a judge",
+        seen,
+        len(units),
+    )
     return units
 
 

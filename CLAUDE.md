@@ -47,6 +47,11 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
 - **D14 — the Insilicom KG is a cross-check and recall backstop**, not a required path.
+- **D16 — a trial is attributed to the EARLIEST submission whose label carries it.** Section 14 is
+  cumulative: a subsection is added at the approval it supported and then never removed.
+  KEYNOTE-087 appears on **37** separate Keytruda submissions, 2017-05-10 through 2026-07-10; it
+  supported the first (classical Hodgkin lymphoma). Attributing it to all 37 would make the
+  deliverable's central claim 36 times wrongly. Later appearances are context, not evidence.
 
 ## Hard constraints
 
@@ -143,6 +148,10 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - `placebo` → `MESH:D010919`; exclude from intervention matching.
 - **Label PDFs: use `https://` and follow redirects.** The `http://` URLs in `ApplicationDocs.txt`
   return nothing.
+- **Section 14 is cumulative, so a trial recurs on every later label.** 772 of 3,007
+  (application, trial) groups span more than one submission, covering 2,728 units. Judge the
+  earliest only — see D16 — or spend 39% of the agent budget re-deriving answers and then assert
+  links that do not exist.
 - **Not every label has a section 14, and that is not a bug.** 90.5% of labels for 2008+ approvals
   carry one; 59.0% for 2000-2007 and 42.3% for pre-2000. The rest head `CLINICAL PHARMACOLOGY` or
   `NONCLINICAL TOXICOLOGY` instead — pharmacology, not efficacy trials. Corpus-wide the rate is

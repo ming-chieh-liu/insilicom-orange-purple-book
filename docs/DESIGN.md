@@ -234,6 +234,7 @@ Supporting tables: `approval_events.tsv` (spine) · `label_trials.tsv` · the fo
 | Δ16 | A wrong identification fabricates an edge | **OPEN — design constraint** | Two judges + blameless `NONE` |
 | Δ17 | Pre-2005 trials unregistered | **WON'T FIX** | Hard ceiling |
 | Δ18 | Combination regimens many-to-many | **DECIDED** | One row per (trial, submission) |
+| Δ22 | §14 is cumulative, so a trial recurs on every later label | **SOLVED (P4)** | KEYNOTE-087 on 37 Keytruda submissions; earliest-wins (D16) cuts 4,963 units to 3,007 |
 
 ---
 
