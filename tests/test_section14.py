@@ -487,3 +487,18 @@ def test_the_pass_collects_each_applications_own_names(
     names = {d.acronym for d in report.descriptions}
     assert "KEYNOTE-006" in names
     assert "KEYTRUDA 200" not in names
+
+
+@pytest.mark.parametrize(
+    "written",
+    ["NCT01474512", "NCT 01474512", "NCT#01474512", "NCT:01474512", "NCT-01474512"],
+)
+def test_a_registry_id_is_found_however_the_label_spaces_it(written: str) -> None:
+    """Labels write 'NCT 01474512' as often as 'NCT01474512'. Requiring no
+    separator missed 40 rows that already stated their own answer, sending them
+    to a judge to identify a trial the label had named."""
+    got = section14.describe_trials(
+        "NDA1", "ORIG", "1",
+        f"14.1 Psoriasis\nThree trials ({written}) enrolled 3866 subjects.",
+    )
+    assert got[0].nct_id == "NCT01474512"

@@ -89,8 +89,12 @@ AFTER_1 = re.compile(r"(?m)^[ \t]*[2-9][ \t]+[A-Z]{3,}")
 #: capitalised title — ``14.2 Non-Small Cell Lung Cancer``.
 SUBSECTION = re.compile(r"(?m)^[ \t]*(14\.\d{1,2})[ \t]+([A-Z][^\n]{2,90})")
 
-#: A registry id, where the label happens to give one.
-NCT = re.compile(r"NCT\d{8}")
+#: A registry id, where the label happens to give one. The separator is
+#: optional because labels write ``NCT 01474512`` as often as ``NCT01474512``,
+#: and also ``NCT#``, ``NCT:`` and ``NCT-``. Requiring none missed 40 rows that
+#: already stated their answer, sending them to a judge to identify a trial the
+#: label had named. Matches are normalised by :func:`normalise_nct`.
+NCT = re.compile(r"NCT[\s:#-]{0,3}(\d{8})")
 
 #: Units and nouns that follow a dose or a duration, never a trial number.
 #: Without this, ``KEYTRUDA 10 mg/kg`` and ``LUTATHERA 7.4 GBq`` are read as
@@ -176,6 +180,15 @@ class LabelReading(NamedTuple):
     def has_section_14(self) -> bool:
         """Whether a Clinical Studies section was found at all."""
         return bool(self.section_14)
+
+
+def normalise_nct(digits: str) -> str:
+    """The canonical form of a registry id.
+
+    >>> normalise_nct("01474512")
+    'NCT01474512'
+    """
+    return f"NCT{digits}"
 
 
 def _bounded(text: str, start: re.Pattern[str], end: re.Pattern[str]) -> str:
@@ -273,7 +286,7 @@ def describe_trials(
     out: list[TrialDescription] = []
     for number, heading, block in split_subsections(body):
         for sentence in _sentences(block):
-            ncts = NCT.findall(sentence)
+            ncts = [normalise_nct(d) for d in NCT.findall(sentence)]
             acronyms = [
                 name
                 for name in ACRONYM.findall(sentence)
@@ -419,6 +432,7 @@ __all__ = [
     "build",
     "describe_trials",
     "is_own_drug_name",
+    "normalise_nct",
     "read_label",
     "render",
     "section",

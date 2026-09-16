@@ -1,4 +1,5 @@
-{"unit_id": "NDA205437|SUPPL|7|PSOR-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA203389|ORIG|1|TABLE 3", "judge_a": "NCT01733316", "judge_b": "NCT01733316", "tiebreak": null, "final": "NCT01733316", "prompt_version": 1}
+{"unit_id": "NDA205437|SUPPL|7|PSOR-1", "judge_a": "NCT01194219", "judge_b": "NCT01194219", "tiebreak": null, "final": "NCT01194219", "prompt_version": 1}
 {"unit_id": "BLA761044|ORIG|1|STUDY 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "BLA125514|SUPPL|30|KEYNOTE-170", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA022434|ORIG|1|STUDY 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
@@ -8,7 +9,7 @@
 {"unit_id": "NDA208798|ORIG|1|RESPICLICK 113", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA208799|ORIG|1|RESPICLICK 232", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA219696|ORIG|1|ADAPT-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "BLA125554|SUPPL|106|CHECKMATE-648", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA125554|SUPPL|106|CHECKMATE-648", "judge_a": "NCT03143153", "judge_b": "NCT03143153", "tiebreak": null, "final": "NCT03143153", "prompt_version": 1}
 {"unit_id": "NDA020969|ORIG|1|CTCL 1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA020969|ORIG|1|CTCL 3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA021345|SUPPL|4|VTE2 423", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
@@ -17,11 +18,12 @@
 {"unit_id": "BLA125261|ORIG|1|STUDY 1", "judge_a": "NCT00267969", "judge_b": "NCT00267969", "tiebreak": null, "final": "NCT00267969", "prompt_version": 1}
 {"unit_id": "NDA021361|SUPPL|12|TARGET 3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA022516|ORIG|1|DPNP-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "NDA202155|SUPPL|6|ADVANCE-3", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA202155|SUPPL|6|ADVANCE-3", "judge_a": "NCT00423319", "judge_b": "NCT00423319", "tiebreak": null, "final": "NCT00423319", "prompt_version": 1}
 {"unit_id": "BLA103909|SUPPL|5197|ASSENT-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA215431|ORIG|1|ICHD-3", "judge_a": "NCT03896009", "judge_b": "NCT03896009", "tiebreak": null, "final": "NCT03896009", "prompt_version": 1}
 {"unit_id": "BLA125514|SUPPL|170|FIGO 2014", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "BLA761467|ORIG|1|KEYNOTE-859", "judge_a": "NCT03675737", "judge_b": "NCT03675737", "tiebreak": null, "final": "NCT03675737", "prompt_version": 1}
+{"unit_id": "BLA761467|ORIG|1|KEYNOTE-859", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA206352|ORIG|1|AI424-043", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA206352|ORIG|1|AI424-397", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "BLA761055|SUPPL|40|SINUS-52", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA020262|SUPPL|24|CA139-174", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
@@ -30,8 +32,8 @@
 {"unit_id": "NDA216579|ORIG|1|AEROSPHERE 320", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA213978|ORIG|1|ONSET-1", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA213978|ORIG|1|ONSET-2", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
-{"unit_id": "BLA125514|SUPPL|132|KEYNOTE-051", "judge_a": "NCT02332668", "judge_b": "NCT02332668", "tiebreak": null, "final": "NCT02332668", "prompt_version": 1}
-{"unit_id": "BLA761467|ORIG|1|KEYNOTE-051", "judge_a": "NCT02332668", "judge_b": "NCT02332668", "tiebreak": null, "final": "NCT02332668", "prompt_version": 1}
+{"unit_id": "BLA125514|SUPPL|132|KEYNOTE-051", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "BLA761467|ORIG|1|KEYNOTE-051", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "BLA022458|ORIG|1|Study 1: Trial of ELELYSO as Initial Therapy", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "BLA125476|ORIG|1|Clinical Studies in Ulcerative Colitis", "judge_a": "NCT00783718", "judge_b": "NCT00783718", "tiebreak": null, "final": "NCT00783718", "prompt_version": 1}
 {"unit_id": "BLA125504|SUPPL|1|Psoriatic Arthritis", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
