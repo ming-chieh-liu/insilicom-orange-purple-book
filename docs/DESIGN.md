@@ -71,6 +71,8 @@ Pathways: **NDA** (§505(b), small molecule, Orange Book) · **ANDA** (§505(j),
 | D13 | **No OCR** | Scanned labels are all pre-2006, which is also pre-PLR with no `14.N` structure to use |
 | D14 | The **Insilicom KG is tier C and is not optional** — 4,539 pre-2008 approvals have no other source | Measured: 95% resolve a drug id, 31% a disease id, 16% yield a registry id |
 | D19 | The graph route runs **parallel** to the label route, as fallback *and* as a zero-cost cross-check | Fallback needs a judge; cross-check is set membership against existing links |
+| D21 | Trial side normalises from CT.gov `derivedSection.*.meshes`, not biokde | 46% / 79% coverage vs 17.8% exact-string, and no NER noise |
+| D22 | Use `meshes`, **never** `ancestors` | `ancestors` walks to the root: epinephrine → Hydrocarbons, PCOS → Neoplasms |
 | D20 | Tier C is **never promoted** above C | The question it answers — "is this plausibly evidence" — is weaker than P4's |
 | D15 | Combination regimens yield **one row per (trial, submission)** | KEYNOTE-189 approved pembrolizumab *with* chemo owned by other applications |
 
@@ -213,6 +215,67 @@ space**; always resolve through `pubmedEntitiesFlat`.
 Supporting tables: `approval_events.tsv` (spine) · `label_trials.tsv` · the four P1 mapping tables ·
 **`unlinked_submissions.tsv`** with `reason` ∈ `no_label` \| `scanned` \| `no_section_14` \|
 `no_drug_mapping` \| `no_candidates` \| `agent_none` \| `pre_registration_era` \| `not_trial_driven`.
+
+---
+
+## 6a. Next work — fix retrieval, then run P4 at scale
+
+Shortlist recall is **54.1%**: for 2,209 of 4,813 cases where the label states the answer, that
+answer is not in the candidate list. P4 cannot find what P3 did not offer, so every one of the
+~6,700 remaining agent calls is spent against that ceiling. **All four fixes are in P1. None is in
+P4.** Ordered by leverage, with what each is expected to move.
+
+### 1 — Trial side reads `derivedSection`, not the biokde synonym index · **P1**
+
+`source/trial_studies.py` currently parses only `protocolSection`. Add
+`derivedSection.interventionBrowseModule.meshes` and `conditionBrowseModule.meshes`, and make them
+the primary trial-side mapping in `service/normalize.py`.
+
+| | studies with a drug resolved |
+|---|---|
+| exact whole-string against biokde (today) | 17.8% |
+| token containment against biokde (considered, rejected) | 37.3% |
+| **CT.gov `derivedSection.meshes`** | **46%** |
+
+Conditions go from the current mapping to **79%**. Use `meshes` only — never `ancestors` (D22).
+biokde remains the FDA-side dictionary and the trial-side fallback where `meshes` is absent.
+
+**This supersedes the stop-list and frequency-floor work.** `Control → Chlordiazepoxide` is an NER
+artefact of the biokde synonym index (`cnt=2` against `Chlordiazepoxide` at 5,419); NLM does not tag
+a control arm as a chemical, so reading a curated mapping removes the class of problem rather than
+patching it. Keep the biokde path guarded anyway, since it is still the fallback.
+
+### 2 — Biosimilars get a retrieval id · **P1** · F-P1-2
+
+158 suffixed ingredient names resolve to nothing, and 161 of the 206 unresolved BLA applications
+fail for this reason alone. The reported 92.9% hides **NDA 96.2% against BLA 57.4%**.
+
+D11 is right that `USTEKINUMAB-AEKN` must not fold into `USTEKINUMAB` — a 351(k) rests on its own
+trials. But nothing carries the stem's id for *retrieval*, so a biosimilar can never receive a
+shortlist. Keep the suffixed name as the row's identity and add a separate column P3 filters on.
+98 stems involved.
+
+### 3 — Re-run P1 → P2 → P3 and re-measure · **no new code**
+
+`--mode validate` reports shortlist recall for free, from the 4,813 labels that state their own
+NCT. **This number decides whether to run P4 at scale.** If it does not move off 54%, something
+above is wrong and more agent calls will not fix it.
+
+### 4 — Then P4 at scale · **P4, unchanged**
+
+3,329 remaining tasks, two judges each. Nothing about P4 needs fixing; it needs a better shortlist.
+
+### Not doing yet, and why
+
+- **Judge precision is still unmeasured.** Worth 400 calls on withheld answers, but the answer
+  changes once the shortlist changes, so it belongs after step 3.
+- **`browseLeaves`** would give a `relevance: HIGH|LOW` tag per term. This archive kept only
+  `meshes` and `ancestors`; the field split does the same job. A note for whoever maintains the
+  download, not a blocker.
+- **F-P0-1** — 5,322 approved submissions dropped for having no `Applications.txt` row, 41 of them
+  modern. Needs a decision about typing them from another source.
+- **F-P0-2** — "NDA + BLA" is really CDER-only, so ~401 Purple Book BLAs are outside the spine
+  entirely. Needs a scope decision, not a fix.
 
 ---
 

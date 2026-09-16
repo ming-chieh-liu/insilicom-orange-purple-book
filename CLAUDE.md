@@ -46,6 +46,17 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 - **D10 — every row carries an evidence tier** (A/B/C).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
+- **D21 — the trial side normalises from ClinicalTrials.gov's own `derivedSection`, not from
+  biokde.** `derivedSection.interventionBrowseModule.meshes` and `conditionBrowseModule.meshes`
+  carry NLM-curated MeSH ids: 46% and 79% coverage against my exact-string matching's 17.8%, and
+  with none of the NER noise — NLM does not tag a control arm as a chemical. biokde stays the
+  **FDA-side** dictionary (an ingredient name has no derivedSection) and the trial-side fallback
+  where `meshes` is absent.
+- **D22 — use `meshes`, NEVER `ancestors`.** `ancestors` is the MeSH hierarchy walked to the root:
+  an epinephrine trial carries `Hydrocarbons`, and a polycystic-ovary trial carries `Neoplasms`.
+  Matching on it would join a drug to everything sharing a benzene ring. Its legitimate use is the
+  opposite — as a **specificity signal**, since a term with many ancestors sits deep in the tree and
+  discriminates, while one with none is a root descriptor P3 should decline to rank on.
 - **D19 — the graph route is PARALLEL to the label route, and serves two purposes.** As a
   *fallback* it needs a judge (2 calls per unit) and runs only where the label route is exhausted.
   As a *cross-check* it needs no agent at all — it is a set-membership test against links that
@@ -96,8 +107,10 @@ P0 spine      Submissions + Applications + ActionTypes
               -> 87,055 approved NDA|BLA events
               -> trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921
                               |
-P1 normalize  biokde as a synonym dictionary -> MeSH descriptor + biokdeid
-              four mappings; the biokdeid is what the graph route needs
+P1 normalize  FDA side  : ingredient -> MeSH via biokde synonyms (+ moiety fold)
+              TRIAL side: derivedSection.*BrowseModule.meshes -- NLM's own
+                          curation, NOT the biokde synonym index
+              both carry the biokdeid the graph route needs
                               |
               +---------------+-------------------------------+
               |                                               |
@@ -196,6 +209,15 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - **The MeSH term sweep does not understand negation.** `Non-Small Cell Lung Cancer` coded to
   `D055752 Small Cell Lung Carcinoma` — the opposite disease — because `[a-z0-9]+` drops the `non-`
   and MeSH writes *carcinoma* where labels write *cancer*. `indications.NEGATORS` guards it.
+- **This archive has no `browseLeaves`.** The CT.gov API returns one with a `relevance: HIGH|LOW`
+  tag per term; whoever built `/data/mliu/insilicom-clinical_trials/final/output_raw` kept only
+  `meshes` and `ancestors`. The field split does the same job, so this is a note for whoever
+  maintains that download, not a blocker.
+- **`meshes` is NLM's indexing, which is generous.** A fertility trial lists `Leuprolide` in
+  `meshes` because the protocol mentions it, not because it was an arm. That is acceptable and even
+  useful here: this is a retrieval filter, not the answer. A false candidate is rejected by the
+  judge; a trial that never enters the shortlist is lost forever, and recall is what the project is
+  short of.
 - **`NA` is a literal placeholder id in the graph, not an identifier.** 90 FDA ingredients
   (acoltremon, acoramidis hydrochloride, anacaulase-bcdb…) all "resolve" to it. Keyed on that,
   every unidentified drug is the same drug — it inflated trial-intervention matches from 7,585 to
