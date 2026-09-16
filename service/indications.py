@@ -66,6 +66,20 @@ FROM_LABEL: str = "label_section_1"
 #: ("hepatitis b"), and everything else is a separator.
 WORD = re.compile(r"[a-z0-9]+")
 
+#: Words that invert the disease named after them. ``[a-z0-9]+`` splits
+#: ``Non-Small Cell Lung Cancer`` into ``non small cell lung cancer``, so a
+#: sweep that matches the four-word span ``small cell lung cancer`` returns
+#: **Small Cell Lung Carcinoma** — the opposite disease, and one treated with
+#: different drugs. MeSH does carry ``non small cell lung carcinoma``, but the
+#: label writes *cancer* where MeSH writes *carcinoma*, so the five-word window
+#: misses and the wrong four-word one wins. Measured in ``indications.tsv``
+#: before this guard: 155 rows coded Small Cell against 3 Non-Small-Cell, where
+#: the truth is the reverse.
+#:
+#: A span preceded by one of these, and not itself starting with it, is
+#: dropped. Returning nothing is right where returning the negation is wrong.
+NEGATORS: frozenset[str] = frozenset({"non", "not", "nonsmall", "un"})
+
 #: Collapses the runs of whitespace the label text is full of. TSV has no
 #: quoting, so the text column is normalised here rather than being repaired
 #: by the repository one warning at a time.
@@ -181,10 +195,23 @@ def code(text: str, index: TermIndex) -> set[str]:
     ['D004194']
     >>> code("", index)
     set()
+
+    **A span negated by the word before it is dropped.** See :data:`NEGATORS`.
+
+    >>> negated = TermIndex({"small cell lung cancer": "D055752"},
+    ...                     {"D055752": "Small Cell Lung Carcinoma"}, 4, 0)
+    >>> sorted(code("small cell lung cancer", negated))
+    ['D055752']
+    >>> code("non-small cell lung cancer", negated)
+    set()
     """
     words = WORD.findall(text.lower())
     spans: list[tuple[int, int, str]] = []
     for start in range(len(words)):
+        if start and words[start - 1] in NEGATORS:
+            # The term after a negator names the disease the text says it is
+            # *not*. Coding nothing is right where coding the opposite is wrong.
+            continue
         for length in range(1, min(index.max_words, len(words) - start) + 1):
             ui = index.by_term.get(" ".join(words[start:start + length]))
             if ui is not None:
@@ -353,6 +380,7 @@ def render(report: IndicationReport) -> str:
 
 
 __all__ = [
+    "NEGATORS",
     "FROM_LABEL",
     "TEXT_LIMIT",
     "IndicationReport",

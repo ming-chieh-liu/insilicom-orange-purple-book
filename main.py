@@ -37,6 +37,7 @@ from dao.tsv_repository import TsvRepository
 from source import mesh_descriptors, trial_studies
 from service import (
     adjudication,
+    candidates,
     approval_events,
     approval_map,
     attribution,
@@ -67,6 +68,8 @@ MODES: dict[str, str] = {
     "MeSH descriptors via the Insilicom graph",
     "labels": "fetch each trial-relevant submission's archived label and read "
     "its section 14 into trial descriptions",
+    "candidates": "narrow the trial registry to a judgeable shortlist per "
+    "section-14 description (needs --mode labels and --mode normalize first)",
 }
 
 
@@ -241,6 +244,41 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(approval_events.render(events_report))
         print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "candidates":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — candidates need the bulk data tree")
+            return 1
+        vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
+        if not vocabulary.exists:
+            print(f"{vocabulary.descriptors} not found — pass --mesh")
+            return 1
+        archive = TrialArchive(root=Path(args.trial_archive))
+        if not archive.study_shards:
+            print(f"{archive.root} has no {archive.study_glob}")
+            return 1
+        out_dir = Path(args.out)
+        for needed in ("label_trials.tsv", "trial_drug_map.tsv", "drug_map.tsv"):
+            if not (out_dir / needed).is_file():
+                print(f"{out_dir / needed} not found — run labels and normalize first")
+                return 1
+        candidates_report = candidates.build(data, archive, vocabulary, out_dir)
+        units_path = out_dir / "candidates.jsonl"
+        with units_path.open("w", encoding="utf-8") as handle:
+            for unit in candidates_report.units:
+                handle.write(
+                    json.dumps(
+                        {
+                            **unit._asdict(),
+                            "candidates": [c._asdict() for c in unit.candidates],
+                        }
+                    )
+                    + "\n"
+                )
+        print(candidates.render(candidates_report))
+        print(f"\nwritten to {units_path}")
         return 0
 
     if args.mode == "labels":
