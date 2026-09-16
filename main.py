@@ -282,13 +282,13 @@ def main(argv: list[str] | None = None) -> int:
         if not connection.has_credentials:
             print(f"{connection.credentials} not found — pass --creds")
             return 1
-        # Exactly what tiers A and B left behind, read rather than recomputed.
+        # Exactly what the label route EXHAUSTED, read rather than recomputed.
+        # not_yet_judged is excluded: that means P4 has not looked, not that it
+        # failed, and a tier-C link is never promoted to the tier P4 might reach.
         with unlinked_path.open(encoding="utf-8") as handle:
-            unserved = {
-                f"{row['application']}|{row['submission_type']}"
-                f"|{row['submission_no']}"
-                for row in csv.DictReader(handle, delimiter="\t")
-            }
+            unserved = graph_links.exhausted_only(
+                list(csv.DictReader(handle, delimiter="\t"))
+            )
         archive = TrialArchive(root=Path(args.trial_archive))
         studies = {
             facts.nct_id: (facts.start_date, facts.enrollment, ";".join(facts.phases))

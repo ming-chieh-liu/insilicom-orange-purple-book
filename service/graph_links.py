@@ -36,6 +36,43 @@ from utility.logging import get_logger
 
 _log = get_logger(__name__)
 
+#: Reasons in ``unlinked_submissions.tsv`` that mean the label route is
+#: **exhausted**, and so the graph route is the only source left.
+#:
+#: Two reasons are deliberately absent. ``not_yet_judged`` means P4 has not
+#: looked yet, not that it failed — running tier C there would produce weak
+#: graph links for approvals P4 may well resolve at tier A, and a tier-C link
+#: is never promoted. ``later_appearance_of_the_same_trial`` is not a miss at
+#: all: it is D16 working, and the trial already has a correct link on the
+#: earlier submission.
+EXHAUSTED: frozenset[str] = frozenset(
+    {
+        "no_description_extracted",
+        "judged_none",
+        "no_candidates",
+        "no_drug_resolved",
+        "scanned",
+        "no_section_14",
+    }
+)
+
+
+def exhausted_only(rows: list[dict[str, str]]) -> set[str]:
+    """Submission keys the label route genuinely could not serve.
+
+    >>> exhausted_only([{"application": "NDA1", "submission_type": "ORIG",
+    ...                  "submission_no": "1", "reason": "judged_none"}])
+    {'NDA1|ORIG|1'}
+    >>> exhausted_only([{"application": "NDA1", "submission_type": "ORIG",
+    ...                  "submission_no": "1", "reason": "not_yet_judged"}])
+    set()
+    """
+    return {
+        f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        for row in rows
+        if row.get("reason") in EXHAUSTED
+    }
+
 
 class GraphCandidate(NamedTuple):
     """One registry id the literature offers, with why it is here."""
@@ -152,10 +189,12 @@ def _read_tsv(path: Path) -> list[dict[str, str]]:
 
 __all__ = [
     "ABSTRACT_BUDGET",
+    "EXHAUSTED",
     "GraphCandidate",
     "GraphReport",
     "GraphUnit",
     "build",
+    "exhausted_only",
     "rank",
     "render",
     "within_date",

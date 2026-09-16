@@ -69,7 +69,9 @@ Pathways: **NDA** (§505(b), small molecule, Orange Book) · **ANDA** (§505(j),
 | D11 | Substances normalise to **active moiety**; biosimilar 4-letter suffixes kept **distinct** | Trials name the moiety; a biosimilar's 351(k) rests on its own trials |
 | D12 | **Any agent-delegated task needs a versioned prompt + runbook** before it runs | See §9 |
 | D13 | **No OCR** | Scanned labels are all pre-2006, which is also pre-PLR with no `14.N` structure to use |
-| D14 | The **Insilicom KG is a cross-check and recall backstop**, not a required path | 126 candidates vs ~8 real for pembrolizumab/NSCLC |
+| D14 | The **Insilicom KG is tier C and is not optional** — 4,539 pre-2008 approvals have no other source | Measured: 95% resolve a drug id, 31% a disease id, 16% yield a registry id |
+| D19 | The graph route runs **parallel** to the label route, as fallback *and* as a zero-cost cross-check | Fallback needs a judge; cross-check is set membership against existing links |
+| D20 | Tier C is **never promoted** above C | The question it answers — "is this plausibly evidence" — is weaker than P4's |
 | D15 | Combination regimens yield **one row per (trial, submission)** | KEYNOTE-189 approved pembrolizumab *with* chemo owned by other applications |
 
 ### Hard constraints

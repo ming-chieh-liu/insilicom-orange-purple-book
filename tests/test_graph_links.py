@@ -400,3 +400,51 @@ def test_the_abstract_budget_bounds_the_read(workspace: Path) -> None:
     )
     assert report.units == ()
     assert report.with_edge == 1
+
+
+# ---------------------------------------------------------------------------
+# What counts as "the label route is out of options"
+# ---------------------------------------------------------------------------
+
+
+def _unlinked(reason: str, no: str = "1") -> dict[str, str]:
+    return {
+        "application": "NDA1",
+        "submission_type": "ORIG",
+        "submission_no": no,
+        "reason": reason,
+    }
+
+
+@pytest.mark.parametrize(
+    "reason",
+    ["no_description_extracted", "judged_none", "no_candidates", "no_drug_resolved"],
+)
+def test_an_exhausted_reason_reaches_the_graph_route(reason: str) -> None:
+    assert graph_links.exhausted_only([_unlinked(reason)]) == {"NDA1|ORIG|1"}
+
+
+def test_not_yet_judged_waits_for_p4() -> None:
+    """P4 has not looked, which is not the same as failing. A tier-C link is
+    never promoted, so pre-empting P4 trades a possible tier A for a certain
+    tier C."""
+    assert graph_links.exhausted_only([_unlinked("not_yet_judged")]) == set()
+
+
+def test_a_later_appearance_is_not_a_miss() -> None:
+    """D16 working: the trial already has a correct link on the earlier
+    submission."""
+    assert (
+        graph_links.exhausted_only([_unlinked("later_appearance_of_the_same_trial")])
+        == set()
+    )
+
+
+def test_a_mixed_file_takes_only_the_exhausted() -> None:
+    rows = [
+        _unlinked("judged_none", "1"),
+        _unlinked("not_yet_judged", "2"),
+        _unlinked("no_description_extracted", "3"),
+        _unlinked("later_appearance_of_the_same_trial", "4"),
+    ]
+    assert graph_links.exhausted_only(rows) == {"NDA1|ORIG|1", "NDA1|ORIG|3"}

@@ -46,6 +46,11 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 - **D10 — every row carries an evidence tier** (A/B/C).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
+- **D19 — the graph route is PARALLEL to the label route, and serves two purposes.** As a
+  *fallback* it needs a judge (2 calls per unit) and runs only where the label route is exhausted.
+  As a *cross-check* it needs no agent at all — it is a set-membership test against links that
+  already exist, and it is the cheaper and more valuable of the two because it gives tier A an
+  independent second source instead of resting on the label alone.
 - **D14 — the Insilicom KG is tier C, and it is NOT optional.** It was scoped as "not a required
   path" and therefore skipped, which was wrong: **4,539 trial-relevant approvals — every one before
   2008, 57% of the set — have zero links from any other source.** Measured on 150 pre-2008
@@ -84,22 +89,58 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 ## Pipeline — six phases
 
 ```
-P0 spine        Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
-                (11,426 indication-changing; the coarse old filter)
-                trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921
-P1 normalize    biokde synonym dictionary -> MeSH descriptor, four mappings
-P2 labels       ApplicationDocs type 2 -> label PDF; anchor ^14 CLINICAL STUDIES;
-                extract acronym, NCT if present, ENROLLMENT COUNT, phase, design
-P3 candidates   CT.gov (600,762) filtered by drug-MeSH + condition-MeSH + phase
-                + start < approval_date  -> 10-40 candidates
-P4 agents       4a identify (new) · 4b polarity (ALREADY BUILT)
-P5 assemble     tier A/B/C -> trial_submission_map.tsv + unlinked_submissions.tsv
-PC tier C       biokde edge -> pubmedRelations.locations -> pubmedDocs abstracts
-                -> regex NCT -> [AGENT] is any of these the evidence?
-                for the 4,539 pre-2008 approvals the label cannot serve
-P6 validate     against the 4,813 units whose label states its own NCT id:
-                shortlist recall (P3's ceiling, free) and judge precision (P4's score)
+                     THE LABEL ROUTE                    THE GRAPH ROUTE
+                                                        (independent source)
+
+P0 spine      Submissions + Applications + ActionTypes
+              -> 87,055 approved NDA|BLA events
+              -> trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921
+                              |
+P1 normalize  biokde as a synonym dictionary -> MeSH descriptor + biokdeid
+              four mappings; the biokdeid is what the graph route needs
+                              |
+              +---------------+-------------------------------+
+              |                                               |
+P2 labels     ApplicationDocs type 2 -> label PDF          P3c graph candidates
+              anchor ^14 CLINICAL STUDIES                  pubmedRelations edge
+              extract NCT | acronym | ENROLLMENT           -> .locations -> PMIDs
+                              |                            -> pubmedDocs abstracts
+              label states an NCT? ---> yes -> TIER A      -> regex NCT
+                              | no                         -> drop trials starting
+P3 candidates CT.gov (600,762) filtered by                    after the approval
+              drug-MeSH + start < approval_date                        |
+              ranked by condition + stated count           P4c judge   |
+              -> 40 candidates                             "is any of these
+                              |                             plausibly evidence?"
+P4 judge      "which candidate is this description?"        two judges, NONE
+              two judges, third on disagreement             expected to dominate
+                              |                                        |
+              counts agree -> TIER A                                   |
+              counts diverge -> TIER B                            TIER C, never
+                              |                                    promoted
+              +---------------+-------------------------------+
+                              |
+P5 assemble   both routes -> trial_submission_map.tsv
+              + unlinked_submissions.tsv, a reason for every unlinked event
+                              |
+P6 validate   shortlist recall (free, from labels that state their own id)
+              judge precision (withheld answers)
+              graph cross-check -> the `conflict` column
 ```
+
+**The two routes are parallel and independent, not sequential.** The graph route
+branches at P1 and skips P2/P3 entirely, because the approvals it serves have no
+readable section 14 — that is the whole reason it exists. It does two jobs:
+
+1. **Fallback.** For approvals the label route exhausted, it is the only source.
+   Runs on `unlinked_submissions.tsv` reasons that mean *exhausted*
+   (`no_description_extracted`, `judged_none`, `no_candidates`,
+   `no_drug_resolved`) — **not** `not_yet_judged`, which means P4 has not looked
+   yet, and **not** `later_appearance_of_the_same_trial`, which is D16 working.
+2. **Cross-check, and this costs no agent calls.** For links the label route
+   already produced, ask whether the graph's literature for that drug and
+   disease mentions the same trial. Agreement between two independent sources is
+   stronger than either alone; silence is worth flagging. Populates `conflict`.
 
 **Why it works:** §14 rarely names an NCT but always describes the trial — design, population, and
 the patient count. Structured filters cut 600,762 studies to 10–40 candidates; enrollment count
