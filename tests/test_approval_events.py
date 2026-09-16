@@ -38,6 +38,55 @@ _SUBMISSIONS = [
     # A submission whose application has no Applications.txt row: undroppable
     # to a canonical key, so it is not an event.
     "999999\t2\tSUPPL\t1\tAP\t2020-01-01 00:00:00\t\t",
+    # A generic. In scope only when the caller asks for every application type.
+    "000009\t1\tORIG\t1\tAP\t2010-05-05 00:00:00\t\t",
+]
+
+_ACTION_LOOKUP = [
+    "ActionTypes_LookupID\tActionTypes_LookupDescription"
+    "\tSupplCategoryLevel1Code\tSupplCategoryLevel2Code",
+    "3\tEfficacy-Accelerated Approval\tEFFICACY\tACCEL APP",
+    "4\tEfficacy-Accelerated Approval Confirmatory Study\tEFFICACY\tCOMP EFF",
+    "7\tEfficacy-New Dosing Regimen\tEFFICACY\tDOSING",
+    "8\tEfficacy-New Indication\tEFFICACY\tINDICATION",
+    "13\tLabeling\tLABELING\tNOT APPLICABLE",
+    # Id 46 has a blank description. It is the row every original joins to, so
+    # a trial-relevant original cannot be recognised from its action type.
+    "46\t\t\tNOT APPLICABLE",
+]
+
+_JOIN_ACTIONS = [
+    "SubmissionType\tj_submissionActionTypeID\tApplNo\tSubmissionNo"
+    "\tActionTypes_LookupID",
+    # SubmissionType is space-padded in the real file; the key must survive it.
+    "SUPPL     \t1\t000001\t14\t8",
+    "SUPPL     \t2\t000001\t15\t13",
+    # A new dosing regimen is an Efficacy supplement that is NOT a new
+    # indication — the discrimination the class code alone cannot make.
+    "SUPPL     \t3\t000001\t16\t7",
+    "ORIG      \t4\t000001\t1\t46",
+    "SUPPL     \t5\t125514\t4\t3",
+    # One submission, two recorded actions.
+    "SUPPL     \t6\t125514\t4\t8",
+]
+
+_PROPERTY_TYPE = [
+    "ApplNo\tSubmissionType\tSubmissionNo\tSubmissionPropertyTypeCode"
+    "\tSubmissionPropertyTypeID",
+    "000001\tSUPPL     \t14\tOrphan\t1",
+    "000001\tSUPPL     \t15\tNull\t0",
+]
+
+_APPLICATION_DOCS = [
+    "ApplicationDocsID\tApplicationDocsTypeID\tApplNo\tSubmissionType"
+    "\tSubmissionNo\tApplicationDocsTitle\tApplicationDocsURL"
+    "\tApplicationDocsDate",
+    "1\t1\t000001\tSUPPL     \t14\t0"
+    "\thttp://www.accessdata.fda.gov/drugsatfda_docs/appletter/2014/1ltr.pdf"
+    "\t2014-09-04 00:00:00",
+    "2\t2\t000001\tSUPPL     \t14\t0"
+    "\thttp://www.accessdata.fda.gov/drugsatfda_docs/label/2014/1s014lbl.pdf"
+    "\t2014-09-04 00:00:00",
 ]
 
 _CLASS_LOOKUP = [
@@ -86,6 +135,17 @@ def corpus(tmp_path: Path) -> RawData:
         zf.writestr("Products.txt", "\r\n".join(_PRODUCTS) + "\r\n")
         zf.writestr("Submissions.txt", "\r\n".join(_SUBMISSIONS) + "\r\n")
         zf.writestr("SubmissionClass_Lookup.txt", "\r\n".join(_CLASS_LOOKUP) + "\r\n")
+        zf.writestr("ActionTypes_Lookup.txt", "\r\n".join(_ACTION_LOOKUP) + "\r\n")
+        zf.writestr(
+            "Join_Submission_ActionTypes_Lookup.txt",
+            "\r\n".join(_JOIN_ACTIONS) + "\r\n",
+        )
+        zf.writestr(
+            "SubmissionPropertyType.txt", "\r\n".join(_PROPERTY_TYPE) + "\r\n"
+        )
+        zf.writestr(
+            "ApplicationDocs.txt", "\r\n".join(_APPLICATION_DOCS) + "\r\n"
+        )
     _write(root / "orangebook" / "x" / "products.txt", _OB_PRODUCTS)
     _write(root / "orangebook" / "x" / "patent.txt", _OB_PATENT)
     _write(root / "orangebook" / "x" / "exclusivity.txt", _OB_EXCLUSIVITY)
@@ -98,8 +158,8 @@ def corpus(tmp_path: Path) -> RawData:
 def test_only_approved_submissions_become_events(corpus: RawData) -> None:
     """A tentative approval is not an approval."""
     report = approval_events.build(corpus)
-    assert report.submissions_seen == 8
-    assert report.approved == 7
+    assert report.submissions_seen == 9
+    assert report.approved == 8
     assert all(row.approval_date for row in report.rows)
 
 
@@ -198,3 +258,187 @@ def test_the_report_renders_its_numbers(corpus: RawData) -> None:
     rendered = approval_events.render(approval_events.build(corpus))
     assert "Approval events" in rendered
     assert "Efficacy" in rendered
+
+
+# ---------------------------------------------------------------------------
+# Action types: what an Efficacy supplement actually did
+# ---------------------------------------------------------------------------
+
+
+def test_the_action_type_rides_along(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    assert by_key[("NDA000001", "14")].action_type == "Efficacy-New Indication"
+
+
+def test_a_padded_submission_type_still_joins(corpus: RawData) -> None:
+    """``Join_Submission_ActionTypes_Lookup`` writes ``'SUPPL     '``. Keying on
+    the raw value would match nothing."""
+    report = approval_events.build(corpus)
+    assert any(r.action_type for r in report.rows if r.submission_type == "SUPPL")
+
+
+def test_several_actions_on_one_submission_are_all_kept(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    assert by_key[("BLA125514", "4")].action_type == (
+        "Efficacy-Accelerated Approval;Efficacy-New Indication"
+    )
+
+
+def test_a_blank_action_description_is_not_indexed(corpus: RawData) -> None:
+    """Id 46 is blank, and it is what originals join to. Indexing it would give
+    every original an empty-string action that looks like a real one."""
+    report = approval_events.build(corpus)
+    orig = next(
+        r for r in report.rows
+        if r.application == "NDA000001" and r.submission_type == "ORIG"
+    )
+    assert orig.action_type == ""
+
+
+# ---------------------------------------------------------------------------
+# Trial relevance
+# ---------------------------------------------------------------------------
+
+
+def test_a_new_indication_supplement_is_trial_relevant(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    assert by_key[("NDA000001", "14")].trial_relevant == "true"
+
+
+def test_a_new_dosing_regimen_supplement_is_not(corpus: RawData) -> None:
+    """The discrimination the submission class alone cannot make: submission 16
+    is an Efficacy supplement by class, but FDA recorded it as a dosing change,
+    so no new trial underwrote it."""
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    row = by_key[("NDA000001", "16")]
+    assert row.action_type == "Efficacy-New Dosing Regimen"
+    assert row.trial_relevant == "false"
+
+
+def test_an_original_is_trial_relevant_despite_a_blank_action(
+    corpus: RawData,
+) -> None:
+    """All 5,879 approved NDA/BLA originals carry a blank action description.
+    An original is the approval that created the indication, so it qualifies on
+    its submission type alone."""
+    report = approval_events.build(corpus)
+    orig = next(
+        r for r in report.rows
+        if r.application == "NDA000001" and r.submission_type == "ORIG"
+    )
+    assert orig.action_type == ""
+    assert orig.trial_relevant == "true"
+
+
+def test_the_report_splits_relevance_by_submission_type(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    assert report.trial_relevant == report.originals + report.core_supplements
+
+
+@pytest.mark.parametrize(
+    ("submission_type", "actions", "expected"),
+    [
+        ("ORIG", set(), True),
+        ("ORIG", {"Labeling"}, True),
+        ("SUPPL", {"Efficacy-New Indication"}, True),
+        ("SUPPL", {"Efficacy-Accelerated Approval"}, True),
+        ("SUPPL", {"Efficacy-Accelerated Approval Confirmatory Study"}, True),
+        ("SUPPL", {"Efficacy-New Dosing Regimen"}, False),
+        ("SUPPL", {"Efficacy-Pediatric"}, False),
+        ("SUPPL", {"Efficacy-New Patient Population"}, False),
+        ("SUPPL", {"Manufacturing (CMC)-Facility"}, False),
+        ("SUPPL", set(), False),
+        # Several actions, one of which qualifies.
+        ("SUPPL", {"Labeling", "Efficacy-New Indication"}, True),
+    ],
+)
+def test_the_trial_relevance_rule(
+    submission_type: str, actions: set[str], expected: bool
+) -> None:
+    assert approval_events.is_trial_relevant(submission_type, actions) is expected
+
+
+# ---------------------------------------------------------------------------
+# The remaining carried columns
+# ---------------------------------------------------------------------------
+
+
+def test_the_orphan_flag_is_carried(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    assert by_key[("NDA000001", "14")].orphan == "true"
+
+
+def test_a_null_property_code_is_not_an_orphan_flag(corpus: RawData) -> None:
+    """``Null`` is the literal value in 315,267 of the file's rows."""
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    assert by_key[("NDA000001", "15")].orphan == "false"
+
+
+def test_the_review_priority_is_carried(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    orig = next(
+        r for r in report.rows
+        if r.application == "BLA125514" and r.submission_type == "ORIG"
+    )
+    assert orig.review_priority == "PRIORITY"
+
+
+@pytest.mark.parametrize(
+    ("approval_date", "expected"),
+    [
+        ("1996-12-17", "pre-2000"),
+        ("1999-12-31", "pre-2000"),
+        ("2000-01-01", "2000-2007"),
+        ("2007-12-31", "2000-2007"),
+        ("2008-01-01", "2008+"),
+        ("2018-08-20", "2008+"),
+        ("", ""),
+        ("n/a", ""),
+        ("19", ""),
+    ],
+)
+def test_the_era_rule(approval_date: str, expected: str) -> None:
+    assert approval_events.era_of(approval_date) == expected
+
+
+def test_the_era_rides_along(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    orig = next(
+        r for r in report.rows
+        if r.application == "NDA000001" and r.submission_type == "ORIG"
+    )
+    assert orig.approval_date == "1996-12-17"
+    assert orig.era == "pre-2000"
+
+
+# ---------------------------------------------------------------------------
+# Scope
+# ---------------------------------------------------------------------------
+
+
+def test_the_spine_excludes_generics(corpus: RawData) -> None:
+    """ANDAs are approved on bioequivalence studies, which are small and
+    unregistered — they cannot be linked to a trial."""
+    report = approval_events.build(corpus)
+    assert "ANDA" not in {r.app_type for r in report.rows}
+
+
+def test_every_type_is_available_on_request(corpus: RawData) -> None:
+    """:mod:`service.attribution` needs them so its existing ANDA rows keep
+    their candidate dates."""
+    report = approval_events.build(corpus, types=None)
+    assert "ANDA" in {r.app_type for r in report.rows}
+    assert len(report.rows) == 7
+
+
+def test_the_report_renders_the_new_sections(corpus: RawData) -> None:
+    rendered = approval_events.render(approval_events.build(corpus))
+    assert "TRIAL-RELEVANT" in rendered
+    assert "by action type" in rendered
+    assert "by era" in rendered

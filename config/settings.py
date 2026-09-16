@@ -66,6 +66,25 @@ class RawData:
     #: which cannot. The code ids are not stable across releases; the
     #: descriptions in this table are what the corpus states.
     submission_class_lookup: DelimitedFile = field(init=False)
+    #: ``ActionTypes_LookupID`` → description. This is the table that says what
+    #: an Efficacy supplement actually *did*: ``Efficacy-New Indication``,
+    #: ``Efficacy-Accelerated Approval``, ``Efficacy-Accelerated Approval
+    #: Confirmatory Study``, as against a new dosing regimen or a pediatric
+    #: extrapolation. Accelerated status and its confirmatory conversion are
+    #: therefore published fields, not something to infer from a PDF.
+    action_types_lookup: DelimitedFile = field(init=False)
+    #: Joins that lookup to ``(ApplNo, SubmissionType, SubmissionNo)``. Note the
+    #: column order is ``SubmissionType`` first, not ``ApplNo``.
+    submission_action_types: DelimitedFile = field(init=False)
+    #: Per-submission properties. In this snapshot the only non-null code is
+    #: ``Orphan`` (3,609 rows); everything else is ``Null``.
+    submission_property_type: DelimitedFile = field(init=False)
+    #: Per-submission documents. ``ApplicationDocsTypeID`` 1 is the approval
+    #: letter (36,970 submissions) and **2 is the label as approved at that
+    #: submission** (29,788) — the point-in-time label this project needs.
+    #: The URLs are ``http://``; they must be requested over ``https://`` with
+    #: redirects followed or they return nothing.
+    application_docs: DelimitedFile = field(init=False)
 
     #: The Orange Book text files, already unzipped under ``orangebook/x/``.
     #: Tilde-delimited, CRLF, header present. ``products.txt`` has **no
@@ -115,6 +134,25 @@ class RawData:
         object.__setattr__(
             self, "submission_class_lookup",
             DelimitedFile(drugsfda_zip, TAB, 3, 28, "SubmissionClass_Lookup.txt"),
+        )
+        object.__setattr__(
+            self, "action_types_lookup",
+            DelimitedFile(drugsfda_zip, TAB, 4, 59, "ActionTypes_Lookup.txt"),
+        )
+        object.__setattr__(
+            self, "submission_action_types",
+            DelimitedFile(
+                drugsfda_zip, TAB, 5, 209_312,
+                "Join_Submission_ActionTypes_Lookup.txt",
+            ),
+        )
+        object.__setattr__(
+            self, "submission_property_type",
+            DelimitedFile(drugsfda_zip, TAB, 5, 318_876, "SubmissionPropertyType.txt"),
+        )
+        object.__setattr__(
+            self, "application_docs",
+            DelimitedFile(drugsfda_zip, TAB, 8, 81_039, "ApplicationDocs.txt"),
         )
         object.__setattr__(
             self, "ob_products",

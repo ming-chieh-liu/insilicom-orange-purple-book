@@ -203,7 +203,9 @@ def main(argv: list[str] | None = None) -> int:
         repository.save(
             "approval_events",
             ("application", "app_type", "submission_type", "submission_no",
-             "submission_class", "approval_date", "indication_changing"),
+             "submission_class", "action_type", "approval_date", "era",
+             "review_priority", "orphan", "indication_changing",
+             "trial_relevant"),
             events_report.rows,
         )
         print(approval_events.render(events_report))
@@ -228,7 +230,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         with mapping.open(encoding="utf-8") as handle:
             map_rows = list(csv.DictReader(handle, delimiter="\t"))
-        events = approval_events.indication_changing_dates(approval_events.build(data))
+        events = approval_events.indication_changing_dates(
+            approval_events.build(data, types=None)
+        )
         starts = trial_studies.read_start_dates(archive)
         attribution_report = attribution.attribute(map_rows, events, starts)
         repository = TsvRepository(args.out)

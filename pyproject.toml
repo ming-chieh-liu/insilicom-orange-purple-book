@@ -31,6 +31,10 @@ packages = ["config", "dao", "source", "service", "utility"]
 # ---------------------------------------------------------------------------
 [tool.pytest.ini_options]
 minversion = "8.0"
+# The repo root on sys.path, so `from config.settings import ...` resolves when
+# the project is not pip-installed into the env. The conda env is shared with
+# another project and carries no editable install of this one.
+pythonpath = ["."]
 # The packages are in testpaths so --doctest-modules collects their doctests.
 # A doctest that is never executed is documentation, not a contract.
 testpaths = ["tests", "config", "dao", "source", "service", "utility"]
