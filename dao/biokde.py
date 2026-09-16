@@ -47,6 +47,12 @@ class Entity(NamedTuple):
     #: ``PubChem:CID56843331``. The prefix is part of the id, not decoration —
     #: not every drug has a MeSH record.
     id: str
+    #: The graph's **internal** node id, and the one ``pubmedRelations`` keys
+    #: its edges on. The prefixed ``id`` above is the external vocabulary id and
+    #: does **not** appear in the edge collection, so anything that wants to
+    #: walk from a drug to its supporting literature needs this. Kept here so
+    #: P1 resolves it once rather than every later query re-deriving it.
+    biokdeid: str
     official_name: str
     #: ``Chemical``, ``Disease``, ``Gene``, ``Species`` …
     type: str
@@ -101,6 +107,7 @@ class BiokdeRepository:
                     "_id": 0,
                     "name": 1,
                     "id": 1,
+                    "biokdeid": 1,
                     "official name": 1,
                     "type": 1,
                     "subtype": 1,
@@ -108,6 +115,7 @@ class BiokdeRepository:
             ).collation(self._collation):
                 entity = Entity(
                     id=str(row.get("id") or ""),
+                    biokdeid=str(row.get("biokdeid") or ""),
                     official_name=str(row.get("official name") or ""),
                     type=str(row.get("type") or ""),
                     subtype=str(row.get("subtype") or ""),
@@ -142,6 +150,28 @@ class BiokdeRepository:
                     out.setdefault(str(row["id"]), set()).add(name)
         _log.info("%d of %d ids have synonyms", len(out), len(wanted))
         return {identifier: frozenset(names) for identifier, names in out.items()}
+
+
+    def internal_ids(self, ids: Iterable[str]) -> dict[str, str]:
+        """External vocabulary id → the graph's internal ``biokdeid``.
+
+        Needed for entities that arrive as an id rather than as a name:
+        indications come out of ``indications.tsv`` already coded to MeSH, so
+        they are never resolved through :meth:`resolve` and would otherwise
+        carry no internal id at all — leaving P5 unable to walk the disease end
+        of a drug-disease edge.
+        """
+        wanted = [identifier for identifier in dict.fromkeys(ids) if identifier]
+        out: dict[str, str] = {}
+        for batch in _batched(wanted, BATCH):
+            for row in self._entities.find(
+                {"id": {"$in": batch}}, {"_id": 0, "id": 1, "biokdeid": 1}
+            ):
+                internal = str(row.get("biokdeid") or "")
+                if internal:
+                    out.setdefault(str(row["id"]), internal)
+        _log.info("%d of %d ids have an internal id", len(out), len(wanted))
+        return out
 
 
 def _batched(items: list[str], size: int) -> Iterator[list[str]]:

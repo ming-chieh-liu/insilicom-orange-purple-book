@@ -18,8 +18,8 @@ _ROWS: list[dict[str, str]] = [
      "type": "Chemical", "subtype": "Drug"},
     {"name": "Keytruda", "id": "PubChem:SID187051801", "official name": "GTPL7499",
      "type": "Chemical", "subtype": "Drug"},
-    {"name": "Carboplatin", "id": "MESH:D016190", "official name": "Carboplatin",
-     "type": "Chemical", "subtype": "Drug"},
+    {"name": "Carboplatin", "id": "MESH:D016190", "biokdeid": "9999",
+     "official name": "Carboplatin", "type": "Chemical", "subtype": "Drug"},
     # An id-less row, which the graph writes as the literal string "NA".
     {"name": "Acoltremon", "id": "NA", "official name": "Acoltremon",
      "type": "Chemical", "subtype": "NA"},
@@ -211,3 +211,13 @@ def test_has_credentials_reports_the_file(tmp_path: Path) -> None:
     present = tmp_path / "creds.json"
     present.write_text("{}")
     assert BiokdeConnection(credentials=present).has_credentials
+
+
+def test_the_internal_node_id_is_retained(
+    repository: biokde.BiokdeRepository,
+) -> None:
+    """``pubmedRelations`` keys its edges on ``biokdeid``, not on the prefixed
+    vocabulary id. Discarding it means every later query that wants to walk
+    from a drug to its supporting literature must resolve the entity again."""
+    got = repository.resolve(["Carboplatin"])
+    assert got["Carboplatin"][0].biokdeid == "9999"

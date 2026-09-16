@@ -312,7 +312,10 @@ def main(argv: list[str] | None = None) -> int:
         finally:
             client.close()
         repository_out = TsvRepository(args.out)
-        columns = ("name", "mesh_id", "official_name", "entity_type", "basis")
+        columns = (
+            "name", "mesh_id", "biokdeid", "official_name", "entity_type",
+            "basis",
+        )
         repository_out.save("drug_map", columns, normalize_report.drugs)
         repository_out.save("indication_map", columns, normalize_report.indications)
         repository_out.save("trial_drug_map", columns, normalize_report.trial_drugs)

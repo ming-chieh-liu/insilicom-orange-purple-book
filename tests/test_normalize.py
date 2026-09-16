@@ -32,6 +32,9 @@ class _FakeRepository:
     def resolve(self, names: Iterable[str]) -> dict[str, tuple[Entity, ...]]:
         return {n: self._entities[n] for n in names if n and n in self._entities}
 
+    def internal_ids(self, ids: Iterable[str]) -> dict[str, str]:
+        return {i: f"bk-{i}" for i in ids if i in self._synonyms or i.startswith("MESH:")}
+
     def synonyms(self, ids: Iterable[str]) -> dict[str, frozenset[str]]:
         self.synonym_ids_asked = list(ids)
         return {
@@ -73,8 +76,8 @@ def test_the_placeholder_id_is_not_an_identifier() -> None:
 
 def test_a_placeholder_id_never_becomes_a_mapping() -> None:
     entities = {
-        "Acoltremon": (Entity("NA", "Acoltremon", "Chemical", "NA"),),
-        "Carboplatin": (Entity("MESH:D016190", "Carboplatin", "Chemical", "Drug"),),
+        "Acoltremon": (Entity("NA", "bkNA", "Acoltremon", "Chemical", "NA"),),
+        "Carboplatin": (Entity("MESH:D016190", "bkMESH:D016190", "Carboplatin", "Chemical", "Drug"),),
     }
     mapped, coverage = normalize.normalise(
         ["Acoltremon", "Carboplatin"], _repository(entities=entities), {}, "drugs"
@@ -113,8 +116,8 @@ def test_a_non_mesh_id_is_never_rolled() -> None:
 def test_two_spellings_of_one_disease_reach_the_same_id() -> None:
     """The whole point of the rollup."""
     entities = {
-        "Gastric Cancer": (Entity("MESH:M0333444", "Cancer Of Stomach", "Disease", "NA"),),
-        "Stomach Neoplasms": (Entity("MESH:D013274", "Stomach Neoplasms", "Disease", "NA"),),
+        "Gastric Cancer": (Entity("MESH:M0333444", "bkMESH:M0333444", "Cancer Of Stomach", "Disease", "NA"),),
+        "Stomach Neoplasms": (Entity("MESH:D013274", "bkMESH:D013274", "Stomach Neoplasms", "Disease", "NA"),),
     }
     mapped, coverage = normalize.normalise(
         ["Gastric Cancer", "Stomach Neoplasms"],
@@ -134,8 +137,8 @@ def test_two_spellings_of_one_disease_reach_the_same_id() -> None:
 
 def test_mesh_is_preferred_over_another_vocabulary() -> None:
     entities = (
-        Entity("PubChem:SID187051801", "GTPL7499", "Chemical", "Drug"),
-        Entity("MESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
+        Entity("PubChem:SID187051801", "bkPubChem:SID187051801", "GTPL7499", "Chemical", "Drug"),
+        Entity("MESH:C582435", "bkMESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
     )
     best = normalize.preferred(entities, {})
     assert best is not None and best.id == "MESH:C582435"
@@ -143,8 +146,8 @@ def test_mesh_is_preferred_over_another_vocabulary() -> None:
 
 def test_a_descriptor_is_preferred_over_a_supplementary_record() -> None:
     entities = (
-        Entity("MESH:C111111", "Supplementary", "Disease", "NA"),
-        Entity("MESH:D013274", "Stomach Neoplasms", "Disease", "NA"),
+        Entity("MESH:C111111", "bkMESH:C111111", "Supplementary", "Disease", "NA"),
+        Entity("MESH:D013274", "bkMESH:D013274", "Stomach Neoplasms", "Disease", "NA"),
     )
     best = normalize.preferred(entities, {})
     assert best is not None and best.id == "MESH:D013274"
@@ -152,8 +155,8 @@ def test_a_descriptor_is_preferred_over_a_supplementary_record() -> None:
 
 def test_a_curated_drug_is_preferred_over_an_untyped_chemical() -> None:
     entities = (
-        Entity("MESH:C000002", "Untyped", "Chemical", "NA"),
-        Entity("MESH:C000001", "Curated", "Chemical", "Drug"),
+        Entity("MESH:C000002", "bkMESH:C000002", "Untyped", "Chemical", "NA"),
+        Entity("MESH:C000001", "bkMESH:C000001", "Curated", "Chemical", "Drug"),
     )
     best = normalize.preferred(entities, {})
     assert best is not None and best.subtype == "Drug"
@@ -161,8 +164,8 @@ def test_a_curated_drug_is_preferred_over_an_untyped_chemical() -> None:
 
 def test_the_choice_does_not_depend_on_result_order() -> None:
     entities = (
-        Entity("MESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
-        Entity("PubChem:SID1", "Other", "Chemical", "Drug"),
+        Entity("MESH:C582435", "bkMESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
+        Entity("PubChem:SID1", "bkPubChem:SID1", "Other", "Chemical", "Drug"),
     )
     forward = normalize.preferred(entities, {})
     backward = normalize.preferred(tuple(reversed(entities)), {})
@@ -176,7 +179,7 @@ def test_no_entities_means_no_choice() -> None:
 def test_a_non_mesh_id_is_kept_not_dropped() -> None:
     """semaglutide and Ozempic resolve only to PubChem. Dropping them would
     lose whole modern drug classes."""
-    entities = {"SEMAGLUTIDE": (Entity("PubChem:CID56843331", "x", "Chemical", "Drug"),)}
+    entities = {"SEMAGLUTIDE": (Entity("PubChem:CID56843331", "bkPubChem:CID56843331", "x", "Chemical", "Drug"),)}
     mapped, coverage = normalize.normalise(
         ["SEMAGLUTIDE"], _repository(entities=entities), {}, "drugs"
     )
@@ -188,8 +191,8 @@ def test_an_entity_type_filter_excludes_a_same_named_gene() -> None:
     """'ASPIRIN' also reaches the gene ASPM in the graph."""
     entities = {
         "ASPIRIN": (
-            Entity("NCBI:259266", "ASPM", "Gene", "NA"),
-            Entity("PubChem:CID2244", "Aspirin", "Chemical", "Drug"),
+            Entity("NCBI:259266", "bkNCBI:259266", "ASPM", "Gene", "NA"),
+            Entity("PubChem:CID2244", "bkPubChem:CID2244", "Aspirin", "Chemical", "Drug"),
         )
     }
     mapped, _ = normalize.normalise(
@@ -262,7 +265,7 @@ def test_the_coverage_rate(asked: int, resolved: int, expected: float) -> None:
 
 
 def test_the_coverage_report_names_what_failed() -> None:
-    entities = {"Known": (Entity("MESH:D1", "Known", "Chemical", "Drug"),)}
+    entities = {"Known": (Entity("MESH:D1", "bkMESH:D1", "Known", "Chemical", "Drug"),)}
     _, coverage = normalize.normalise(
         ["Known", "Unknown"], _repository(entities=entities), {}, "drugs"
     )
@@ -278,9 +281,9 @@ def test_source_of_names_the_vocabulary() -> None:
 
 def test_counted_reports_the_most_claimed_ids() -> None:
     mapped = {
-        "a": normalize.Mapping("a", "MESH:D1", "", "", "exact"),
-        "b": normalize.Mapping("b", "MESH:D1", "", "", "exact"),
-        "c": normalize.Mapping("c", "MESH:D2", "", "", "exact"),
+        "a": normalize.Mapping("a", "MESH:D1", "", "", "", "exact"),
+        "b": normalize.Mapping("b", "MESH:D1", "", "", "", "exact"),
+        "c": normalize.Mapping("c", "MESH:D2", "", "", "", "exact"),
     }
     assert normalize.counted(mapped)[0] == ("MESH:D1", 2)
 
@@ -428,7 +431,7 @@ def test_the_pass_maps_every_side_it_can(
     repository = _FakeRepository(
         entities={
             "PEMBROLIZUMAB": (
-                Entity("MESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
+                Entity("MESH:C582435", "bkMESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
             )
         },
         synonyms={"MESH:C582435": frozenset({"Keytruda", "Pembrolizumab"})},
@@ -477,3 +480,40 @@ def test_the_trial_side_matches_through_the_synonym_index(tmp_path: Path) -> Non
     assert coverage.asked == 3
     assert coverage.resolved == 2
     assert all(r.basis == "synonym" for r in rows)
+
+
+def test_the_internal_node_id_reaches_the_output() -> None:
+    """P5 walks drug -> disease edges in pubmedRelations, which keys on
+    biokdeid. P1 already resolves it; throwing it away makes P5 redo the work."""
+    entities = {
+        "PEMBROLIZUMAB": (
+            Entity("MESH:C582435", "6308113", "Pembrolizumab", "Chemical", "Drug"),
+        )
+    }
+    mapped, _ = normalize.normalise(
+        ["PEMBROLIZUMAB"], _repository(entities=entities), {}, "drugs"
+    )
+    assert mapped["PEMBROLIZUMAB"].biokdeid == "6308113"
+
+
+def test_a_trial_side_row_inherits_the_internal_id() -> None:
+    rows, _ = normalize._match_trial_strings(
+        [("Keytruda",)],
+        {"keytruda": "MESH:C582435"},
+        "trial intervention",
+        {"MESH:C582435": "6308113"},
+    )
+    assert rows[0].biokdeid == "6308113"
+
+
+def test_an_indication_gets_an_internal_id_too(
+    full_corpus: RawData, empty_archive: TrialArchive
+) -> None:
+    """Indications arrive already coded to MeSH, so they never go through
+    resolve() and would otherwise carry no biokdeid — leaving P5 unable to walk
+    the disease end of a drug-disease edge."""
+    report = normalize.build(
+        full_corpus, empty_archive, _FakeRepository(),  # type: ignore[arg-type]
+        _CONCEPTS, ["D002289"],
+    )
+    assert report.indications[0].biokdeid == "bk-MESH:D002289"

@@ -95,6 +95,10 @@ class Mapping(NamedTuple):
 
     name: str
     mesh_id: str
+    #: The graph's internal node id — the key ``pubmedRelations`` uses. Carried
+    #: so P5 can walk drug → disease edges → supporting PMIDs without resolving
+    #: every entity a second time.
+    biokdeid: str
     official_name: str
     entity_type: str
     #: ``exact`` when the graph answered directly, ``rolled-up`` when a MeSH
@@ -243,6 +247,7 @@ def normalise(
         out[name] = Mapping(
             name=name,
             mesh_id=rolled,
+            biokdeid=best.biokdeid,
             official_name=best.official_name,
             entity_type=best.type,
             basis="rolled-up" if rolled != best.id else "exact",
@@ -358,7 +363,10 @@ def ingredients_of(
 
 
 def _match_trial_strings(
-    values: Iterable[tuple[str, ...]], index: dict[str, str], label: str
+    values: Iterable[tuple[str, ...]],
+    index: dict[str, str],
+    label: str,
+    biokdeids: dict[str, str] | None = None,
 ) -> tuple[tuple[Mapping, ...], Coverage]:
     """Map distinct trial strings through a synonym index.
 
@@ -380,6 +388,7 @@ def _match_trial_strings(
                 Mapping(
                     name=value,
                     mesh_id=mesh_id,
+                    biokdeid=(biokdeids or {}).get(mesh_id, ""),
                     official_name="",
                     entity_type="",
                     basis="synonym",
@@ -420,10 +429,14 @@ def build(
         if not any(name in drugs for name in by_application.get(application, ()))
     )
 
+    indication_internal = repository.internal_ids(
+        [roll_up(as_graph_id(i), concepts) for i in indication_ids]
+    )
     rolled_indications = {
         mesh_id: Mapping(
             name=mesh_id,
             mesh_id=roll_up(mesh_id, concepts),
+            biokdeid=indication_internal.get(roll_up(mesh_id, concepts), ""),
             official_name="",
             entity_type="Disease",
             basis="rolled-up" if roll_up(mesh_id, concepts) != mesh_id else "exact",
@@ -454,11 +467,17 @@ def build(
     for facts in trial_studies.read_study_facts(archive):
         interventions.append(facts.interventions)
         conditions.append(facts.conditions)
+    # The graph's internal id, keyed by the external one, so a trial-side row
+    # inherits the biokdeid its FDA-side counterpart already resolved.
+    drug_biokdeids = {m.mesh_id: m.biokdeid for m in drugs.values() if m.biokdeid}
     trial_drugs, trial_drug_coverage = _match_trial_strings(
-        interventions, drug_index, "trial intervention"
+        interventions, drug_index, "trial intervention", drug_biokdeids
     )
+    condition_biokdeids = {
+        m.mesh_id: m.biokdeid for m in rolled_indications.values() if m.biokdeid
+    }
     trial_conditions, trial_condition_coverage = _match_trial_strings(
-        conditions, condition_index, "trial condition"
+        conditions, condition_index, "trial condition", condition_biokdeids
     )
     return NormalizeReport(
         drugs=tuple(sorted(drugs.values())),

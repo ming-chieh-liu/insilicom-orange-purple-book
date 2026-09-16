@@ -105,6 +105,12 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 
 - **`biokdeIDTest` is a different id space** from `pubmedRelations` — always resolve through
   `pubmedEntitiesFlat`.
+- **Keep the `biokdeid`.** The prefixed `id` (`MESH:C582435`) is the *external* vocabulary id and
+  does not appear in `pubmedRelations` at all; edges are keyed on the internal `biokdeid`
+  (`6308113`). P1 carries it on every mapping row so P5 can walk drug → disease edges without
+  re-resolving. Entities that arrive already coded — indications, which come out of
+  `indications.tsv` as bare MeSH ids — need `BiokdeRepository.internal_ids()`, since they never
+  pass through a name lookup.
 - **MeSH `M` ids vs `D` ids:** `Stomach Neoplasms` → `MESH:D013274` but `Gastric Cancer` →
   `MESH:M0333444`. Same disease. Roll `M*` up to its descriptor or the join silently fails.
 - **Code names are separate concepts:** `MK-3475` → `MESH:M0586474`, not pembrolizumab's
