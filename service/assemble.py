@@ -161,6 +161,82 @@ def tier_for(
     return TIER_CORROBORATED if count_check == "counts_agree" else TIER_JUDGED
 
 
+#: The one polarity verdict that means the label presents a trial as evidence.
+#: Everything else -- ``NOT_SUPPORTING`` in v2, ``NEGATIVE`` and ``UNCLEAR`` in
+#: v1 -- means it does not.
+SUPPORTING: str = "SUPPORTING"
+
+
+def refuted_pairs(path: Path) -> set[tuple[str, str]]:
+    """``(nct_id, application)`` pairs section 14 does not present as evidence.
+
+    **The OR rule, from the section-14 runbook.** A trial discussed in several
+    subsections yields several verdicts, and if *any* says SUPPORTING the pair
+    is supporting: Tyvaso cites one trial as both its pivotal study and its
+    durability follow-up, and a judge may reasonably call the second
+    not-supporting while the first plainly supports. A pair is refuted only
+    when **every** verdict on it is unsupportive; a pair with no verdict is
+    left alone, because unjudged is not refuted.
+
+    **Known limitation.** These verdicts were made against openFDA's
+    *current-snapshot* labels, at application grain, while the links they
+    filter come from *per-submission* labels. Section 14 is cumulative and
+    pruned, so a trial pivotal in 2015 can appear under a "lack of efficacy"
+    heading today -- and this would then drop a correct 2015 link on the
+    strength of a 2026 reading. Measured coverage is 2,005 of 2,293 pairs; how
+    often the two readings disagree is not measured and would need the era
+    labels judged separately.
+    """
+    supporting: set[tuple[str, str]] = set()
+    against: set[tuple[str, str]] = set()
+    for row in identification.iter_json_lines(path):
+        nct = str(row.get("nct_id") or "")
+        application = str(row.get("application") or "")
+        if not nct or not application:
+            continue
+        target = supporting if row.get("final") == SUPPORTING else against
+        target.add((nct, application))
+    return against - supporting
+
+
+def _submission_sort(number: str) -> tuple[int, str]:
+    """Order submission numbers numerically, since the file stores strings.
+
+    >>> sorted(["10", "9", "1"], key=_submission_sort)
+    ['1', '9', '10']
+    >>> _submission_sort("ORIG")
+    (999999, 'ORIG')
+    """
+    return (int(number), number) if number.isdigit() else (999_999, number)
+
+
+def _label_group(unit: dict[str, object]) -> str:
+    """What identifies the label a unit came from, for tie-breaking.
+
+    The PDF digest where P2 recorded one. Where it did not, the submission's
+    own key -- unique by construction, so the unit groups only with itself and
+    is never merged away on missing evidence. The same principle as
+    :func:`service.candidates.within_date`: absent data must not hide a real
+    answer.
+    """
+    sha = str(unit.get("label_sha") or "")
+    return sha or (
+        f"?{unit.get('application')}|{unit.get('submission_type')}"
+        f"|{unit.get('submission_no')}"
+    )
+
+
+def _identified(
+    unit: dict[str, object], verdicts: dict[str, identification.Verdict]
+) -> str:
+    """The trial this unit resolves to, by either route, or ``""``."""
+    stated = str(unit.get("stated_nct") or "")
+    if stated:
+        return stated
+    verdict = verdicts.get(str(unit.get("unit_id") or ""))
+    return verdict.final if verdict is not None and verdict.identified else ""
+
+
 def read_jsonl(path: Path) -> Iterator[dict[str, object]]:
     """Each JSON object in a JSONL file."""
     yield from identification.iter_json_lines(path)
@@ -192,6 +268,7 @@ __all__ = [
     "render",
     "counts_agree",
     "read_jsonl",
+    "refuted_pairs",
     "tier_for",
 ]
 
@@ -226,6 +303,11 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     verdicts = identification.read_verdicts(
         adjudication_dir / "identify_verdicts.jsonl"
     )
+    # Section-14 polarity: trials the label cites but does not present as
+    # evidence. The fenofibrate label discusses ACCORD Lipid under a heading
+    # reading "Lack of Efficacy in Cardiovascular Outcomes Trials"; a regex
+    # sees a trial id, and only a reader sees that it failed.
+    refuted = refuted_pairs(adjudication_dir / "verdicts.jsonl")
     # Which MeSH ids were reached only by stripping a biologic suffix. Read
     # from drug_map rather than recomputed, so P5 and P3 cannot disagree about
     # which drugs are stem-sourced.
@@ -247,19 +329,58 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     links: list[Link] = []
     unlinked: list[Unlinked] = []
     linked_submissions: set[str] = set()
-    # D16: one link per (application, trial), on the earliest approval whose
-    # label carries it. Cumulative section 14 otherwise multiplies every trial
-    # across every later submission.
-    earliest: dict[tuple[str, str], str] = {}
+    #: ``(trial, submission)`` already written. The declared grain is one row
+    #: per pair, and a label often cites one trial under two section-14
+    #: headings -- KEYNOTE-158 under both "MSI-High" and "Endometrial
+    #: Carcinoma" -- which is two units and would otherwise be two identical
+    #: rows.
+    emitted: set[tuple[str, str]] = set()
     units = list(read_jsonl(out_dir / "candidates.jsonl"))
+
+    # D16, in two steps, and over **both** branches together. A trial can be
+    # named in prose on an early submission and by id on a later one --
+    # NCT01194219 is judged on NDA205437 SUPPL 7 and stated on SUPPL 11 -- so
+    # each branch enforcing D16 privately still lets the pair through twice.
+    #
+    # Step one: the earliest date any submission of this application carries
+    # the trial. Section 14 is cumulative, so later labels keep it without
+    # having rested on it.
+    earliest: dict[tuple[str, str], str] = {}
     for unit in units:
-        stated = str(unit.get("stated_nct") or "")
-        if not stated:
+        found = _identified(unit, verdicts)
+        if not found:
             continue
-        pair = (str(unit["application"]), stated)
+        pair = (str(unit["application"]), found)
         when = str(unit.get("approval_date") or "")
         if pair not in earliest or when < earliest[pair]:
             earliest[pair] = when
+
+    # Step two: among the submissions tied at that date, the **label** decides
+    # how many survive. FDA routinely approves several supplements on one day,
+    # so dates alone let all of them through -- 140 (trial, application) pairs
+    # spanned more than one submission and 138 were exact date ties. Measured
+    # across those ties, 70 share one PDF and 70 have genuinely different ones:
+    #
+    # * **Same label bytes** -- one document counted several times. Temodar's
+    #   NDA021029 SUPPL 36, 37 and 38 were all approved 2023-09-14 off a single
+    #   ``021029s036_037_038lbl.pdf``, so NCT00006353 was claimed as evidence
+    #   for three approvals when it was evidence for one event filed three
+    #   ways. Keep the lowest submission number.
+    # * **Different label bytes** -- distinct approvals that happen to share a
+    #   date, like NDA208419 SUPPL 2, 3 and 4. Keep them all; they are
+    #   different claims.
+    keeper: dict[tuple[str, str, str, str], str] = {}
+    for unit in units:
+        found = _identified(unit, verdicts)
+        when = str(unit.get("approval_date") or "")
+        if not found or earliest.get((str(unit["application"]), found)) != when:
+            continue
+        group = (str(unit["application"]), found, when, _label_group(unit))
+        number = str(unit["submission_no"])
+        if group not in keeper or _submission_sort(number) < _submission_sort(
+            keeper[group]
+        ):
+            keeper[group] = number
 
     submissions_with_units: set[str] = set()
     for unit in units:
@@ -275,20 +396,6 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         label_count = str(unit.get("enrollment") or "")
 
         if stated:
-            if earliest.get((str(unit["application"]), stated)) != str(
-                unit.get("approval_date") or ""
-            ):
-                unlinked.append(
-                    Unlinked(
-                        str(unit["application"]),
-                        str(unit["submission_type"]),
-                        str(unit["submission_no"]),
-                        str(unit.get("approval_date") or ""),
-                        name,
-                        "later_appearance_of_the_same_trial",
-                    )
-                )
-                continue
             nct, source = stated, "label_nct"
         else:
             verdict = verdicts.get(str(unit.get("unit_id") or ""))
@@ -317,6 +424,47 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                 )
                 continue
             nct, source = verdict.final, "label_description"
+
+        when = str(unit.get("approval_date") or "")
+        pair = (str(unit["application"]), nct)
+        group = (str(unit["application"]), nct, when, _label_group(unit))
+        if earliest.get(pair) != when:
+            reason = "later_appearance_of_the_same_trial"
+        elif keeper.get(group) != str(unit["submission_no"]):
+            # Not later -- simultaneous. A sibling submission approved the same
+            # day off the same label document already carries it.
+            reason = "same_day_sibling_submission"
+        else:
+            reason = ""
+        if reason:
+            unlinked.append(
+                Unlinked(
+                    str(unit["application"]),
+                    str(unit["submission_type"]),
+                    str(unit["submission_no"]),
+                    when,
+                    name,
+                    reason,
+                )
+            )
+            continue
+
+        if (nct, str(unit["application"])) in refuted:
+            unlinked.append(
+                Unlinked(
+                    str(unit["application"]),
+                    str(unit["submission_type"]),
+                    str(unit["submission_no"]),
+                    when,
+                    name,
+                    "judged_not_supporting",
+                )
+            )
+            continue
+
+        if (nct, key) in emitted:
+            continue
+        emitted.add((nct, key))
 
         check = counts_agree(label_count, registry.get(nct, ""))
         drug_mesh = str(unit.get("drug_mesh") or "")

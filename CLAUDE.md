@@ -269,6 +269,20 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - Label `version` values are dirty; order by `effective_time`.
 - ANDA labels cite NCT ids because generics copy the RLD label — attribute those to the reference
   application, not the ANDA.
+- **FDA approves several supplements of one application on the same day, and D16 compares dates.**
+  140 (trial, application) pairs spanned more than one submission and 138 were exact date ties.
+  The label PDF's digest breaks them, measured 70/70: Temodar's `NDA021029` SUPPL 36, 37 and 38
+  share one `021029s036_037_038lbl.pdf`, so the trial is evidence for one event filed three ways
+  and only SUPPL 36 keeps the link; `NDA208419` SUPPL 2, 3 and 4 have three different PDFs and are
+  three real claims. **An absent digest must count as distinct, never as shared** — grouping on the
+  empty string collapses every tie into one link and reports nothing.
+- **Section-14 polarity was judged on the *current* openFDA labels, at application grain, but
+  filters links built from *per-submission* labels.** §14 is cumulative and pruned, so a trial
+  pivotal in 2015 can sit under a "lack of efficacy" heading today, and the filter would drop a
+  correct 2015 link on a 2026 reading. Coverage is 2,005 of 2,293 pairs; the disagreement rate
+  between the two readings is **not measured** and would need the era labels judged separately.
+- **Submission numbers are strings in Drugs@FDA**, so `"10"` sorts before `"9"`. Anything choosing
+  "the lowest supplement" must compare numerically — `assemble._submission_sort`.
 
 ## CONVENTION — agent-delegated work requires a runbook
 

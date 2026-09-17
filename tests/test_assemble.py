@@ -93,6 +93,14 @@ _SPINE = (
     "\t2008+\tP\tfalse\ttrue\ttrue\n"
     "BLA125514\tBLA\tSUPPL\t99\tLabeling\t\t2019-01-01\t2008+\t\tfalse"
     "\tfalse\tfalse\n"
+    # Three supplements approved on ONE day — the Temodar shape. 36 and 37
+    # share a label PDF; 38 has its own.
+    "NDA021029\tNDA\tSUPPL\t36\tEfficacy\tEfficacy-New Indication"
+    "\t2023-09-14\t2008+\tP\tfalse\ttrue\ttrue\n"
+    "NDA021029\tNDA\tSUPPL\t37\tEfficacy\tEfficacy-New Indication"
+    "\t2023-09-14\t2008+\tP\tfalse\ttrue\ttrue\n"
+    "NDA021029\tNDA\tSUPPL\t38\tEfficacy\tEfficacy-New Indication"
+    "\t2023-09-14\t2008+\tP\tfalse\ttrue\ttrue\n"
 )
 
 
@@ -271,11 +279,12 @@ def test_a_submission_no_description_reached_is_still_accounted_for(
 def test_only_trial_relevant_submissions_are_counted(
     workspace: tuple[Path, Path]
 ) -> None:
-    """The labeling supplement in the fixture is not trial-driven."""
+    """The labeling supplement in the fixture is not trial-driven, so it is
+    excluded: the spine holds six rows and five are trial-relevant."""
     out, adj = workspace
     _write_units(out, [_unit()])
     report = assemble.build(out, adj)
-    assert report.submissions_total == 2
+    assert report.submissions_total == 5
 
 
 def test_the_report_renders_its_tiers(workspace: tuple[Path, Path]) -> None:
@@ -333,3 +342,166 @@ def test_a_submission_is_never_both_unjudged_and_unlabelled(
         by_submission.setdefault(key, set()).add(row.reason)
     for key, reasons in by_submission.items():
         assert not ("no_label" in reasons and len(reasons) > 1), key
+
+
+# ---------------------------------------------------------------------------
+# D16 tie-breaking: the label decides how many claims a shared date carries
+# ---------------------------------------------------------------------------
+
+
+def _temodar(number: str, sha: str, heading: str = "Glioblastoma") -> dict[str, object]:
+    return _unit(
+        unit_id=f"NDA021029|SUPPL|{number}|{heading}",
+        application="NDA021029", submission_type="SUPPL", submission_no=number,
+        approval_date="2023-09-14", heading=heading, stated_nct="NCT00006353",
+        acronym="", label_sha=sha,
+        candidates=[{"nct_id": "NCT00006353", "enrollment": "573"}],
+    )
+
+
+def test_one_label_serving_three_submissions_yields_one_link(
+    workspace: tuple[Path, Path]
+) -> None:
+    """Temodar SUPPL 36, 37 and 38 were approved the same day off a single
+    021029s036_037_038lbl.pdf. Comparing dates alone let all three through."""
+    out, adj = workspace
+    _write_units(out, [_temodar(n, "sha-shared") for n in ("36", "37", "38")])
+    links = [l for l in assemble.build(out, adj).links if l.application == "NDA021029"]
+    assert [l.submission_no for l in links] == ["36"]
+
+
+def test_distinct_labels_on_one_day_stay_distinct(
+    workspace: tuple[Path, Path]
+) -> None:
+    """Half the ties are genuinely different documents sharing a date."""
+    out, adj = workspace
+    _write_units(out, [_temodar(n, f"sha-{n}") for n in ("36", "37", "38")])
+    links = [l for l in assemble.build(out, adj).links if l.application == "NDA021029"]
+    assert {l.submission_no for l in links} == {"36", "37", "38"}
+
+
+def test_an_unknown_digest_is_distinct_never_shared(
+    workspace: tuple[Path, Path]
+) -> None:
+    """The dangerous direction. With no label_sha — units built before P2
+    recorded one, or a PDF that would not hash — grouping on the empty string
+    would collapse every tied submission into one link and say nothing.
+    Missing data must not hide a real answer."""
+    out, adj = workspace
+    _write_units(out, [_temodar(n, "") for n in ("36", "37", "38")])
+    links = [l for l in assemble.build(out, adj).links if l.application == "NDA021029"]
+    assert {l.submission_no for l in links} == {"36", "37", "38"}
+
+
+def test_a_same_day_sibling_is_not_called_a_later_appearance(
+    workspace: tuple[Path, Path]
+) -> None:
+    """It is not later, it is simultaneous. An auditor reading the unlinked
+    file should not be told something untrue."""
+    out, adj = workspace
+    _write_units(out, [_temodar(n, "sha-shared") for n in ("36", "37", "38")])
+    report = assemble.build(out, adj)
+    dropped = {u.reason for u in report.unlinked if u.submission_no in {"37", "38"}}
+    assert dropped == {"same_day_sibling_submission"}
+
+
+def test_a_genuinely_later_submission_is_still_dropped(
+    workspace: tuple[Path, Path]
+) -> None:
+    """The tie-break must not weaken D16 itself."""
+    out, adj = workspace
+    _write_units(out, [
+        _unit(unit_id="a", submission_no="35", approval_date="2018-08-20", label_sha="a"),
+        _unit(unit_id="b", submission_no="45", approval_date="2018-12-19", label_sha="b"),
+    ])
+    report = assemble.build(out, adj)
+    assert [l.submission_no for l in report.links] == ["35"]
+    assert "later_appearance_of_the_same_trial" in {u.reason for u in report.unlinked}
+
+
+def test_ties_break_numerically_not_lexically() -> None:
+    """Drugs@FDA stores submission numbers as strings, so "10" < "9"."""
+    assert assemble._submission_sort("9") < assemble._submission_sort("10")
+
+
+def test_one_trial_under_two_headings_is_one_row(
+    workspace: tuple[Path, Path]
+) -> None:
+    """The declared grain is one row per (trial, submission). KEYNOTE-158 is
+    cited under both "MSI-High" and "Endometrial Carcinoma" on one label."""
+    out, adj = workspace
+    _write_units(out, [
+        _temodar("36", "sha", "Glioblastoma"),
+        _temodar("36", "sha", "Anaplastic Astrocytoma"),
+    ])
+    links = [l for l in assemble.build(out, adj).links if l.application == "NDA021029"]
+    assert len(links) == 1
+
+
+# ---------------------------------------------------------------------------
+# Section-14 polarity reaches the deliverable
+# ---------------------------------------------------------------------------
+
+
+def _polarity(adj: Path, rows: list[dict[str, object]]) -> None:
+    (adj / "verdicts.jsonl").write_text(
+        "\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8"
+    )
+
+
+def test_a_refuted_trial_does_not_reach_the_deliverable(
+    workspace: tuple[Path, Path]
+) -> None:
+    """The fenofibrate shape: section 14 cites ACCORD Lipid under "Lack of
+    Efficacy". A regex sees an id; only a reader sees that it failed."""
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
+                     "final": "NOT_SUPPORTING"}])
+    report = assemble.build(out, adj)
+    assert report.links == ()
+    assert "judged_not_supporting" in {u.reason for u in report.unlinked}
+
+
+def test_supporting_anywhere_wins(workspace: tuple[Path, Path]) -> None:
+    """The runbook's OR rule — Tyvaso cites one trial as both its pivotal
+    study and its durability follow-up."""
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _polarity(adj, [
+        {"nct_id": "NCT02578680", "application": "BLA125514", "final": "NOT_SUPPORTING"},
+        {"nct_id": "NCT02578680", "application": "BLA125514", "final": "SUPPORTING"},
+    ])
+    assert len(assemble.build(out, adj).links) == 1
+
+
+def test_a_legacy_negative_verdict_still_counts_as_refuting() -> None:
+    """v1 wrote NEGATIVE and UNCLEAR; both mean not-supporting downstream."""
+    import tempfile
+    d = Path(tempfile.mkdtemp())
+    (d / "v.jsonl").write_text(
+        json.dumps({"nct_id": "N", "application": "A", "final": "NEGATIVE"}) + "\n",
+        encoding="utf-8",
+    )
+    assert assemble.refuted_pairs(d / "v.jsonl") == {("N", "A")}
+
+
+def test_an_unjudged_trial_is_not_refuted(workspace: tuple[Path, Path]) -> None:
+    """Unjudged is not refuted; dropping it would make partial adjudication
+    look like data loss."""
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _polarity(adj, [{"nct_id": "NCT99999999", "application": "BLA125514",
+                     "final": "NOT_SUPPORTING"}])
+    assert len(assemble.build(out, adj).links) == 1
+
+
+def test_polarity_is_keyed_on_the_application_too(
+    workspace: tuple[Path, Path]
+) -> None:
+    """A trial can support one drug's approval and be a failure on another."""
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _polarity(adj, [{"nct_id": "NCT02578680", "application": "NDA999999",
+                     "final": "NOT_SUPPORTING"}])
+    assert len(assemble.build(out, adj).links) == 1

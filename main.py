@@ -533,7 +533,8 @@ def main(argv: list[str] | None = None) -> int:
         repository.save(
             "label_trials",
             ("application", "submission_type", "submission_no", "section",
-             "heading", "nct_id", "acronym", "enrollment", "design", "excerpt"),
+             "heading", "nct_id", "acronym", "enrollment", "design", "excerpt",
+             "label_sha"),
             labels_report.descriptions,
         )
         repository.save(
