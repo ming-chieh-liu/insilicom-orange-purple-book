@@ -105,6 +105,9 @@ class Unit(NamedTuple):
     enrollment: str
     excerpt: str
     candidates: tuple[Candidate, ...]
+    #: Digest of the label PDF this description came from, so P5 can tell one
+    #: label counted several times from several labels sharing a date.
+    label_sha: str = ""
 
     @property
     def needs_judgement(self) -> bool:
@@ -179,13 +182,56 @@ def _read_tsv(path: Path) -> Iterator[dict[str, str]]:
         yield from csv.DictReader(handle, delimiter="\t")
 
 
+def _name_of(row: dict[str, str]) -> str:
+    """The trial name a row groups under, before the unnamed fallbacks.
+
+    Acronym first, then a stated id, then the subsection heading — the same
+    order :func:`collapse` uses. Rows that state an id never reach the
+    fallbacks, so this is exact for the pre-pass that counts ids per group.
+    """
+    return row.get("acronym") or row.get("nct_id") or row.get("heading") or ""
+
+
 def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     """One row per ``(submission, trial)``, keeping the most informative.
 
     A label describes one trial over several sentences, and only some of them
     state the patient count. Keeping the row that has one — and its NCT id
     where any sentence gave one — is what makes the unit judgeable.
+
+    **A stated registry id is never merged away.** Grouping on the acronym
+    alone assumed one acronym meant one trial, and a section-14 subsection
+    routinely cites two: the melanoma subsection names ``KEYNOTE-006`` beside
+    both ``NCT01866319`` (which is KEYNOTE-006) and ``NCT01704287`` (which is
+    KEYNOTE-002), because the extractor tags each id with the nearest acronym.
+    Collapsing them kept one id and discarded the other — **382 label-stated
+    ids across 381 groups**, and silently, since the surviving unit looked
+    served. Those are the strongest evidence the pipeline has: the FDA wrote
+    the id on the label.
+
+    So the id joins the key when the group holds more than one. Where a group
+    holds one id or none, the acronym still rules and rows without an id merge
+    into it, which is what stops one trial becoming two units — the reason the
+    acronym was the key in the first place. Where it holds several, rows
+    stating no id cannot be assigned to either and stay their own unit for a
+    judge; P5's ``(trial, submission)`` grain guard absorbs the answer if the
+    judge picks one already linked.
     """
+    # Which distinct stated ids each (submission, trial-name) group holds.
+    ids_in_group: dict[tuple[str, ...], set[str]] = {}
+    for row in rows:
+        if row.get("nct_id"):
+            name = _name_of(row)
+            ids_in_group.setdefault(
+                (
+                    row["application"],
+                    row["submission_type"],
+                    row["submission_no"],
+                    name,
+                ),
+                set(),
+            ).add(row["nct_id"])
+
     best: dict[tuple[str, ...], dict[str, str]] = {}
     seen_unnamed: Counter[tuple[str, str, str]] = Counter()
     for row in rows:
@@ -215,6 +261,16 @@ def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
             else:
                 seen_unnamed[submission] += 1
                 name = f"#{seen_unnamed[submission]}"
+        group = (
+            row["application"],
+            row["submission_type"],
+            row["submission_no"],
+            name,
+        )
+        # Several ids under one name: each keeps its own unit, and the name
+        # becomes the id so two units cannot share a unit_id.
+        if len(ids_in_group.get(group, set())) > 1 and row.get("nct_id"):
+            name = row["nct_id"]
         key = (
             row["application"],
             row["submission_type"],
@@ -512,6 +568,7 @@ def build(
                 enrollment=row.get("enrollment", ""),
                 excerpt=row.get("excerpt", ""),
                 candidates=shortlisted,
+                label_sha=row.get("label_sha", ""),
             )
         )
     sizes.sort()

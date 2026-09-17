@@ -502,3 +502,72 @@ def test_a_registry_id_is_found_however_the_label_spaces_it(written: str) -> Non
         f"14.1 Psoriasis\nThree trials ({written}) enrolled 3866 subjects.",
     )
     assert got[0].nct_id == "NCT01474512"
+
+
+# ---------------------------------------------------------------------------
+# A sentence naming several trials must not lose any of them
+# ---------------------------------------------------------------------------
+
+
+_TWO = (
+    "14 CLINICAL STUDIES\n"
+    "The efficacy of VUITY for the treatment of presbyopia was demonstrated in "
+    "two 30-Day Phase 3, randomized, double-masked, vehicle-controlled studies, "
+    "namely GEMINI 1 (NCT03804268) and GEMINI 2 (NCT03857542).\n"
+)
+
+
+def test_both_ids_in_one_sentence_are_kept() -> None:
+    """Labels routinely introduce a pair together. Keeping only the first
+    dropped the second silently — 26 of a 40-case sample were ids sitting
+    inside a section 14 already captured correctly."""
+    got = section14.describe_trials("NDA214028", "ORIG", "1", _TWO)
+    assert {d.nct_id for d in got} == {"NCT03804268", "NCT03857542"}
+
+
+def test_acronyms_pair_positionally_with_their_ids() -> None:
+    """GEMINI 1 belongs to the first id, GEMINI 2 to the second. Mis-pairing is
+    what made two different trials collide in candidates.collapse."""
+    got = {d.nct_id: d.acronym for d in section14.describe_trials(
+        "NDA214028", "ORIG", "1", _TWO
+    )}
+    assert got == {"NCT03804268": "GEMINI 1", "NCT03857542": "GEMINI 2"}
+
+
+def test_an_unpairable_acronym_is_not_guessed_onto_the_second_id() -> None:
+    """A wrong name is worse than none."""
+    body = (
+        "14 CLINICAL STUDIES\n"
+        "The MONARCH trial compared the two arms (NCT00000001) and (NCT00000002).\n"
+    )
+    got = {d.nct_id: d.acronym for d in section14.describe_trials(
+        "NDA1", "ORIG", "1", body
+    )}
+    assert got["NCT00000002"] == ""
+
+
+def test_the_count_stays_with_the_first_id_only() -> None:
+    """A sentence naming two trials and one count does not say which it belongs
+    to. Copying it to both manufactures the count agreement P5 reads as
+    corroboration (D17)."""
+    body = (
+        "14 CLINICAL STUDIES\n"
+        "Efficacy was shown in ALPHA (NCT00000001) and BETA (NCT00000002), "
+        "which enrolled 616 patients.\n"
+    )
+    got = {d.nct_id: d.enrollment for d in section14.describe_trials(
+        "NDA1", "ORIG", "1", body
+    )}
+    assert got["NCT00000002"] == ""
+
+
+def test_the_single_trial_case_is_unchanged() -> None:
+    body = (
+        "14 CLINICAL STUDIES\n"
+        "KEYNOTE-189 (NCT02578680) was conducted in 616 patients.\n"
+    )
+    got = section14.describe_trials("BLA125514", "SUPPL", "35", body)
+    assert len(got) == 1
+    assert (got[0].nct_id, got[0].acronym, got[0].enrollment) == (
+        "NCT02578680", "KEYNOTE-189", "616",
+    )

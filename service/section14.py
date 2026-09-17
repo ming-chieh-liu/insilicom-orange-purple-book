@@ -39,6 +39,7 @@ match yields the table of contents.
 
 from __future__ import annotations
 
+import hashlib
 import re
 from concurrent.futures import (
     ProcessPoolExecutor,
@@ -165,6 +166,13 @@ class TrialDescription(NamedTuple):
     design: str
     #: The sentence the trial was named in, for a judge to read.
     excerpt: str
+    #: SHA-256 of the label PDF this came out of. One PDF often serves several
+    #: submissions approved together — ``021029s036_037_038lbl.pdf`` is the
+    #: label for three — and FDA sometimes files separate but identical PDFs
+    #: instead. Carrying the digest lets P5 tell "the same label, counted
+    #: three times" from "three genuinely different labels that happen to
+    #: share a date". See D16.
+    label_sha: str = ""
 
 
 class LabelReading(NamedTuple):
@@ -282,6 +290,25 @@ def describe_trials(
     two. A subsection naming no trial at all still yields one row when it
     states an enrollment — the trial is there, just unnamed, and P4 can still
     compare it against candidates.
+
+    **A sentence naming several registry ids yields one description each.**
+    Labels routinely introduce a pair together — *"two Phase 3 studies, namely
+    GEMINI 1 (NCT03804268) and GEMINI 2 (NCT03857542)"* — and keeping only the
+    first silently dropped the second. Measured against the openFDA snapshot of
+    the same labels, 26 of a 40-case sample were ids sitting inside a section 14
+    this module had already captured, and **none** were outside it: the region
+    was right and the reading was lossy. An id the FDA wrote on the label is the
+    strongest evidence this project has, so none may be discarded.
+
+    Acronyms pair positionally when the sentence supplies as many as it does
+    ids, which is the usual shape. When it does not, only the first id keeps an
+    acronym — a wrong name is worse than none, and mis-paired acronyms are what
+    made two different trials collide in :func:`service.candidates.collapse`.
+
+    The **enrollment count stays with the first id only**. A sentence naming two
+    trials and one count does not say which it belongs to, and copying it to
+    both would manufacture agreement between a label and a registry that P5
+    reads as corroboration (D17).
     """
     out: list[TrialDescription] = []
     for number, heading, block in split_subsections(body):
@@ -299,20 +326,33 @@ def describe_trials(
             ]
             if not (ncts or acronyms or counts):
                 continue
-            out.append(
-                TrialDescription(
-                    application=application,
-                    submission_type=submission_type,
-                    submission_no=submission_no,
-                    section=number,
-                    heading=heading,
-                    nct_id=ncts[0] if ncts else "",
-                    acronym=acronyms[0] if acronyms else "",
-                    enrollment=counts[0].replace(",", "") if counts else "",
-                    design=";".join(sorted({d.lower() for d in DESIGN.findall(sentence)})),
-                    excerpt=sentence[:600],
+            design = ";".join(sorted({d.lower() for d in DESIGN.findall(sentence)}))
+            paired = len(acronyms) == len(ncts)
+            for position, nct in enumerate(ncts or [""]):
+                if position and paired:
+                    acronym = acronyms[position]
+                elif position:
+                    acronym = ""
+                else:
+                    acronym = acronyms[0] if acronyms else ""
+                out.append(
+                    TrialDescription(
+                        application=application,
+                        submission_type=submission_type,
+                        submission_no=submission_no,
+                        section=number,
+                        heading=heading,
+                        nct_id=nct,
+                        acronym=acronym,
+                        enrollment=(
+                            counts[0].replace(",", "")
+                            if counts and not position
+                            else ""
+                        ),
+                        design=design,
+                        excerpt=sentence[:600],
+                    )
                 )
-            )
     return tuple(out)
 
 
@@ -547,6 +587,16 @@ def build(
                     texts[pending_parse[finished_parse]] = got[0]
     _log.info("%d parsed, %d unreadable", len(texts), unreadable)
 
+    # One digest per distinct PDF, computed once. The cache is keyed on URL,
+    # so two submissions sharing a URL trivially share a digest; two filed
+    # under different URLs are compared on their bytes.
+    shas: dict[str, str] = {}
+    for url, path in cached.items():
+        try:
+            shas[url] = hashlib.sha256(path.read_bytes()).hexdigest()
+        except OSError:  # pragma: no cover - a cached file vanishing mid-run
+            shas[url] = ""
+
     descriptions: list[TrialDescription] = []
     indications: list[SubmissionIndication] = []
     scanned = with_14 = with_1 = subsections = 0
@@ -591,6 +641,7 @@ def build(
                     application=document.application,
                     submission_type=document.submission_type,
                     submission_no=document.submission_no,
+                    label_sha=shas.get(document.url, ""),
                 )
             )
     return LabelsReport(

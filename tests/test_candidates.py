@@ -633,3 +633,84 @@ def test_the_biosimilar_key_only_ranks_and_never_filters() -> None:
         prefer_biosimilar=True,
     )
     assert len(got) == 2
+
+
+# ---------------------------------------------------------------------------
+# A stated registry id is ground truth and is never merged away
+# ---------------------------------------------------------------------------
+
+
+def _desc(acronym: str, nct: str = "", enrollment: str = "", excerpt: str = "x"
+          ) -> dict[str, str]:
+    return {
+        "application": "BLA125514", "submission_type": "SUPPL",
+        "submission_no": "16", "section": "14.1", "heading": "Melanoma",
+        "nct_id": nct, "acronym": acronym, "enrollment": enrollment,
+        "design": "", "excerpt": excerpt,
+    }
+
+
+def test_two_trials_under_one_acronym_stay_two_units() -> None:
+    """The melanoma subsection names KEYNOTE-006 beside both NCT01866319
+    (KEYNOTE-006) and NCT01704287 (KEYNOTE-002); the extractor tags each id
+    with the nearest acronym. Grouping on the acronym discarded one of them —
+    382 label-stated ids across 381 groups, silently, because the surviving
+    unit looked served."""
+    out = candidates.collapse([
+        _desc("KEYNOTE-006", "NCT01866319"),
+        _desc("KEYNOTE-006", "NCT01704287"),
+    ])
+    assert {row["nct_id"] for row in out} == {"NCT01866319", "NCT01704287"}
+
+
+def test_one_trial_over_several_sentences_is_still_one_unit() -> None:
+    """The reason the acronym was the key: a label names a trial in every
+    sentence but gives the id in at most one. Splitting on the id would send a
+    judge to identify a trial the label had already identified."""
+    out = candidates.collapse([
+        _desc("KEYNOTE-189", "NCT02578680"),
+        _desc("KEYNOTE-189", ""),
+        _desc("KEYNOTE-189", "", enrollment="616"),
+    ])
+    assert len(out) == 1
+    assert out[0]["nct_id"] == "NCT02578680"
+    assert out[0]["enrollment"] == "616"
+
+
+def test_an_id_less_sentence_beside_two_ids_becomes_its_own_unit() -> None:
+    """It cannot be assigned to either trial, so a judge decides. P5's
+    (trial, submission) grain guard absorbs the answer if the judge picks one
+    that is already linked."""
+    out = candidates.collapse([
+        _desc("KEYNOTE-006", "NCT01866319"),
+        _desc("KEYNOTE-006", "NCT01704287"),
+        _desc("KEYNOTE-006", ""),
+    ])
+    assert len(out) == 3
+    assert sum(1 for row in out if not row["nct_id"]) == 1
+
+
+def test_split_units_do_not_share_a_trial_key() -> None:
+    """unit_id is built from the trial key, and two units sharing one would
+    collide in the verdict file — a bug this project has already had."""
+    out = candidates.collapse([
+        _desc("KEYNOTE-006", "NCT01866319"),
+        _desc("KEYNOTE-006", "NCT01704287"),
+    ])
+    keys = [row[candidates.TRIAL_KEY] for row in out]
+    assert len(set(keys)) == len(keys)
+
+
+def test_no_stated_id_is_ever_dropped() -> None:
+    """The property, stated directly: every id P2 extracted survives collapse."""
+    rows = [
+        _desc("KEYNOTE-006", "NCT01866319"),
+        _desc("KEYNOTE-006", "NCT01704287"),
+        _desc("KEYNOTE-024", "NCT02039674"),
+        _desc("KEYNOTE-024", "NCT02142738"),
+        _desc("KEYNOTE-189", "NCT02578680"),
+    ]
+    out = candidates.collapse(rows)
+    assert {row["nct_id"] for row in rows if row["nct_id"]} <= {
+        row["nct_id"] for row in out
+    }
