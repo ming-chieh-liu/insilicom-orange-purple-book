@@ -147,7 +147,7 @@ readable section 14 — that is the whole reason it exists. It does two jobs:
 
 1. **Fallback.** For approvals the label route exhausted, it is the only source.
    Runs on `unlinked_submissions.tsv` reasons that mean *exhausted*
-   (`no_description_extracted`, `judged_none`, `no_candidates`,
+   (`no_label`, `judged_none`, `no_candidates`,
    `no_drug_resolved`) — **not** `not_yet_judged`, which means P4 has not looked
    yet, and **not** `later_appearance_of_the_same_trial`, which is D16 working.
 2. **Cross-check, and this costs no agent calls.** For links the label route

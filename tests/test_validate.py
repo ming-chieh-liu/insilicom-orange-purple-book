@@ -201,3 +201,124 @@ def test_the_report_leads_with_the_ceiling() -> None:
     rendered = validate.render(validate.Recall(100, 54, ("x -> NCT1",)), (("A", 5),))
     assert "SHORTLIST RECALL" in rendered
     assert "54.0%" in rendered
+
+
+# ---------------------------------------------------------------------------
+# The gold set must not show the judge its own answer
+# ---------------------------------------------------------------------------
+
+
+def test_a_unit_whose_excerpt_prints_the_id_is_not_a_gold_case(
+    tmp_path: Path,
+) -> None:
+    """2,192 of 3,352 eligible units carry an NCT id in the excerpt, because
+    collapse() merges sentences and keeps the most informative one. Judging
+    those measures copying an identifier, not identifying a trial."""
+    units = tmp_path / "units.jsonl"
+    units.write_text(
+        json.dumps(
+            {
+                "unit_id": "u1",
+                "stated_nct": "NCT01866319",
+                "excerpt": "investigated in KEYNOTE-006 (NCT01866319), a trial",
+                "candidates": [{"nct_id": "NCT01866319", "enrollment": "834"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    truth = validate.withhold(units, tmp_path / "out.jsonl", 10)
+    assert truth == {}
+
+
+def test_a_unit_named_only_in_prose_is_a_gold_case(tmp_path: Path) -> None:
+    """The label named the trial by acronym; the answer is known from a
+    sibling sentence the judge never sees. This is the task P4 performs."""
+    units = tmp_path / "units.jsonl"
+    units.write_text(
+        json.dumps(
+            {
+                "unit_id": "u1",
+                "stated_nct": "NCT01866319",
+                "excerpt": "investigated in KEYNOTE-006, a randomized trial in "
+                "834 patients",
+                "candidates": [{"nct_id": "NCT01866319", "enrollment": "834"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    truth = validate.withhold(units, tmp_path / "out.jsonl", 10)
+    assert truth == {"u1": "NCT01866319"}
+
+
+def test_the_written_unit_does_not_carry_the_answer(tmp_path: Path) -> None:
+    units = tmp_path / "units.jsonl"
+    units.write_text(
+        json.dumps(
+            {
+                "unit_id": "u1",
+                "stated_nct": "NCT01866319",
+                "excerpt": "investigated in KEYNOTE-006, a randomized trial",
+                "candidates": [{"nct_id": "NCT01866319", "enrollment": "834"}],
+            }
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    out = tmp_path / "out.jsonl"
+    validate.withhold(units, out, 10)
+    written = out.read_text(encoding="utf-8").splitlines()[0]
+    # The answer must not reach the judge by any route: not as a field, and
+    # not inside the excerpt. The candidate list legitimately contains it —
+    # that is the question — so only the prose is checked.
+    assert "stated_nct" not in json.loads(written)
+    assert "NCT01866319" not in json.loads(written)["excerpt"]
+
+
+def test_the_sample_is_spread_rather_than_taken_from_the_head(
+    tmp_path: Path,
+) -> None:
+    """candidates.jsonl is in application order, so the first N eligible units
+    are one sponsor and one era. The sample must not be the file's head."""
+    units = tmp_path / "units.jsonl"
+    units.write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "unit_id": f"u{i:03d}",
+                    "stated_nct": f"NCT{i:08d}",
+                    "excerpt": "investigated in a randomized trial",
+                    "candidates": [{"nct_id": f"NCT{i:08d}", "enrollment": "10"}],
+                }
+            )
+            for i in range(100)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    truth = validate.withhold(units, tmp_path / "out.jsonl", 10)
+    assert set(truth) != {f"u{i:03d}" for i in range(10)}
+
+
+def test_the_sample_is_reproducible(tmp_path: Path) -> None:
+    """Same input, same units — a precision figure has to be re-derivable."""
+    units = tmp_path / "units.jsonl"
+    units.write_text(
+        "\n".join(
+            json.dumps(
+                {
+                    "unit_id": f"u{i:03d}",
+                    "stated_nct": f"NCT{i:08d}",
+                    "excerpt": "investigated in a randomized trial",
+                    "candidates": [{"nct_id": f"NCT{i:08d}", "enrollment": "10"}],
+                }
+            )
+            for i in range(100)
+        )
+        + "\n",
+        encoding="utf-8",
+    )
+    first = validate.withhold(units, tmp_path / "a.jsonl", 10)
+    second = validate.withhold(units, tmp_path / "b.jsonl", 10)
+    assert first == second

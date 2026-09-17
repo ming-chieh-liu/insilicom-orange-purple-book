@@ -39,6 +39,11 @@ _log = get_logger(__name__)
 #: Reasons in ``unlinked_submissions.tsv`` that mean the label route is
 #: **exhausted**, and so the graph route is the only source left.
 #:
+#: A submission only ever carries ``no_label`` when it produced **no unit at
+#: all**. Before that was enforced it also carried the catch-all alongside a
+#: specific reason, and 695 of 1,327 tier-C units were built for submissions
+#: P4 had not yet judged — the very pre-emption this filter exists to stop.
+#:
 #: Two reasons are deliberately absent. ``not_yet_judged`` means P4 has not
 #: looked yet, not that it failed — running tier C there would produce weak
 #: graph links for approvals P4 may well resolve at tier A, and a tier-C link
@@ -47,7 +52,7 @@ _log = get_logger(__name__)
 #: earlier submission.
 EXHAUSTED: frozenset[str] = frozenset(
     {
-        "no_description_extracted",
+        "no_label",
         "judged_none",
         "no_candidates",
         "no_drug_resolved",

@@ -25,10 +25,12 @@ judging failure until the shortlist was checked.
 from __future__ import annotations
 
 import csv
+import hashlib
 from pathlib import Path
 from typing import NamedTuple
 
 from service import identification
+from service.section14 import NCT
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -126,13 +128,30 @@ def shortlist_recall(units_path: Path, limit: int | None = None) -> Recall:
 def withhold(units_path: Path, out_path: Path, limit: int) -> dict[str, str]:
     """Write judging units from known-answer cases, with the answer removed.
 
-    The excerpt keeps whatever the label wrote, including the id if it is in the
-    prose — stripping that would test a different task than the one P4 performs.
     What is withheld is the ``stated_nct`` field the pipeline would otherwise
     short-circuit on, so the unit reaches a judge at all.
+
+    **A unit whose excerpt still prints an NCT id is not usable here**, and
+    that is most of them: 2,192 of the 3,352 eligible units, 65.4%. They exist
+    because :func:`service.candidates.collapse` merges a label's sentences —
+    one sentence supplies the id and a different, more informative one is kept
+    as the excerpt — so the unit knows the answer while the excerpt still shows
+    it somewhere. A judge would read it off, and the score would measure
+    copying an identifier rather than identifying a trial from its description.
+    That is not the task P4 performs: a real P4 unit has no id in its prose,
+    which is precisely why it needs a judge.
+
+    The remaining 1,160 are the honest gold set — the label named the trial in
+    prose only, and the answer is known from a sibling sentence the judge never
+    sees.
+
+    Selection is **spread deterministically** rather than taken from the head
+    of the file. ``candidates.jsonl`` is in application order, so the first N
+    eligible units are all low application numbers — one sponsor, one era, one
+    therapeutic area. Hashing the unit id gives a stable, arbitrary order that
+    is reproducible across runs without importing a seed.
     """
-    truth: dict[str, str] = {}
-    chosen: list[dict[str, object]] = []
+    eligible: list[dict[str, object]] = []
     for unit in identification.iter_json_lines(units_path):
         stated = str(unit.get("stated_nct") or "")
         raw = unit.get("candidates")
@@ -143,12 +162,21 @@ def withhold(units_path: Path, out_path: Path, limit: int) -> dict[str, str]:
             # Unanswerable: P3 never offered it. Counted by shortlist_recall,
             # not by the judge's score.
             continue
-        if len(chosen) >= limit:
-            break
-        truth[str(unit["unit_id"])] = stated
-        chosen.append({**unit, "stated_nct": ""})
+        if NCT.search(str(unit.get("excerpt") or "")):
+            # The answer is printed in the text the judge reads.
+            continue
+        eligible.append(unit)
+    eligible.sort(key=lambda u: hashlib.sha256(
+        str(u.get("unit_id") or "").encode()
+    ).hexdigest())
+    chosen = [{**unit, "stated_nct": ""} for unit in eligible[:limit]]
+    truth = {str(unit["unit_id"]): str(unit["stated_nct"]) for unit in eligible[:limit]}
     identification.write_units(chosen, out_path)
-    _log.info("wrote %d withheld-answer units", len(chosen))
+    _log.info(
+        "wrote %d withheld-answer units from %d leak-free eligible",
+        len(chosen),
+        len(eligible),
+    )
     return truth
 
 

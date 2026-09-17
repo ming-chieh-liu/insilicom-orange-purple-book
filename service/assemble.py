@@ -261,11 +261,13 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         if pair not in earliest or when < earliest[pair]:
             earliest[pair] = when
 
+    submissions_with_units: set[str] = set()
     for unit in units:
         key = (
             f"{unit['application']}|{unit['submission_type']}"
             f"|{unit['submission_no']}"
         )
+        submissions_with_units.add(key)
         event = spine.get(key, {})
         name = str(unit.get("acronym") or unit.get("heading") or "")
         stated = str(unit.get("stated_nct") or "")
@@ -345,8 +347,24 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         )
         linked_submissions.add(key)
 
+    # Only submissions that produced **no unit at all** get a catch-all row.
+    # A submission whose units each failed for a stated reason is already
+    # explained by those rows, and adding a second, vaguer row on top of them
+    # double-counted 1,503 submissions — inflating the largest unlinked
+    # category by 22% and, worse, admitting them to tier C through
+    # :data:`service.graph_links.EXHAUSTED` although P4 had not looked yet.
+    # That is exactly the pre-emption the EXHAUSTED filter exists to prevent:
+    # 695 of 1,327 tier-C units were built for submissions still queued for a
+    # judge.
+    #
+    # The reason is ``no_label`` rather than the old
+    # ``no_description_extracted`` because that is what it measures. Splitting
+    # the 6,757 showed **zero** submissions where a label PDF existed and no
+    # description came out of it — section-14 extraction loses nothing. All
+    # 5,254 genuinely unitless submissions simply have no type-2 label PDF in
+    # ApplicationDocs, 3,351 of them pre-2000.
     for key, row in spine.items():
-        if key not in linked_submissions:
+        if key not in linked_submissions and key not in submissions_with_units:
             unlinked.append(
                 Unlinked(
                     row["application"],
@@ -354,7 +372,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                     row["submission_no"],
                     row["approval_date"],
                     "",
-                    "no_description_extracted",
+                    "no_label",
                 )
             )
 

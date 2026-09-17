@@ -265,7 +265,7 @@ def test_a_submission_no_description_reached_is_still_accounted_for(
     out, adj = workspace
     _write_units(out, [_unit()])
     report = assemble.build(out, adj)
-    assert "no_description_extracted" in {u.reason for u in report.unlinked}
+    assert "no_label" in {u.reason for u in report.unlinked}
 
 
 def test_only_trial_relevant_submissions_are_counted(
@@ -311,3 +311,25 @@ def test_a_stated_id_is_unaffected_by_a_stem_sourced_drug() -> None:
 
 def test_an_ordinary_drug_still_reaches_tier_a_on_agreeing_counts() -> None:
     assert assemble.tier_for("label_description", "counts_agree", "") == "A"
+
+
+# ---------------------------------------------------------------------------
+# One submission, one explanation
+# ---------------------------------------------------------------------------
+
+
+def test_a_submission_is_never_both_unjudged_and_unlabelled(
+    workspace: tuple[Path, Path]
+) -> None:
+    """Stated as a property over the whole report, which is how the bug would
+    have been caught: no submission may carry the catch-all alongside a
+    specific reason."""
+    out, adj = workspace
+    _write_units(out, [_unit(stated_nct="", unit_id="u1")])
+    report = assemble.build(out, adj)
+    by_submission: dict[tuple[str, str, str], set[str]] = {}
+    for row in report.unlinked:
+        key = (row.application, row.submission_type, row.submission_no)
+        by_submission.setdefault(key, set()).add(row.reason)
+    for key, reasons in by_submission.items():
+        assert not ("no_label" in reasons and len(reasons) > 1), key

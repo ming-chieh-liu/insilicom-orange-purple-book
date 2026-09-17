@@ -418,7 +418,7 @@ def _unlinked(reason: str, no: str = "1") -> dict[str, str]:
 
 @pytest.mark.parametrize(
     "reason",
-    ["no_description_extracted", "judged_none", "no_candidates", "no_drug_resolved"],
+    ["no_label", "judged_none", "no_candidates", "no_drug_resolved"],
 )
 def test_an_exhausted_reason_reaches_the_graph_route(reason: str) -> None:
     assert graph_links.exhausted_only([_unlinked(reason)]) == {"NDA1|ORIG|1"}
@@ -444,7 +444,7 @@ def test_a_mixed_file_takes_only_the_exhausted() -> None:
     rows = [
         _unlinked("judged_none", "1"),
         _unlinked("not_yet_judged", "2"),
-        _unlinked("no_description_extracted", "3"),
+        _unlinked("no_label", "3"),
         _unlinked("later_appearance_of_the_same_trial", "4"),
     ]
     assert graph_links.exhausted_only(rows) == {"NDA1|ORIG|1", "NDA1|ORIG|3"}
