@@ -82,6 +82,13 @@ class Link(NamedTuple):
     evidence_source: str
     #: ``counts_agree`` \\| ``counts_diverge`` \\| ``no_count``.
     count_check: str
+    #: How the approval's drug reached its id. ``stem`` means the FDA name
+    #: carried a four-letter biologic suffix that resolved to nothing, so the
+    #: suffix was stripped and the **reference product's** id used to retrieve.
+    #: That is a retrieval convenience, not an identity claim, so such a link
+    #: is held below tier A however well the counts agree — see
+    #: :func:`tier_for`.
+    drug_basis: str = ""
 
 
 class Unlinked(NamedTuple):
@@ -116,12 +123,23 @@ def counts_agree(label: str, registry: str) -> str:
     return "counts_agree" if gap <= COUNT_TOLERANCE else "counts_diverge"
 
 
-def tier_for(evidence_source: str, count_check: str) -> str:
+def tier_for(
+    evidence_source: str, count_check: str, drug_basis: str = ""
+) -> str:
     """The tier a link earns.
 
     A label that names its own trial is tier A outright — there is nothing to
     corroborate, the FDA stated it. A judged link reaches tier A only when the
     counts agree.
+
+    **A stem-derived drug never reaches tier A by count agreement.** When the
+    FDA name carried a biologic suffix that resolved to nothing, retrieval fell
+    back to the suffix-stripped stem, which for a biosimilar is a *different*
+    product — its reference. The candidate pool is then dominated by the
+    reference product's trials, and agreeing patient counts are exactly what a
+    wrong match in that pool looks like. A 351(k) rests on its own trials
+    (D11), so the claim stays at tier B and the basis is written on the row.
+    A label that stated the id outright is unaffected: the FDA said it.
 
     >>> tier_for("label_nct", "no_count")
     'A'
@@ -131,9 +149,15 @@ def tier_for(evidence_source: str, count_check: str) -> str:
     'B'
     >>> tier_for("label_description", "no_count")
     'B'
+    >>> tier_for("label_description", "counts_agree", "stem")
+    'B'
+    >>> tier_for("label_nct", "no_count", "stem")
+    'A'
     """
     if evidence_source == "label_nct":
         return TIER_STATED
+    if drug_basis == "stem":
+        return TIER_JUDGED
     return TIER_CORROBORATED if count_check == "counts_agree" else TIER_JUDGED
 
 
@@ -202,6 +226,16 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     verdicts = identification.read_verdicts(
         adjudication_dir / "identify_verdicts.jsonl"
     )
+    # Which MeSH ids were reached only by stripping a biologic suffix. Read
+    # from drug_map rather than recomputed, so P5 and P3 cannot disagree about
+    # which drugs are stem-sourced.
+    stem_ids: set[str] = set()
+    drug_map = out_dir / "drug_map.tsv"
+    if drug_map.is_file():
+        with drug_map.open(encoding="utf-8") as handle:
+            for row in csv.DictReader(handle, delimiter="\t"):
+                if row.get("basis") == "stem" and row.get("mesh_id"):
+                    stem_ids.add(row["mesh_id"])
     spine: dict[str, dict[str, str]] = {}
     with (out_dir / "approval_events.tsv").open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
@@ -283,6 +317,12 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
             nct, source = verdict.final, "label_description"
 
         check = counts_agree(label_count, registry.get(nct, ""))
+        drug_mesh = str(unit.get("drug_mesh") or "")
+        basis = (
+            "stem"
+            if stem_ids and set(drug_mesh.split(";")) & stem_ids
+            else ""
+        )
         links.append(
             Link(
                 nct_id=nct,
@@ -293,13 +333,14 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                 action_type=event.get("action_type", ""),
                 indication_mesh=str(unit.get("indication_mesh") or ""),
                 indication_term=str(unit.get("heading") or ""),
-                drug_mesh=str(unit.get("drug_mesh") or ""),
+                drug_mesh=drug_mesh,
                 trial_name=name,
                 label_enrollment=label_count,
                 registry_enrollment=registry.get(nct, ""),
-                evidence_tier=tier_for(source, check),
+                evidence_tier=tier_for(source, check, basis),
                 evidence_source=source,
                 count_check=check,
+                drug_basis=basis,
             )
         )
         linked_submissions.add(key)

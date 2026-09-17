@@ -638,3 +638,128 @@ def test_a_real_drug_whose_name_merely_contains_a_design_word_survives() -> None
         ["MESH:D1"], repository, {}  # type: ignore[arg-type]
     )
     assert "controlled-release morphine" in index
+
+
+# ---------------------------------------------------------------------------
+# The biologic suffix: retrieval by stem, never identity by stem
+# ---------------------------------------------------------------------------
+
+
+def _suffix_graph() -> _FakeRepository:
+    """A graph that knows the stems but not the suffixed products.
+
+    That is the real shape: MeSH stopped adding biosimilar concepts around
+    2017, so ADALIMUMAB-AACF is absent while ADALIMUMAB is not.
+    """
+    return _FakeRepository(
+        entities={
+            "ADALIMUMAB": (
+                Entity("MESH:D000068879", "bk-1", "Adalimumab", "Chemical", "Drug"),
+            ),
+            "ADUCANUMAB": (
+                Entity("MESH:C000600266", "bk-2", "Aducanumab", "Chemical", "Drug"),
+            ),
+            "ADALIMUMAB-ATTO": (
+                Entity("MESH:M000638621", "bk-3", "Adalimumab-Atto", "Chemical", "Drug"),
+            ),
+        }
+    )
+
+
+def test_an_unresolvable_suffixed_name_falls_back_to_its_stem() -> None:
+    """ADALIMUMAB-AACF is in no vocabulary at all. Without the fallback the
+    application resolves no drug, gets no candidates, and the miss looks like a
+    drug whose trials were never registered."""
+    mapped, _ = normalize.normalise(
+        ["ADALIMUMAB-AACF"],
+        _repository(entities=_suffix_graph()._entities),
+        _CONCEPTS,
+        "drugs",
+        stems=True,
+    )
+    assert mapped["ADALIMUMAB-AACF"].mesh_id == "MESH:D000068879"
+
+
+def test_a_stem_derived_row_is_marked_as_such() -> None:
+    """The whole point of the basis column: for a biosimilar the stem names a
+    *different* product, so downstream must be able to tell."""
+    mapped, _ = normalize.normalise(
+        ["ADALIMUMAB-AACF"],
+        _repository(entities=_suffix_graph()._entities),
+        _CONCEPTS,
+        "drugs",
+        stems=True,
+    )
+    assert mapped["ADALIMUMAB-AACF"].basis == "stem"
+
+
+def test_a_suffixed_name_the_graph_knows_keeps_its_own_id() -> None:
+    """The stem is a fallback, not a competitor. ADALIMUMAB-ATTO resolves on
+    its own, so it must not be folded into its reference product."""
+    mapped, _ = normalize.normalise(
+        ["ADALIMUMAB-ATTO"],
+        _repository(entities=_suffix_graph()._entities),
+        _CONCEPTS,
+        "drugs",
+        stems=True,
+    )
+    assert mapped["ADALIMUMAB-ATTO"].basis != "stem"
+
+
+def test_the_stem_fallback_is_off_unless_asked_for() -> None:
+    """Only the FDA drug side wants it. A trial intervention named with a
+    suffix should not silently become its reference product."""
+    mapped, _ = normalize.normalise(
+        ["ADALIMUMAB-AACF"],
+        _repository(entities=_suffix_graph()._entities),
+        _CONCEPTS,
+        "interventions",
+    )
+    assert "ADALIMUMAB-AACF" not in mapped
+
+
+def test_a_novel_biologic_suffix_also_resolves_by_stem() -> None:
+    """FDA suffixes every new biologic since 2017, not only biosimilars.
+    ADUCANUMAB-AVWA has no reference product to be confused with."""
+    mapped, _ = normalize.normalise(
+        ["ADUCANUMAB-AVWA"],
+        _repository(entities=_suffix_graph()._entities),
+        _CONCEPTS,
+        "drugs",
+        stems=True,
+    )
+    assert mapped["ADUCANUMAB-AVWA"].mesh_id == "MESH:C000600266"
+
+
+def test_a_stem_that_resolves_to_nothing_leaves_the_name_unresolved() -> None:
+    """25 of the 159 are combinations whose stem is not a substance either.
+    They must stay unresolved rather than acquire a wrong id."""
+    mapped, coverage = normalize.normalise(
+        ["DARATUMUMAB AND HYALURONIDASE-FIHJ"],
+        _repository(entities=_suffix_graph()._entities),
+        _CONCEPTS,
+        "drugs",
+        stems=True,
+    )
+    assert not mapped
+    assert coverage.resolved == 0
+
+
+def test_the_entity_type_filter_still_applies_to_the_stem() -> None:
+    """A stem answered only by a Disease entity is not a drug mapping."""
+    graph = _FakeRepository(
+        entities={
+            "ADALIMUMAB": (
+                Entity("MESH:D000001", "bk-9", "Something", "Disease", "NA"),
+            )
+        }
+    )
+    mapped, _ = normalize.normalise(
+        ["ADALIMUMAB-AACF"],
+        _repository(entities=graph._entities),
+        _CONCEPTS,
+        "drugs",
+        "Chemical",
+        stems=True,
+    )
+    assert "ADALIMUMAB-AACF" not in mapped

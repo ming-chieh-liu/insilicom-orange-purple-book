@@ -45,7 +45,7 @@ from config.settings import RawData, TrialArchive
 from dao.biokde import BiokdeRepository, Entity
 from service import approval_events, identity_census
 from source import trial_studies
-from source.moiety import Moiety
+from source.moiety import BIOSIMILAR_SUFFIX, Moiety
 from source.raw_table import read_rows
 from utility import application_number as appno
 from utility.logging import get_logger
@@ -99,6 +99,37 @@ PREFER_DESCRIPTOR: str = "MESH:D"
 #: candidate generation in P3 would match all of them to each other. Newer
 #: drugs are exactly the ones that lack an id, so this is not a rare corner.
 PLACEHOLDER_IDS: frozenset[str] = frozenset({"NA", "", "-", "None", "null"})
+
+
+def stem_of(name: str) -> str:
+    """The name without its four-letter biologic suffix, or ``""``.
+
+    FDA has given **every** new biologic a hyphenated four-letter suffix since
+    the 2017 naming guidance, not only biosimilars, so this fires on two quite
+    different populations and the caller must keep them apart:
+
+    * ``ADUCANUMAB-AVWA`` — a novel biologic. The suffix is a naming
+      convention and the stem is the same molecule; no other product shares it.
+    * ``ADALIMUMAB-AACF`` — a biosimilar. The stem names a **different**,
+      earlier product, so folding the two together is a retrieval convenience
+      and never an identity claim. See D11 and :data:`Mapping.basis`.
+
+    Measured on ``Products.txt``: 219 of 2,897 distinct ingredients carry the
+    suffix and 159 of those resolve to nothing at all. Resolving the stem
+    instead recovers 134 of the 159 — 57 novel biologics and 77 biosimilars.
+    The remaining 25 are combinations (``DARATUMUMAB AND HYALURONIDASE-FIHJ``)
+    whose stem is not a single substance either.
+
+    >>> stem_of("ADALIMUMAB-AACF")
+    'ADALIMUMAB'
+    >>> stem_of("ADUCANUMAB-AVWA")
+    'ADUCANUMAB'
+    >>> stem_of("PEMBROLIZUMAB")
+    ''
+    >>> stem_of("ABIRATERONE ACETATE")
+    ''
+    """
+    return name[: -len(match.group())] if (match := BIOSIMILAR_SUFFIX.search(name.upper())) else ""
 
 
 def is_identifier(mesh_id: str) -> bool:
@@ -256,6 +287,7 @@ def normalise(
     label: str,
     entity_type: str = "",
     moieties: dict[str, Moiety] | None = None,
+    stems: bool = False,
 ) -> tuple[dict[str, Mapping], Coverage]:
     """Resolve ``names`` to one entity each, rolling MeSH concepts up.
 
@@ -269,15 +301,29 @@ def normalise(
     drug matches no trials at all, and does so silently. Both spellings are
     asked for and :func:`preferred` picks between the answers, so the moiety
     wins only when it is the better-vocabularied of the two.
+
+    ``stems`` does the same for the four-letter biologic suffix, and **only as
+    a last resort**: the stem is asked for only when the full name resolved to
+    nothing. A suffixed name that the graph knows keeps its own id, so the 60
+    that already resolve are untouched. Where the stem does answer, the row is
+    marked ``basis="stem"`` and every consumer downstream must treat it as a
+    retrieval key rather than an identity — for a biosimilar the stem names a
+    different product, and a 351(k) rests on its own trials (D11).
     """
     folded = moieties or {}
     queries = list(names)
     moiety_of: dict[str, str] = {}
+    stem_of_name: dict[str, str] = {}
     for name in names:
         record = folded.get(name.upper())
         if record is not None:
             moiety_of[name] = record.moiety
             queries.append(record.moiety)
+        if stems:
+            stem = stem_of(name)
+            if stem:
+                stem_of_name[name] = stem
+                queries.append(stem)
     resolved = repository.resolve(queries)
     out: dict[str, Mapping] = {}
     rolled_up = non_mesh = 0
@@ -292,6 +338,18 @@ def normalise(
         )
         if entity_type:
             candidates = tuple(e for e in candidates if e.type == entity_type)
+        # The stem is a fallback, never a competitor: a suffixed name the
+        # graph already knows keeps its own id, and only a name that resolved
+        # to nothing falls back to the molecule its suffix hangs off.
+        via_stem = False
+        if not candidates and name in stem_of_name:
+            candidates = tuple(
+                e
+                for e in resolved.get(stem_of_name[name], ())
+                if is_identifier(e.id)
+                and (not entity_type or e.type == entity_type)
+            )
+            via_stem = bool(candidates)
         best = preferred(candidates, concepts)
         if best is None:
             continue
@@ -308,7 +366,9 @@ def normalise(
             official_name=best.official_name,
             entity_type=best.type,
             basis=(
-                "moiety"
+                "stem"
+                if via_stem
+                else "moiety"
                 if via_moiety
                 else "rolled-up"
                 if rolled != best.id
@@ -502,6 +562,7 @@ def build(
         "FDA drug (active ingredient)",
         "Chemical",
         moieties,
+        stems=True,
     )
     unresolved_applications = sum(
         1
@@ -638,6 +699,7 @@ def counted(mappings: dict[str, Mapping]) -> tuple[tuple[str, int], ...]:
 __all__ = [
     "DESIGN_WORDS",
     "MIN_SYNONYM_LENGTH",
+    "stem_of",
     "PLACEHOLDER_IDS",
     "PREFERRED_SUBTYPE",
     "PREFER_DESCRIPTOR",

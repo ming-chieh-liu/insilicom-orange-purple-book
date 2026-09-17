@@ -288,3 +288,26 @@ def test_the_report_renders_its_tiers(workspace: tuple[Path, Path]) -> None:
 
 def test_coverage_is_zero_with_no_submissions() -> None:
     assert assemble.AssembleReport((), (), (), (), (), 0, 0).coverage == 0.0
+
+
+# ---------------------------------------------------------------------------
+# A stem-derived drug is a retrieval key, not an identity
+# ---------------------------------------------------------------------------
+
+
+def test_a_stem_sourced_link_cannot_reach_tier_a_on_agreeing_counts() -> None:
+    """A biosimilar retrieves on its reference product's id, so the pool is
+    mostly the reference product's trials — and agreeing patient counts are
+    exactly what a wrong match in that pool looks like. A 351(k) rests on its
+    own trials (D11)."""
+    assert assemble.tier_for("label_description", "counts_agree", "stem") == "B"
+
+
+def test_a_stated_id_is_unaffected_by_a_stem_sourced_drug() -> None:
+    """The FDA wrote the trial id on the label. How we resolved the drug name
+    afterwards does not weaken that."""
+    assert assemble.tier_for("label_nct", "no_count", "stem") == "A"
+
+
+def test_an_ordinary_drug_still_reaches_tier_a_on_agreeing_counts() -> None:
+    assert assemble.tier_for("label_description", "counts_agree", "") == "A"

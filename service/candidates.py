@@ -40,8 +40,9 @@ NCT id are set aside as needing no judgement at all.
 from __future__ import annotations
 
 import csv
+import re
 from collections import Counter
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
@@ -80,6 +81,12 @@ class Candidate(NamedTuple):
     start_date: str
     conditions: str
     interventions: str
+    #: Whether the study looks like a biosimilar's own trial rather than the
+    #: reference product's. Set when an intervention name carries the
+    #: four-letter biologic suffix or the title says "biosimilar". Used only to
+    #: order the shortlist for an approval whose drug resolved via its stem —
+    #: see :func:`shortlist`.
+    biosimilar: bool = False
 
 
 class Unit(NamedTuple):
@@ -124,6 +131,26 @@ class CandidatesReport(NamedTuple):
     @property
     def to_judge(self) -> int:
         return sum(1 for unit in self.units if unit.needs_judgement)
+
+
+#: A study naming a suffixed biologic, or calling itself a biosimilar study.
+#: Measured over the archive: 2,879 studies name a suffixed product and 302 say
+#: "biosimilar". Deliberately loose — this only orders a list, and a false
+#: positive costs a judge one line while a false negative buries the answer.
+BIOSIMILAR_TRIAL = re.compile(r"(?i)\b[a-z]{5,}-[a-z]{4}\b|biosimilar")
+
+
+def looks_biosimilar(title: str, interventions: Iterable[str]) -> bool:
+    """Whether a study is plausibly a biosimilar's own trial.
+
+    >>> looks_biosimilar("A Study of ABP 501", ["Adalimumab-atto", "Placebo"])
+    True
+    >>> looks_biosimilar("Biosimilar Trastuzumab in HER2+ Breast Cancer", [])
+    True
+    >>> looks_biosimilar("KEYNOTE-189", ["Pembrolizumab", "Carboplatin"])
+    False
+    """
+    return bool(BIOSIMILAR_TRIAL.search(" ; ".join([title, *interventions])))
 
 
 def code_heading(
@@ -248,6 +275,7 @@ def index_studies(
             start_date=facts.start_date,
             conditions=";".join(facts.conditions)[:300],
             interventions=";".join(facts.interventions)[:300],
+            biosimilar=looks_biosimilar(facts.brief_title, facts.interventions),
         )
         # CT.gov's own curation first, the synonym index only where it is
         # absent. NLM assigns MeSH to 46% of studies' interventions and 79% of
@@ -292,6 +320,7 @@ def shortlist(
     by_drug: dict[str, set[str]],
     by_condition: dict[str, set[str]],
     stated_enrollment: str = "",
+    prefer_biosimilar: bool = False,
 ) -> tuple[Candidate, ...]:
     """The studies that could have supported this approval.
 
@@ -313,6 +342,16 @@ def shortlist(
     count the label states. Ranking cannot lose the answer the way filtering
     can — the worst it does is place it lower. The count is used only to order
     the list; deciding remains P4's job, on the evidence the judge reads.
+
+    ``prefer_biosimilar`` adds one more key, ahead of the others, and is set
+    when the approval's drug resolved only through its stem. A biosimilar
+    retrieves on its **reference product's** id, so the pool is dominated by
+    the reference product's trials: measured across the 109 biosimilar
+    approvals, the drug and date bounds leave a median of 318 candidates of
+    which only about 6 are biosimilar-related, and just 9 of the 109 fit under
+    the cap unaided. Sorting those 6 to the front is what puts the answer
+    inside a 40-slot shortlist. It is still a ranking, so a wrongly unflagged
+    study is demoted rather than lost.
     """
     pool: set[str] = set()
     for mesh in drug_mesh:
@@ -330,13 +369,21 @@ def shortlist(
         matching = by_condition.get(indication_mesh, set()) if indication_mesh else set()
         target = int(stated_enrollment) if stated_enrollment.isdigit() else None
 
-        def rank(nct: str) -> tuple[int, int, str]:
+        def rank(nct: str) -> tuple[int, int, int, str]:
             enrolled = studies[nct].enrollment
             if target is None or not enrolled.isdigit():
                 distance = 10**9
             else:
                 distance = abs(int(enrolled) - target)
-            return (0 if nct in matching else 1, distance, nct)
+            biosimilar_first = (
+                0 if prefer_biosimilar and studies[nct].biosimilar else 1
+            )
+            return (
+                biosimilar_first,
+                0 if nct in matching else 1,
+                distance,
+                nct,
+            )
 
         pool = set(sorted(pool, key=rank)[:CANDIDATE_CAP])
     return tuple(sorted((studies[nct] for nct in pool), key=lambda c: c.nct_id))
@@ -350,8 +397,10 @@ __all__ = [
     "CandidatesReport",
     "Unit",
     "build",
+    "BIOSIMILAR_TRIAL",
     "code_heading",
     "collapse",
+    "looks_biosimilar",
     "index_studies",
     "render",
     "shortlist",
@@ -384,9 +433,15 @@ def build(
         row["source_name"].casefold(): row["mesh_id"]
         for row in _read_tsv(out_dir / "trial_condition_map.tsv")
     }
-    fda_drug = {
-        row["source_name"]: row["mesh_id"]
-        for row in _read_tsv(out_dir / "drug_map.tsv")
+    drug_rows = list(_read_tsv(out_dir / "drug_map.tsv"))
+    fda_drug = {row["source_name"]: row["mesh_id"] for row in drug_rows}
+    # Ingredients whose id came from the suffix-stripped stem rather than the
+    # name itself. For those the pool is the reference product's trials, so the
+    # shortlist is ordered to put biosimilar-looking studies first.
+    via_stem = {
+        row["source_name"]
+        for row in drug_rows
+        if row.get("basis") == "stem"
     }
 
     spine = approval_events.build(data)
@@ -409,11 +464,11 @@ def build(
     sizes: list[int] = []
     for row in collapsed:
         key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        application_names = ingredients.get(row["application"], ())
         drug_mesh = {
-            fda_drug[name]
-            for name in ingredients.get(row["application"], ())
-            if name in fda_drug
+            fda_drug[name] for name in application_names if name in fda_drug
         }
+        stem_sourced = any(name in via_stem for name in application_names)
         heading = row.get("heading", "")
         indication_mesh = code_heading(heading, exact_condition, term_index)
         if indication_mesh and not indication_mesh.startswith("MESH:"):
@@ -430,6 +485,7 @@ def build(
                 by_drug,
                 by_condition,
                 row.get("enrollment", ""),
+                prefer_biosimilar=stem_sourced,
             )
         stated = row.get("nct_id", "")
         if stated:

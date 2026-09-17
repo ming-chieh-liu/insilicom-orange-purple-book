@@ -542,3 +542,94 @@ def test_conditions_follow_the_same_rule(patched_archive: None) -> None:
     )
     assert by_condition["MESH:D002386"] == {"NCT1"}
     assert by_condition["MESH:D002289"] == {"NCT2"}
+
+
+# ---------------------------------------------------------------------------
+# Biosimilars: the reference product's pool, ordered so the answer survives
+# ---------------------------------------------------------------------------
+
+
+def test_a_suffixed_intervention_marks_a_study_as_biosimilar() -> None:
+    assert candidates.looks_biosimilar("A Study of ABP 501", ["Adalimumab-atto"])
+
+
+def test_the_word_biosimilar_in_a_title_is_enough() -> None:
+    """86 of the 302 biosimilar studies carry no derived MeSH at all, so the
+    title has to be readable on its own."""
+    assert candidates.looks_biosimilar("Biosimilar Trastuzumab in HER2+", [])
+
+
+def test_an_ordinary_trial_is_not_flagged() -> None:
+    assert not candidates.looks_biosimilar(
+        "KEYNOTE-189", ["Pembrolizumab", "Carboplatin"]
+    )
+
+
+def _bio(nct: str, *, biosimilar: bool, n: str = "100") -> candidates.Candidate:
+    return candidates.Candidate(
+        nct_id=nct, brief_title=f"Study {nct}", acronym="", org_study_id="",
+        phases="PHASE3", enrollment=n, start_date="2015-01-01", conditions="",
+        interventions="", biosimilar=biosimilar,
+    )
+
+
+def _big_pool(biosimilar_at: set[str]) -> dict[str, candidates.Candidate]:
+    """More candidates than the cap, so the ranking actually runs."""
+    return {
+        f"NCT{i:08d}": _bio(f"NCT{i:08d}", biosimilar=f"NCT{i:08d}" in biosimilar_at)
+        for i in range(candidates.CANDIDATE_CAP * 3)
+    }
+
+
+def test_biosimilar_studies_are_ranked_first_for_a_stem_sourced_drug() -> None:
+    """The measured shape: a biosimilar approval retrieves a median of 318
+    candidates on its reference product's id, of which ~6 are its own. Without
+    this key those 6 fall outside a 40-slot shortlist and no judge can find
+    them."""
+    needle = "NCT00000119"
+    studies = _big_pool({needle})
+    got = candidates.shortlist(
+        {"MESH:D000068879"},
+        "",
+        "2020-01-01",
+        studies,
+        {"MESH:D000068879": set(studies)},
+        {},
+        prefer_biosimilar=True,
+    )
+    assert needle in {c.nct_id for c in got}
+
+
+def test_without_a_stem_sourced_drug_the_flag_does_not_reorder() -> None:
+    """The reference product's own approvals must keep the old ranking — its
+    pivotal trials are not biosimilar studies."""
+    needle = "NCT00000119"
+    studies = _big_pool({needle})
+    got = candidates.shortlist(
+        {"MESH:D000068879"},
+        "",
+        "2020-01-01",
+        studies,
+        {"MESH:D000068879": set(studies)},
+        {},
+    )
+    assert needle not in {c.nct_id for c in got}
+
+
+def test_the_biosimilar_key_only_ranks_and_never_filters() -> None:
+    """Ranking cannot lose an answer the way filtering can — a pool under the
+    cap comes back whole however it is flagged."""
+    studies = {
+        "NCT00000001": _bio("NCT00000001", biosimilar=False),
+        "NCT00000002": _bio("NCT00000002", biosimilar=True),
+    }
+    got = candidates.shortlist(
+        {"MESH:D000068879"},
+        "",
+        "2020-01-01",
+        studies,
+        {"MESH:D000068879": set(studies)},
+        {},
+        prefer_biosimilar=True,
+    )
+    assert len(got) == 2

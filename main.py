@@ -390,7 +390,7 @@ def main(argv: list[str] | None = None) -> int:
             ("nct_id", "application", "submission_type", "submission_no",
              "approval_date", "action_type", "indication_mesh", "indication_term",
              "drug_mesh", "trial_name", "label_enrollment", "registry_enrollment",
-             "evidence_tier", "evidence_source", "count_check"),
+             "evidence_tier", "evidence_source", "count_check", "drug_basis"),
             assemble_report.links,
         )
         repository.save(
