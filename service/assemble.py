@@ -89,6 +89,9 @@ class Link(NamedTuple):
     #: is held below tier A however well the counts agree — see
     #: :func:`tier_for`.
     drug_basis: str = ""
+    #: ``true`` when the trial entered the shortlist through the literature
+    #: rather than the drug filter. See :func:`tier_for`.
+    injected: str = ""
 
 
 class Unlinked(NamedTuple):
@@ -124,7 +127,10 @@ def counts_agree(label: str, registry: str) -> str:
 
 
 def tier_for(
-    evidence_source: str, count_check: str, drug_basis: str = ""
+    evidence_source: str,
+    count_check: str,
+    drug_basis: str = "",
+    injected: bool = False,
 ) -> str:
     """The tier a link earns.
 
@@ -153,10 +159,19 @@ def tier_for(
     'B'
     >>> tier_for("label_nct", "no_count", "stem")
     'A'
+
+    **An injected candidate never reaches tier A either.** It entered the
+    shortlist because the literature named it, not because it passed the drug
+    filter — one of only two hard facts the pool rests on. The judge still
+    identified it from the label's own prose, so the link is real, but it rests
+    on one fewer independent check.
+
+    >>> tier_for("label_description", "counts_agree", "", True)
+    'B'
     """
     if evidence_source == "label_nct":
         return TIER_STATED
-    if drug_basis == "stem":
+    if drug_basis == "stem" or injected:
         return TIER_JUDGED
     return TIER_CORROBORATED if count_check == "counts_agree" else TIER_JUDGED
 
@@ -459,6 +474,12 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
             )
             continue
 
+        raw_candidates = unit.get("candidates")
+        was_injected = isinstance(raw_candidates, list) and any(
+            isinstance(c, dict) and c.get("nct_id") == nct and c.get("injected")
+            for c in raw_candidates
+        )
+
         if (nct, str(unit["application"])) in refuted:
             unlinked.append(
                 Unlinked(
@@ -497,10 +518,11 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                 trial_name=name,
                 label_enrollment=label_count,
                 registry_enrollment=registry.get(nct, ""),
-                evidence_tier=tier_for(source, check, basis),
+                evidence_tier=tier_for(source, check, basis, was_injected),
                 evidence_source=source,
                 count_check=check,
                 drug_basis=basis,
+                injected="true" if was_injected else "",
             )
         )
         linked_submissions.add(key)

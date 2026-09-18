@@ -823,3 +823,126 @@ def test_a_trial_nearer_the_approval_outranks_an_older_one() -> None:
 
 def test_years_before_handles_a_missing_date() -> None:
     assert candidates._years_before("", "2018-08-20") == 999
+
+
+# ---------------------------------------------------------------------------
+# The literature as a ranking key
+# ---------------------------------------------------------------------------
+
+
+def test_a_graph_supported_trial_is_ranked_into_the_shortlist() -> None:
+    """The graph finds trials bibliographically, so it fails independently of
+    the MeSH drug filter: of 1,425 units whose answer the shortlist missed, it
+    names the true trial for 448."""
+    studies = {
+        f"NCT{i:08d}": _named(f"NCT{i:08d}")
+        for i in range(candidates.CANDIDATE_CAP + 20)
+    }
+    studies["NCT09999999"] = _named("NCT09999999")
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": set(studies)}, {},
+        from_graph=frozenset({"NCT09999999"}),
+    )
+    assert "NCT09999999" in {c.nct_id for c in got}
+
+
+def test_without_the_graph_the_same_pool_loses_it() -> None:
+    """Guards the claim that it is the graph key doing the work."""
+    studies = {
+        f"NCT{i:08d}": _named(f"NCT{i:08d}")
+        for i in range(candidates.CANDIDATE_CAP + 20)
+    }
+    studies["NCT09999999"] = _named("NCT09999999")
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": set(studies)}, {},
+    )
+    assert "NCT09999999" not in {c.nct_id for c in got}
+
+
+def test_the_label_name_still_outranks_the_graph() -> None:
+    """Order matters: the label naming a trial is direct evidence, while the
+    graph only says the literature associates them."""
+    studies = {
+        f"NCT{i:08d}": _named(f"NCT{i:08d}")
+        for i in range(candidates.CANDIDATE_CAP + 20)
+    }
+    studies["NCT00000001"] = _named("NCT00000001", acronym="KEYNOTE-189")
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": set(studies)}, {},
+        label_name="KEYNOTE-189", from_graph=frozenset({"NCT00000002"}),
+    )
+    assert got and "NCT00000001" in {c.nct_id for c in got}
+
+
+def test_graph_supported_reads_the_precompute(tmp_path: Path) -> None:
+    (tmp_path / "graph_trials.tsv").write_text(
+        "application\tnct_id\tmentions\n"
+        "BLA125514\tNCT02578680\t4\n"
+        "BLA125514\tNCT01866319\t2\n"
+        "NDA021029\tNCT00006353\t1\n",
+        encoding="utf-8",
+    )
+    got = candidates.graph_supported(tmp_path)
+    assert got["BLA125514"] == frozenset({"NCT02578680", "NCT01866319"})
+
+
+def test_a_missing_precompute_is_silent(tmp_path: Path) -> None:
+    """P3 must run unchanged where the Mongo pass has not been done."""
+    assert candidates.graph_supported(tmp_path) == {}
+
+
+# ---------------------------------------------------------------------------
+# Injection: the only route to a drug the trial index cannot be joined to
+# ---------------------------------------------------------------------------
+
+
+def test_a_graph_named_trial_the_drug_filter_missed_is_injected() -> None:
+    """53% of the drug map is keyed on PubChem while the trial index is keyed
+    on MeSH, and biokde gives an entity one external id, never both — so those
+    drugs can never retrieve candidates. Measured: 337 of 339 units whose
+    answer the pool lacked entirely were this."""
+    studies = {"NCT00000001": _named("NCT00000001")}
+    got = candidates.shortlist(
+        {"PubChem:CID1"}, "", "2020-01-01", studies, {}, {},
+        from_graph=frozenset({"NCT00000001"}),
+    )
+    assert [c.nct_id for c in got] == ["NCT00000001"]
+
+
+def test_an_injected_candidate_is_marked_as_such() -> None:
+    """It skipped the drug filter, so P5 must be able to tier it lower."""
+    studies = {"NCT00000001": _named("NCT00000001")}
+    got = candidates.shortlist(
+        {"PubChem:CID1"}, "", "2020-01-01", studies, {}, {},
+        from_graph=frozenset({"NCT00000001"}),
+    )
+    assert got[0].injected is True
+
+
+def test_a_candidate_the_drug_filter_found_is_not_marked() -> None:
+    studies = {"NCT00000001": _named("NCT00000001")}
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": {"NCT00000001"}}, {},
+        from_graph=frozenset({"NCT00000001"}),
+    )
+    assert got[0].injected is False
+
+
+def test_the_graph_cannot_inject_a_trial_the_archive_lacks() -> None:
+    """An id the registry does not carry cannot be shown to a judge."""
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", {}, {}, {},
+        from_graph=frozenset({"NCT09999999"}),
+    )
+    assert got == ()
+
+
+def test_an_injected_trial_still_respects_the_date_bound() -> None:
+    """A trial cannot have supported an approval granted before it began — the
+    one hard fact injection must not bypass."""
+    studies = {"NCT00000001": _named("NCT00000001", start="2024-01-01")}
+    got = candidates.shortlist(
+        {"PubChem:CID1"}, "", "2020-01-01", studies, {}, {},
+        from_graph=frozenset({"NCT00000001"}),
+    )
+    assert got == ()

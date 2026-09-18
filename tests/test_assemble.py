@@ -505,3 +505,15 @@ def test_polarity_is_keyed_on_the_application_too(
     _polarity(adj, [{"nct_id": "NCT02578680", "application": "NDA999999",
                      "final": "NOT_SUPPORTING"}])
     assert len(assemble.build(out, adj).links) == 1
+
+
+def test_an_injected_candidate_cannot_reach_tier_a() -> None:
+    """It entered the shortlist because the literature named it, not because it
+    passed the drug filter — one of only two hard facts the pool rests on."""
+    assert assemble.tier_for("label_description", "counts_agree", "", True) == "B"
+
+
+def test_a_stated_id_is_unaffected_by_injection() -> None:
+    """The FDA wrote the trial id on the label; how the candidate list was
+    assembled afterwards does not weaken that."""
+    assert assemble.tier_for("label_nct", "no_count", "", True) == "A"

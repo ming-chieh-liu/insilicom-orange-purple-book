@@ -19,11 +19,18 @@ list the judge still reads, and a trial the judge rejects is still rejected.
 
 Written once to ``graph_trials.tsv`` because the walk is the expensive part —
 one Mongo pass over the applications in scope, then P3 reads a TSV.
+
+**It is latency-bound, so it reports progress.** Measured on the first attempt:
+6% CPU over 16 minutes, i.e. almost entirely waiting on round trips, on a host
+also serving another team's NER job. A pass with no output is indistinguishable
+from a stuck one, and :data:`PROGRESS_EVERY` exists so a caller can decide
+whether to wait or to narrow the scope.
 """
 
 from __future__ import annotations
 
 import csv
+import time
 from collections import defaultdict
 from pathlib import Path
 from typing import NamedTuple
@@ -38,6 +45,12 @@ _log = get_logger(__name__)
 #: cost 160 edge queries to add a handful of ids the first few already found.
 MAX_DRUGS: int = 3
 MAX_DISEASES: int = 5
+
+#: Log a line every this many applications. The pass is bound by Mongo
+#: round-trip latency — 6% CPU over 16 minutes on the first attempt — so
+#: without this it is a black box for however long it runs, and a slow pass
+#: cannot be told from a stuck one.
+PROGRESS_EVERY: int = 100
 
 
 class GraphTrial(NamedTuple):
@@ -111,7 +124,22 @@ def build(
 
     rows: list[GraphTrial] = []
     with_drug = with_disease = with_edge = with_trials = 0
-    for application in sorted(applications):
+    started = time.monotonic()
+    total = len(applications)
+    for done, application in enumerate(sorted(applications), start=1):
+        if done % PROGRESS_EVERY == 0:
+            elapsed = time.monotonic() - started
+            rate = done / elapsed if elapsed else 0.0
+            _log.info(
+                "%d/%d (%.0f%%), %.1f/s, ~%.0f min left, %d edges, %d yielding",
+                done,
+                total,
+                100 * done / total,
+                rate,
+                ((total - done) / rate / 60) if rate else 0.0,
+                with_edge,
+                with_trials,
+            )
         drugs = {
             drug_of[name]
             for name in ingredients.get(application, frozenset())

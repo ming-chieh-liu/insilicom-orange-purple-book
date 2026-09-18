@@ -108,6 +108,11 @@ class Candidate(NamedTuple):
     #: order the shortlist for an approval whose drug resolved via its stem —
     #: see :func:`shortlist`.
     biosimilar: bool = False
+    #: Whether this study reached the shortlist through the literature rather
+    #: than the drug filter. The drug filter is one of only two hard facts the
+    #: pool rests on, so a candidate that skipped it is weaker evidence and P5
+    #: holds its link below tier A — the same guard stem-derived drugs get.
+    injected: bool = False
 
 
 class Unit(NamedTuple):
@@ -251,6 +256,19 @@ def _years_before(start: str, approval: str) -> int:
         return int(approval[:4]) - int(start[:4])
     except ValueError:  # pragma: no cover - a malformed date in the archive
         return 999
+
+
+def graph_supported(out_dir: Path) -> dict[str, frozenset[str]]:
+    """Application → the trials the literature connects to its drug.
+
+    Read from ``graph_trials.tsv``, which :mod:`service.graph_trials` writes in
+    one Mongo pass. An absent file yields nothing, so P3 runs unchanged where
+    the precompute has not been done.
+    """
+    out: dict[str, set[str]] = {}
+    for row in _read_tsv(out_dir / "graph_trials.tsv"):
+        out.setdefault(row["application"], set()).add(row["nct_id"])
+    return {app: frozenset(ncts) for app, ncts in out.items()}
 
 
 def code_heading(
@@ -475,6 +493,7 @@ def shortlist(
     stated_enrollment: str = "",
     prefer_biosimilar: bool = False,
     label_name: str = "",
+    from_graph: frozenset[str] = frozenset(),
 ) -> tuple[Candidate, ...]:
     """The studies that could have supported this approval.
 
@@ -506,17 +525,29 @@ def shortlist(
     2. **The label's trial name matching the registry record.** Present for 41%
        of the buried answers and *unique in the pool* for 40%, which makes it
        the strongest signal available — and it was not used at all.
-    3. Condition match: 22%.
-    4. Phase 3 ahead of earlier phases: 70% of true answers are phase 3.
-    5. Nearest start date to the approval.
-    6. **Enrollment distance, demoted.** D8 measured that every candidate in a
+    3. **The literature connecting this trial to this drug** — the same graph
+       walk tier C uses, precomputed by :mod:`service.graph_trials`. It finds
+       trials bibliographically rather than by MeSH intervention coding, so it
+       fails independently of the drug filter: of the 1,425 units whose answer
+       the shortlist still missed, the graph names the true trial for **448**,
+       lifting the attainable ceiling from 77.8% to 84.7%.
+    4. Condition match: 22%.
+    5. Phase 3 ahead of earlier phases: 70% of true answers are phase 3.
+    6. Nearest start date to the approval.
+    7. **Enrollment distance, demoted.** D8 measured that every candidate in a
        drug-and-condition set had a distinct count, and that holds *within a
        small relevant set*. As the primary sort over a median pool of 1,344 it
        orders by a number thousands of unrelated trials share. It belongs after
        the keys that establish relevance, doing the job it was validated for.
-    7. The id, for determinism.
+    8. The id, for determinism.
 
     Deciding remains P4's job, on the evidence the judge reads.
+
+    **Injected candidates sit outside the cap.** They are appended after the
+    truncation rather than ranked against the drug-filtered pool, so a unit may
+    be shown slightly more than :data:`CANDIDATE_CAP` studies. Letting them
+    compete cost 48 units an answer they already had while gaining 456 --
+    positive, but avoidable for a handful of extra rows.
 
     ``prefer_biosimilar`` adds one more key, ahead of the others, and is set
     when the approval's drug resolved only through its stem. A biosimilar
@@ -531,20 +562,30 @@ def shortlist(
     pool: set[str] = set()
     for mesh in drug_mesh:
         pool |= by_drug.get(mesh, set())
-    if not pool:
+    # Trials the literature names for this application, whether or not the drug
+    # filter could reach them. **This is the only route to them.** 53% of the
+    # drug map is keyed on PubChem while the trial index is keyed on MeSH —
+    # biokde gives an entity one external id, never both, so those two id
+    # spaces cannot be bridged. Measured: of 339 units whose answer the pool
+    # lacked entirely, 337 were this. Injected candidates are marked, because
+    # they skipped the drug filter.
+    injected = {nct for nct in from_graph if nct in studies} - pool
+    if not (pool or injected):
         return ()
     if approval_date:
-        pool = {
+        started_before = {
             nct
-            for nct in pool
+            for nct in pool | injected
             if not studies[nct].start_date
             or studies[nct].start_date <= approval_date
         }
+        pool &= started_before
+        injected &= started_before
     if len(pool) > CANDIDATE_CAP:
         matching = by_condition.get(indication_mesh, set()) if indication_mesh else set()
         target = int(stated_enrollment) if stated_enrollment.isdigit() else None
 
-        def rank(nct: str) -> tuple[int, int, int, int, int, int, str]:
+        def rank(nct: str) -> tuple[int, int, int, int, int, int, int, str]:
             candidate = studies[nct]
             enrolled = candidate.enrollment
             if target is None or not enrolled.isdigit():
@@ -554,6 +595,7 @@ def shortlist(
             return (
                 0 if prefer_biosimilar and candidate.biosimilar else 1,
                 0 if names_match(label_name, candidate) else 1,
+                0 if nct in from_graph else 1,
                 0 if nct in matching else 1,
                 0 if "PHASE3" in candidate.phases else 1,
                 _years_before(candidate.start_date, approval_date),
@@ -562,7 +604,19 @@ def shortlist(
             )
 
         pool = set(sorted(pool, key=rank)[:CANDIDATE_CAP])
-    return tuple(sorted((studies[nct] for nct in pool), key=lambda c: c.nct_id))
+    # Injected candidates are **appended, never in competition**. They are the
+    # only route to a drug whose id space the trial index cannot be joined to,
+    # and making them fight for the same 100 slots evicted the right answer
+    # from 48 units that previously had it -- a 456/48 trade that is positive
+    # but needlessly lossy. Appending costs little: the graph names a median of
+    # 5 trials per application, p99 38, max 87.
+    pool |= injected
+    return tuple(
+        sorted(
+            (studies[nct]._replace(injected=nct in injected) for nct in pool),
+            key=lambda c: c.nct_id,
+        )
+    )
 
 
 __all__ = [
@@ -577,6 +631,7 @@ __all__ = [
     "MIN_NAME_LENGTH",
     "code_heading",
     "collapse",
+    "graph_supported",
     "looks_biosimilar",
     "names_match",
     "index_studies",
@@ -611,6 +666,7 @@ def build(
         row["source_name"].casefold(): row["mesh_id"]
         for row in _read_tsv(out_dir / "trial_condition_map.tsv")
     }
+    from_graph_by_app = graph_supported(out_dir)
     drug_rows = list(_read_tsv(out_dir / "drug_map.tsv"))
     fda_drug = {row["source_name"]: row["mesh_id"] for row in drug_rows}
     # Ingredients whose id came from the suffix-stripped stem rather than the
@@ -672,6 +728,7 @@ def build(
                 # study's title and promotes it over the right answer. Passing
                 # the key instead of the acronym cost 4.2 points of recall.
                 label_name=row.get("acronym", ""),
+                from_graph=from_graph_by_app.get(row["application"], frozenset()),
             )
         stated = row.get("nct_id", "")
         if stated:

@@ -86,6 +86,8 @@ MODES: dict[str, str] = {
     "trial_submission_map.tsv and unlinked_submissions.tsv",
     "validate": "score the map against the links the FDA states outright: "
     "shortlist recall now, judge precision with --limit",
+    "graph-trials": "precompute the trials the literature connects to each "
+    "application, as a ranking input for P3 (Mongo only, no agent calls)",
     "graph-links": "tier C: gather literature candidates from the Insilicom "
     "graph for approvals the label route could not serve",
 }
@@ -428,7 +430,7 @@ def main(argv: list[str] | None = None) -> int:
             ("nct_id", "application", "submission_type", "submission_no",
              "approval_date", "action_type", "indication_mesh", "indication_term",
              "drug_mesh", "trial_name", "label_enrollment", "registry_enrollment",
-             "evidence_tier", "evidence_source", "count_check", "drug_basis"),
+             "evidence_tier", "evidence_source", "count_check", "drug_basis", "injected"),
             assemble_report.links,
         )
         repository.save(
