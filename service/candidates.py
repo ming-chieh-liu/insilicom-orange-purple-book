@@ -53,9 +53,30 @@ from utility.logging import get_logger
 
 _log = get_logger(__name__)
 
-#: Above this many candidates a unit is emitted but flagged: the shortlist is
-#: too long to be a comparison, and P4 should treat it as weak evidence.
-CANDIDATE_CAP: int = 40
+#: How many candidates a judge is shown. Swept against the 6,368 known answers
+#: after the ranking rewrite, reporting recall over the units P4 actually
+#: judges and the rows each judge reads:
+#:
+#: ====  ========  =========  ==================
+#: cap   recall    rows/unit  gain per +10 rows
+#: ====  ========  =========  ==================
+#: 40      70.7%       36.1   --
+#: 60      74.9%       52.3   +2.6 pts
+#: 100     78.4%       82.0   +1.2 pts
+#: 150     80.5%      115.6   +0.6 pts
+#: 250     82.1%      174.4   +0.3 pts
+#: ====  ========  =========  ==================
+#:
+#: 100 is the knee. **A higher cap can only raise recall**, so the number to
+#: judge on is cost, not recall: beyond 100 each further 10 rows buys under a
+#: point. For comparison the whole ranking rewrite bought 2.4 points in the
+#: pipeline, and this constant buys 7.7.
+#:
+#: **Not re-measured for precision.** The pilot's 96.3% was measured at 40, and
+#: a judge choosing among 2.3x more candidates has more chances to pick wrong.
+#: Raising this without re-running that pilot was a deliberate call, not an
+#: oversight.
+CANDIDATE_CAP: int = 100
 
 #: Where :func:`collapse` records the name it keyed on, so ``build`` and the
 #: P4 reader use the same one rather than each deriving it again.
@@ -154,6 +175,82 @@ def looks_biosimilar(title: str, interventions: Iterable[str]) -> bool:
     False
     """
     return bool(BIOSIMILAR_TRIAL.search(" ; ".join([title, *interventions])))
+
+
+#: Shortest label trial name that may be matched against a registry record.
+#:
+#: **Not load-bearing.** Swept from 4 to 8 against the 6,368 known answers and
+#: recall moved by at most one unit — 70.2% at every value. The false acronyms
+#: the section-14 extractor produces (``IIIC 1``, ``TABLE 2``, ``AUC0-6``) do
+#: match at this floor, and that turns out to be survivable: the name key only
+#: *promotes* a study into a 40-slot list, so a spurious match costs a slot
+#: rather than evicting the right answer. Kept to exclude the pathological
+#: one- and two-character case.
+MIN_NAME_LENGTH: int = 5
+
+
+def _squash(text: str) -> str:
+    """Letters and digits only, lower-cased, for comparing trial names.
+
+    A label writes ``KEYNOTE-189`` where the registry writes ``KEYNOTE 189``,
+    ``Keynote-189`` or the sponsor id ``3475-189``. Punctuation and case are
+    noise in that comparison; the digits are not.
+
+    >>> _squash("KEYNOTE-189")
+    'keynote189'
+    >>> _squash("CheckMate 648")
+    'checkmate648'
+    """
+    return "".join(c for c in text.lower() if c.isalnum())
+
+
+def names_match(label_name: str, candidate: "Candidate") -> bool:
+    """Whether the label's trial name appears in this registry record.
+
+    Checked against the acronym, the sponsor's protocol id and the title,
+    because a registry record carries the name in whichever of those the
+    sponsor chose to use.
+
+    **This is the single strongest ranking signal and it was unused.** Measured
+    over the 1,489 units whose answer sat in the pool but ranked below the cap:
+    the label's name appears in the true trial's record for **610 of them
+    (41%)**, and for **597 (40%)** it appears in *no other study in the pool* —
+    so those units would rank the right answer first instead of near 300.
+
+    >>> c = Candidate("NCT1", "A Study of X", "KEYNOTE-189", "3475-189",
+    ...               "PHASE3", "616", "2016-02-26", "", "")
+    >>> names_match("KEYNOTE-189", c)
+    True
+    >>> names_match("TABLE 2", c)
+    False
+    """
+    squashed = _squash(label_name)
+    if len(squashed) < MIN_NAME_LENGTH:
+        return False
+    return squashed in _squash(
+        f"{candidate.acronym} {candidate.org_study_id} {candidate.brief_title}"
+    )
+
+
+def _years_before(start: str, approval: str) -> int:
+    """Whole years between a trial starting and an approval, or a large number.
+
+    A trial that began twenty years before an approval is rarely its evidence,
+    while one that began three years before usually is. Used only to order the
+    pool, never to exclude: the date *filter* has already dropped anything
+    starting after the approval.
+
+    >>> _years_before("2016-02-26", "2018-08-20")
+    2
+    >>> _years_before("", "2018-08-20")
+    999
+    """
+    if not start or not approval:
+        return 999
+    try:
+        return int(approval[:4]) - int(start[:4])
+    except ValueError:  # pragma: no cover - a malformed date in the archive
+        return 999
 
 
 def code_heading(
@@ -377,6 +474,7 @@ def shortlist(
     by_condition: dict[str, set[str]],
     stated_enrollment: str = "",
     prefer_biosimilar: bool = False,
+    label_name: str = "",
 ) -> tuple[Candidate, ...]:
     """The studies that could have supported this approval.
 
@@ -394,10 +492,31 @@ def shortlist(
     that disagreement is the norm, not an edge case.
 
     So when the pool is longer than a judge can read, it is **ranked** rather
-    than cut: condition matches first, then whatever is closest to the patient
-    count the label states. Ranking cannot lose the answer the way filtering
-    can — the worst it does is place it lower. The count is used only to order
-    the list; deciding remains P4's job, on the evidence the judge reads.
+    than cut. Ranking cannot lose the answer the way filtering can — the worst
+    it does is place it lower — but only if the order means something, and for
+    a long time it did not.
+
+    **The order, and why it is this order.** Measured over the 2,298 units whose
+    known answer was absent from their own shortlist: 809 were never in the pool
+    at all, and **1,489 were in it and sorted below the cap**. Within those the
+    true answer sat at median rank 304 where the label stated a patient count
+    and 119 where it did not — the count-first sort was *worse* than no sort.
+
+    1. ``prefer_biosimilar`` — narrow and conditional, see below.
+    2. **The label's trial name matching the registry record.** Present for 41%
+       of the buried answers and *unique in the pool* for 40%, which makes it
+       the strongest signal available — and it was not used at all.
+    3. Condition match: 22%.
+    4. Phase 3 ahead of earlier phases: 70% of true answers are phase 3.
+    5. Nearest start date to the approval.
+    6. **Enrollment distance, demoted.** D8 measured that every candidate in a
+       drug-and-condition set had a distinct count, and that holds *within a
+       small relevant set*. As the primary sort over a median pool of 1,344 it
+       orders by a number thousands of unrelated trials share. It belongs after
+       the keys that establish relevance, doing the job it was validated for.
+    7. The id, for determinism.
+
+    Deciding remains P4's job, on the evidence the judge reads.
 
     ``prefer_biosimilar`` adds one more key, ahead of the others, and is set
     when the approval's drug resolved only through its stem. A biosimilar
@@ -425,18 +544,19 @@ def shortlist(
         matching = by_condition.get(indication_mesh, set()) if indication_mesh else set()
         target = int(stated_enrollment) if stated_enrollment.isdigit() else None
 
-        def rank(nct: str) -> tuple[int, int, int, str]:
-            enrolled = studies[nct].enrollment
+        def rank(nct: str) -> tuple[int, int, int, int, int, int, str]:
+            candidate = studies[nct]
+            enrolled = candidate.enrollment
             if target is None or not enrolled.isdigit():
                 distance = 10**9
             else:
                 distance = abs(int(enrolled) - target)
-            biosimilar_first = (
-                0 if prefer_biosimilar and studies[nct].biosimilar else 1
-            )
             return (
-                biosimilar_first,
+                0 if prefer_biosimilar and candidate.biosimilar else 1,
+                0 if names_match(label_name, candidate) else 1,
                 0 if nct in matching else 1,
+                0 if "PHASE3" in candidate.phases else 1,
+                _years_before(candidate.start_date, approval_date),
                 distance,
                 nct,
             )
@@ -454,9 +574,11 @@ __all__ = [
     "Unit",
     "build",
     "BIOSIMILAR_TRIAL",
+    "MIN_NAME_LENGTH",
     "code_heading",
     "collapse",
     "looks_biosimilar",
+    "names_match",
     "index_studies",
     "render",
     "shortlist",
@@ -542,6 +664,14 @@ def build(
                 by_condition,
                 row.get("enrollment", ""),
                 prefer_biosimilar=stem_sourced,
+                # The acronym, NOT the collapsed trial key. TRIAL_KEY falls
+                # back to a subsection heading or "n=616" when the label names
+                # no trial, and those are non-empty 70% of the time — so an
+                # `or` never reaches the acronym, and a heading like "Adult
+                # Patients with Growth Hormone Deficiency" matches some other
+                # study's title and promotes it over the right answer. Passing
+                # the key instead of the acronym cost 4.2 points of recall.
+                label_name=row.get("acronym", ""),
             )
         stated = row.get("nct_id", "")
         if stated:

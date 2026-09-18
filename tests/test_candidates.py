@@ -714,3 +714,112 @@ def test_no_stated_id_is_ever_dropped() -> None:
     assert {row["nct_id"] for row in rows if row["nct_id"]} <= {
         row["nct_id"] for row in out
     }
+
+
+# ---------------------------------------------------------------------------
+# Ranking: the label's trial name is the strongest signal, and it was unused
+# ---------------------------------------------------------------------------
+
+
+def _named(nct: str, acronym: str = "", org: str = "", title: str = "",
+           phases: str = "PHASE3", n: str = "100",
+           start: str = "2015-01-01") -> candidates.Candidate:
+    return candidates.Candidate(
+        nct_id=nct, brief_title=title, acronym=acronym, org_study_id=org,
+        phases=phases, enrollment=n, start_date=start, conditions="",
+        interventions="",
+    )
+
+
+def test_a_label_name_matches_the_registry_acronym() -> None:
+    assert candidates.names_match("KEYNOTE-189", _named("NCT1", acronym="KEYNOTE-189"))
+
+
+def test_punctuation_and_case_do_not_block_the_match() -> None:
+    """A label writes KEYNOTE-189 where the registry writes 'Keynote 189'."""
+    assert candidates.names_match("KEYNOTE-189", _named("NCT1", acronym="Keynote 189"))
+
+
+def test_the_sponsor_protocol_id_also_counts() -> None:
+    """Registry records carry the name in whichever field the sponsor used."""
+    assert candidates.names_match("3475-189", _named("NCT1", org="3475-189"))
+
+
+def test_a_degenerate_name_cannot_match() -> None:
+    """The floor only guards the pathological case. Sweeping it from 4 to 8
+    against the 6,368 known answers moved recall by at most one unit (70.2% at
+    every value), so it is not load-bearing: a false acronym like ``IIIC 1``
+    does match, and that is tolerable because the name key only *promotes* one
+    study into a 40-slot list — it cannot evict the right answer on its own."""
+    assert not candidates.names_match("A2", _named("NCT1", org="A2"))
+
+
+def test_a_false_acronym_may_match_and_that_is_survivable() -> None:
+    """Documented rather than prevented, for the reason above."""
+    assert candidates.names_match("IIIC 1", _named("NCT1", org="IIIC 1 study"))
+
+
+def test_an_unrelated_name_does_not_match() -> None:
+    assert not candidates.names_match("KEYNOTE-189", _named("NCT1", acronym="CHECKMATE-648"))
+
+
+def _pool() -> dict[str, candidates.Candidate]:
+    """A pool comfortably over the cap, sized from the constant rather than a
+    literal so the test still exercises ranking when the cap moves."""
+    studies = {
+        f"NCT{i:08d}": _named(f"NCT{i:08d}", n="100")
+        for i in range(candidates.CANDIDATE_CAP + 20)
+    }
+    studies["NCT09999999"] = _named("NCT09999999", acronym="KEYNOTE-189", n="616")
+    return studies
+
+
+def test_the_named_trial_is_ranked_into_the_shortlist() -> None:
+    """The measured failure: over 1,489 units whose answer was in the pool but
+    below the cap, the label's name identified it uniquely 40% of the time and
+    nothing compared them."""
+    studies = _pool()
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies,
+        {"MESH:D1": set(studies)}, {}, "616", label_name="KEYNOTE-189",
+    )
+    assert "NCT09999999" in {c.nct_id for c in got}
+
+
+def test_without_the_name_the_same_pool_loses_it() -> None:
+    """Guards the claim: it is the name key doing the work, not the count."""
+    studies = _pool()
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies,
+        {"MESH:D1": set(studies)}, {}, "", label_name="",
+    )
+    assert "NCT09999999" not in {c.nct_id for c in got}
+
+
+def test_phase_three_outranks_an_earlier_phase() -> None:
+    """70% of true answers are phase 3."""
+    studies = {
+        f"NCT{i:08d}": _named(f"NCT{i:08d}", phases="PHASE1")
+        for i in range(candidates.CANDIDATE_CAP + 20)
+    }
+    studies["NCT09999999"] = _named("NCT09999999", phases="PHASE3")
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": set(studies)}, {},
+    )
+    assert "NCT09999999" in {c.nct_id for c in got}
+
+
+def test_a_trial_nearer_the_approval_outranks_an_older_one() -> None:
+    studies = {
+        f"NCT{i:08d}": _named(f"NCT{i:08d}", start="1998-01-01")
+        for i in range(candidates.CANDIDATE_CAP + 20)
+    }
+    studies["NCT09999999"] = _named("NCT09999999", start="2019-01-01")
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": set(studies)}, {},
+    )
+    assert "NCT09999999" in {c.nct_id for c in got}
+
+
+def test_years_before_handles_a_missing_date() -> None:
+    assert candidates._years_before("", "2018-08-20") == 999

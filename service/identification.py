@@ -22,6 +22,7 @@ skipped so a re-run costs nothing.
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 from collections.abc import Iterable, Iterator
@@ -90,7 +91,9 @@ def unit_id_for(
     return f"{application}|{submission_type}|{submission_no}|{name}"
 
 
-def read_units(path: Path) -> list[dict[str, object]]:
+def read_units(
+    path: Path, borrowed: frozenset[str] = frozenset()
+) -> list[dict[str, object]]:
     """Every unit P3 wrote that still needs a judge, one per trial.
 
     A unit whose label stated its own NCT id is skipped: sending it would spend
@@ -107,14 +110,34 @@ def read_units(path: Path) -> list[dict[str, object]]:
     assert that one trial supported 37 distinct approvals, which is the
     deliverable's central claim made 36 times wrongly. Taking the earliest
     drops 4,963 units to 3,007 and is the more defensible attribution: see D16.
+
+    **A biosimilar's section 14 is its reference product's, so it is not
+    judged at all.** ``borrowed`` holds the MeSH ids that were reached only by
+    stripping a four-letter biologic suffix. A 351(k) application copies the
+    originator's Clinical Studies section verbatim, so the excerpt truthfully
+    describes the originator's trial and a judge identifies it correctly —
+    then the link asserts that the biosimilar was approved on evidence that
+    legally cannot support it, since a 351(k) rests on its own PK and
+    similarity data. Observed on the first wave of the full run: eight
+    ustekinumab biosimilars (PYZCHIVA, OTULFI, YESINTEK, STARJEMZA, SELARSDI,
+    IMULDOSA, WEZLANA) were all assigned ``NCT00267969``, **and both judges
+    agreed every time** — so the two-judge protocol cannot catch it and the
+    stem tiering only makes the false claim tier B rather than tier A.
+
+    Skipping them costs nothing real and saves 1,036 calls. They are recorded
+    in ``unlinked_submissions.tsv`` as ``biosimilar_copied_label`` rather than
+    dropped, so recall stays auditable.
     """
     by_trial: dict[tuple[str, str], dict[str, object]] = {}
-    seen = 0
+    seen = skipped = 0
     for row in iter_json_lines(path):
         if row.get("stated_nct"):
             continue
         candidates = row.get("candidates")
         if not isinstance(candidates, list) or not candidates:
+            continue
+        if borrowed and set(str(row.get("drug_mesh") or "").split(";")) & borrowed:
+            skipped += 1
             continue
         seen += 1
         # The same key P3 collapsed on, taken from the unit rather than
@@ -132,11 +155,29 @@ def read_units(path: Path) -> list[dict[str, object]]:
             by_trial[key] = row
     units = list(by_trial.values())
     _log.info(
-        "%d units carry a trial; %d distinct (application, trial) need a judge",
+        "%d units carry a trial; %d distinct (application, trial) need a judge"
+        "; %d skipped as a biosimilar's borrowed section 14",
         seen,
         len(units),
+        skipped,
     )
     return units
+
+
+def borrowed_ids(drug_map: Path) -> frozenset[str]:
+    """MeSH ids reached only by stripping a four-letter biologic suffix.
+
+    Read from ``drug_map.tsv`` rather than recomputed, so P4 and P5 cannot
+    disagree about which drugs are stem-sourced.
+    """
+    if not drug_map.is_file():
+        return frozenset()
+    with drug_map.open(encoding="utf-8") as handle:
+        return frozenset(
+            row["mesh_id"]
+            for row in csv.DictReader(handle, delimiter="\t")
+            if row.get("basis") == "stem" and row.get("mesh_id")
+        )
 
 
 def prioritise(

@@ -48,6 +48,7 @@ from service import (
     identification,
     indications,
     graph_links,
+    graph_trials,
     normalize,
     section14,
     validate,
@@ -268,6 +269,43 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 
+    if args.mode == "graph-trials":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found")
+            return 1
+        out_dir = Path(args.out)
+        connection = BiokdeConnection(credentials=Path(args.creds))
+        if not connection.has_credentials:
+            print(f"{connection.credentials} not found — pass --creds")
+            return 1
+        gt_spine = approval_events.build(data)
+        gt_apps = frozenset(
+            row.application for row in gt_spine.rows if row.trial_relevant == "true"
+        )
+        gt_ingredients = normalize.ingredients_of(data, gt_apps)
+        import pymongo
+
+        gt_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
+            connection_uri(connection),
+            serverSelectionTimeoutMS=connection.timeout_ms,
+        )
+        try:
+            gt_report = graph_trials.build(
+                out_dir,
+                GraphEvidenceRepository(gt_client, connection),
+                gt_apps,
+                gt_ingredients,
+            )
+        finally:
+            gt_client.close()
+        repository_gt = TsvRepository(out_dir)
+        repository_gt.save(
+            "graph_trials", ("application", "nct_id", "mentions"), gt_report.rows
+        )
+        print(graph_trials.render(gt_report))
+        return 0
+
     if args.mode == "graph-links":
         data = RawData(root=Path(args.fda_raw))
         if not data.exists:
@@ -413,9 +451,10 @@ def main(argv: list[str] | None = None) -> int:
         id_decided = identification.read_verdicts(
             adjudication_dir / "identify_verdicts.jsonl"
         )
+        id_borrowed = identification.borrowed_ids(out_dir / "drug_map.tsv")
         id_prepare_pending = [
             unit
-            for unit in identification.read_units(units_source)
+            for unit in identification.read_units(units_source, id_borrowed)
             if unit["unit_id"] not in id_decided
         ]
         id_chosen = identification.prioritise(id_prepare_pending, args.limit)

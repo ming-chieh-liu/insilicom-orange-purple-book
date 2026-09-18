@@ -318,6 +318,10 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
             for row in csv.DictReader(handle, delimiter="\t"):
                 if row.get("basis") == "stem" and row.get("mesh_id"):
                     stem_ids.add(row["mesh_id"])
+    # A 351(k) copies the originator's section 14 verbatim, so its prose
+    # describes a trial that legally cannot have supported it. P4 does not
+    # judge those units at all (see identification.read_units), and they are
+    # recorded here rather than left looking unjudged.
     spine: dict[str, dict[str, str]] = {}
     with (out_dir / "approval_events.tsv").open(encoding="utf-8") as handle:
         for row in csv.DictReader(handle, delimiter="\t"):
@@ -407,7 +411,13 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                         str(unit["submission_no"]),
                         str(unit.get("approval_date") or ""),
                         name,
-                        "not_yet_judged" if unit.get("candidates") else _why(unit),
+                        "biosimilar_copied_label"
+                        if stem_ids
+                        and set(str(unit.get("drug_mesh") or "").split(";"))
+                        & stem_ids
+                        else "not_yet_judged"
+                        if unit.get("candidates")
+                        else _why(unit),
                     )
                 )
                 continue

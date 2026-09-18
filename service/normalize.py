@@ -132,6 +132,49 @@ def stem_of(name: str) -> str:
     return name[: -len(match.group())] if (match := BIOSIMILAR_SUFFIX.search(name.upper())) else ""
 
 
+#: A synonym row this much weaker than the best one offered for the same drug
+#: is an artefact, not an alternative. Measured on the failures it fixes:
+#: ``Lenacapavir Sodium`` reaches ``Sodium`` at ``cnt=3`` while ``Lenacapavir``
+#: reaches its PubChem id at ``cnt=1700`` — a ratio of 0.2%. Legitimate
+#: alternatives for one drug do not differ by three orders of magnitude.
+#:
+#: **Why a rejection and not a ranking key.** Sorting by ``cnt`` would reorder
+#: every drug that resolves to more than one entity, which is a large blast
+#: radius for a defect affecting eight. This only removes rows the graph itself
+#: barely attests, and leaves the existing preference to choose among what is
+#: left.
+WEAK_SYNONYM_RATIO: float = 0.01
+
+
+def drop_weak(entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
+    """Discard synonym rows the graph barely attests.
+
+    ``pubmedEntitiesFlat`` is a (name, entity) table and ``cnt`` is its
+    confidence in that pairing, not the entity's overall frequency. A single
+    node is reached by ``Sodium`` at 349,700 and by ``Lenacapavir Sodium`` at 3;
+    the second is a bad row claiming a 2022 antiretroviral *is* sodium, and
+    without ``cnt`` it is indistinguishable from a real synonym.
+
+    That matters because the loser is systematically the *newer* drug: the
+    counter-ion has a clean MeSH descriptor and lenacapavir has only a PubChem
+    id, so :func:`preferred` picks the artefact on vocabulary alone.
+
+    Everything is kept when nothing has a count, so a graph without the field
+    behaves exactly as before.
+
+    >>> a = Entity("MESH:D012964", "1", "Sodium", "Chemical", "Drug", 3)
+    >>> b = Entity("PubChem:CID1", "2", "Lenacapavir", "Chemical", "Drug", 1700)
+    >>> [e.official_name for e in drop_weak((a, b))]
+    ['Lenacapavir']
+    >>> [e.official_name for e in drop_weak((a,))]
+    ['Sodium']
+    """
+    best = max((e.cnt for e in entities), default=0)
+    if best <= 0:
+        return entities
+    return tuple(e for e in entities if e.cnt >= best * WEAK_SYNONYM_RATIO)
+
+
 def is_identifier(mesh_id: str) -> bool:
     """Whether an id identifies anything.
 
@@ -350,7 +393,7 @@ def normalise(
                 and (not entity_type or e.type == entity_type)
             )
             via_stem = bool(candidates)
-        best = preferred(candidates, concepts)
+        best = preferred(drop_weak(candidates), concepts)
         if best is None:
             continue
         rolled = roll_up(best.id, concepts)
@@ -699,6 +742,8 @@ def counted(mappings: dict[str, Mapping]) -> tuple[tuple[str, int], ...]:
 __all__ = [
     "DESIGN_WORDS",
     "MIN_SYNONYM_LENGTH",
+    "WEAK_SYNONYM_RATIO",
+    "drop_weak",
     "stem_of",
     "PLACEHOLDER_IDS",
     "PREFERRED_SUBTYPE",

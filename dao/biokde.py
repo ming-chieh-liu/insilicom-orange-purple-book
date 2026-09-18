@@ -58,6 +58,19 @@ class Entity(NamedTuple):
     type: str
     #: ``Drug``, ``Rare Disease``, or ``NA``.
     subtype: str
+    #: How often this **(name, entity) pair** was seen — the graph's own
+    #: confidence in the synonym, not the entity's overall frequency. The same
+    #: node carries wildly different counts under different spellings:
+    #: ``MESH:D012964`` is reached by ``Sodium`` at 349,700 and by
+    #: ``Lenacapavir Sodium`` at **3**, which is a bad synonym row asserting
+    #: that a 2022 antiretroviral *is* sodium.
+    #:
+    #: Reading it is what separates a canonical name from an artefact. Without
+    #: it the two look identical and the vocabulary preference then picks the
+    #: artefact, because the counter-ion has a clean MeSH descriptor while the
+    #: newer drug has only a PubChem id. Same shape as ``Control`` reaching
+    #: ``Chlordiazepoxide`` at cnt 2 against 5,419.
+    cnt: int = 0
 
 
 def connection_uri(connection: BiokdeConnection) -> str:
@@ -111,6 +124,7 @@ class BiokdeRepository:
                     "official name": 1,
                     "type": 1,
                     "subtype": 1,
+                    "cnt": 1,
                 },
             ).collation(self._collation):
                 entity = Entity(
@@ -119,6 +133,7 @@ class BiokdeRepository:
                     official_name=str(row.get("official name") or ""),
                     type=str(row.get("type") or ""),
                     subtype=str(row.get("subtype") or ""),
+                    cnt=int(row.get("cnt") or 0),
                 )
                 if not entity.id:
                     continue

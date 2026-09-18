@@ -1,0 +1,5 @@
+BLA125516|ORIG|1|n=226 = NCT00026312
+NDA212436|SUPPL|12|LET222 171 = NCT01740427
+BLA761451|ORIG|1|Intravenous Administration in Adults with Moderate to Severe SLE = NCT01438489
+NDA214958|SUPPL|2|Psoriatic Arthritis = NCT04908189
+NDA210496|SUPPL|19|BRAF V600E Mutation-Positive Metastatic Colorectal Cancer (mCRC) = NCT02928224

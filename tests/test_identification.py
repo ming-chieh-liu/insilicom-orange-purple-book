@@ -323,3 +323,65 @@ def test_a_unit_id_containing_an_equals_sign_still_parses(tmp_path: Path) -> Non
         "BLA125516|ORIG|1|n=226": "NCT00026312",
         "NDA019941|SUPPL|11|n=200": "NONE",
     }
+
+
+# ---------------------------------------------------------------------------
+# A biosimilar's section 14 is borrowed, so it is not judged
+# ---------------------------------------------------------------------------
+
+
+def _bio_unit(app: str, mesh: str, uid: str) -> dict[str, object]:
+    return {
+        "unit_id": uid, "application": app, "submission_type": "ORIG",
+        "submission_no": "1", "approval_date": "2024-01-01", "stated_nct": "",
+        "drug_mesh": mesh, "acronym": "STUDY 1", "enrollment": "766",
+        "excerpt": "STUDY 1 was a randomized trial in 766 patients",
+        "candidates": [{"nct_id": "NCT00267969", "enrollment": "766"}],
+    }
+
+
+def test_a_stem_resolved_drug_is_not_sent_to_a_judge(tmp_path: Path) -> None:
+    """Eight ustekinumab biosimilars were all assigned NCT00267969 — a Stelara
+    trial — and both judges agreed every time, because each label copies the
+    originator's section 14 verbatim. The excerpt is truthful; the link is
+    not. A 351(k) rests on its own PK and similarity data."""
+    p = tmp_path / "units.jsonl"
+    p.write_text(
+        json.dumps(_bio_unit("BLA761373", "MESH:D000069549", "u1")) + "\n",
+        encoding="utf-8",
+    )
+    assert identification.read_units(p, frozenset({"MESH:D000069549"})) == []
+
+
+def test_an_ordinary_drug_is_still_judged(tmp_path: Path) -> None:
+    p = tmp_path / "units.jsonl"
+    p.write_text(
+        json.dumps(_bio_unit("BLA125514", "MESH:C582435", "u1")) + "\n",
+        encoding="utf-8",
+    )
+    assert len(identification.read_units(p, frozenset({"MESH:D000069549"}))) == 1
+
+
+def test_with_no_borrowed_ids_nothing_is_excluded(tmp_path: Path) -> None:
+    """The default must not change behaviour for callers that pass nothing."""
+    p = tmp_path / "units.jsonl"
+    p.write_text(
+        json.dumps(_bio_unit("BLA761373", "MESH:D000069549", "u1")) + "\n",
+        encoding="utf-8",
+    )
+    assert len(identification.read_units(p)) == 1
+
+
+def test_borrowed_ids_reads_only_stem_rows(tmp_path: Path) -> None:
+    m = tmp_path / "drug_map.tsv"
+    m.write_text(
+        "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
+        "USTEKINUMAB-TTWE\tMESH:D000069549\tb1\tUstekinumab\tChemical\tstem\n"
+        "PEMBROLIZUMAB\tMESH:C582435\tb2\tPembrolizumab\tChemical\texact\n",
+        encoding="utf-8",
+    )
+    assert identification.borrowed_ids(m) == frozenset({"MESH:D000069549"})
+
+
+def test_borrowed_ids_on_a_missing_file_is_empty(tmp_path: Path) -> None:
+    assert identification.borrowed_ids(tmp_path / "nope.tsv") == frozenset()
