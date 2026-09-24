@@ -54,14 +54,27 @@ Pathways: **NDA** (§505(b), small molecule, Orange Book) · **ANDA** (§505(j),
 
 ## 3. Decisions
 
+**How this table is maintained.** Decisions are append-only and never deleted or renumbered. A new
+decision takes the next free number and a date. When it changes an older one, the older row keeps
+its original text and gains a status marker at the front of its Decision cell:
+
+- **`[SUPERSEDED by Dn, YYYY-MM-DD]`** — no longer in force; read Dn instead.
+- **`[PARTIALLY SUPERSEDED by Dn, YYYY-MM-DD]`** — still in force except for the part Dn names,
+  which is stated in the marker.
+- **`[CLARIFIED YYYY-MM-DD]`** — wording made precise; the decision itself is unchanged.
+
+A row with no marker is in force. The same markers are applied to the matching bullet in
+`CLAUDE.md`, which must never disagree with this table. A decision that is agreed but not yet
+reflected in code says so (`not yet implemented`) until the code lands.
+
 | # | Decision | Rationale |
 |---|---|---|
 | D1 | Output is flat TSV, not a KG | One edge type |
 | D2 | **The edge is trial → submission**, keyed `(ApplNo, SubmissionType, SubmissionNo)` | Accelerated→confirmatory conversions collapse at application grain |
 | D3 | Scope NDA + BLA, **all years** (87,055 approved events). Era is a column, not a filter | The spine is cheap; linkability should be measured, not assumed away |
-| D4 | Trial-relevant set = **5,879 ORIG + 2,042 core SUPPL = 7,921** | Core SUPPL = action types New Indication (1,894), Accelerated (120), Confirmatory (28) |
-| D5 | **Which submissions are trial-driven is published data** | `ActionTypes_Lookup` + `Join_Submission_ActionTypes_Lookup`. Accelerated status and confirmatory conversion are structured fields — no PDF parsing |
-| D6 | **Point-in-time labels come from `ApplicationDocs` type 2** | 29,788 per-submission label PDFs, e.g. `…/2009/017881s010lbl.pdf` |
+| D4 | **[SUPERSEDED by D23, 2026-09-24]** Trial-relevant set = **5,879 ORIG + 2,042 core SUPPL = 7,921** | Core SUPPL = action types New Indication (1,894), Accelerated (120), Confirmatory (28) |
+| D5 | **[PARTIALLY SUPERSEDED by D23, 2026-09-24 — the scope is now chosen by submission class, not action type; and "accelerated status and confirmatory conversion are structured fields" does not hold: originals carry no action type at all, so an accelerated ORIG is invisible, and the subtype tags are noisy — see §3a]** **Which submissions are trial-driven is published data** | `ActionTypes_Lookup` + `Join_Submission_ActionTypes_Lookup`. Accelerated status and confirmatory conversion are structured fields — no PDF parsing |
+| D6 | **[CLARIFIED 2026-09-24 — "type 2" means `ApplicationDocs.ApplicationDocsTypeID = 2`, which `ApplicationsDocsType_Lookup` names `Label`; it is unrelated to submission class id 2 or action type id 2, both of which mean Efficacy]** **Point-in-time labels come from `ApplicationDocs` type 2** | 29,788 per-submission label PDFs, e.g. `…/2009/017881s010lbl.pdf` |
 | D7 | **Trials are identified from §14 prose, not NCT ids** | Only 1/6 originals carry an NCT; 0.9% corpus-wide. This is the core problem the project exists to solve |
 | D8 | **Enrollment count is the disambiguating key** | Across 5 drug+condition candidate sets, every candidate had a distinct enrollment — zero collisions |
 | D9 | **MeSH descriptor is the shared id space**; biokde is the synonym dictionary | Both sides must normalise to the same space for the join to fire |
@@ -75,6 +88,11 @@ Pathways: **NDA** (§505(b), small molecule, Orange Book) · **ANDA** (§505(j),
 | D22 | Use `meshes`, **never** `ancestors` | `ancestors` walks to the root: epinephrine → Hydrocarbons, PCOS → Neoplasms |
 | D20 | Tier C is **never promoted** above C | The question it answers — "is this plausibly evidence" — is weaker than P4's |
 | D15 | Combination regimens yield **one row per (trial, submission)** | KEYNOTE-189 approved pembrolizumab *with* chemo owned by other applications |
+| D23 | **2026-09-24 · not yet implemented.** The trial-relevant scope is chosen by **submission class code**, one rule for both submission types, with action type used only to exclude two supplement subtypes. ORIG: `EFFICACY, BIOEQUIV, BIOSIMILAR, TYPE 1, 1/4, 2, 2/3, 2/4, 3, 3/4, 4, 4/5, 5, 6, 7, 9, 9- BLA, 10, 10- BLA, UNKNOWN`, blank. SUPPL: `EFFICACY, BIOSIMILAR, BIOEQUIV`, minus supplements whose only efficacy action is 10 New Route or 12 Rx→OTC. **11,295 events** (was 7,921). Full detail, counts and rejected alternatives in §3a | Action type is empty on every original, so it cannot scope them; submission class is populated on both. D4 kept 3 of FDA's 12 efficacy subtypes and so dropped 3,506 efficacy supplements whose letters name trials, and D16 then attributed those trials to the next in-scope supplement — a false edge. Supersedes D4, partly D5 |
+| D24 | **2026-09-24 · not yet implemented.** Supplements whose only efficacy actions are **5 Labeling Change With Clinical Data** or **6 Manufacturing Change With Clinical Data** (1,520) are in scope as a **D16 guard**: P2 reads their label and label-stated NCT ids link, but P4 does not judge their prose descriptions. Unjudged units get the unlinked reason `label_change_not_judged` | They rest on named studies but support a label claim, not a new use. Their labels must be read so that a trial first described there is not later attributed to an in-scope supplement (D16); judging them is a separate, optional P4 run |
+| D25 | **2026-09-24 · not yet implemented.** **Approval letters (`ApplicationDocsTypeID = 1`) are an indication source**, alongside label §1. A letter's "provides for …" sentence states the approved indication of that exact submission. Letters are **not** a trial source | Letters exist for 95.2% of in-scope submissions since 1998 (7,413 of 7,786) and for almost none before (28 of 3,509); they add 454 submissions that have no label PDF. Their study mentions are mostly postmarketing requirements. Detail §3b |
+| D26 | **2026-09-24 · not yet implemented.** **FDA review documents are a trial source**, as a route parallel to the label route: Summary Review (21), Review (3, resolved to its component PDFs) and the pediatric reviews. A protocol id is captured by regex after `Study/Trial/Protocol`, matched **exactly** to one registry study's `orgStudyId` or secondary id, passed through deterministic guards, then given a **role** by two judges (`docs/prompts/review-trial-role.md`). Abbreviated ids are not expanded. Readability is decided **per file** (no text layer → skipped), never by year | Precision over recall, by instruction. Pilot, 2026-09-24: identity 70/70 correct; judges agreed 66/70; the 38 PIVOTAL/SUPPORTING links were checked and confirmed plausible by the user (3 read in full). Detail §3b |
+| D27 | **2026-09-24 · not yet implemented.** A review-route link judged **PIVOTAL or SUPPORTING is tier A** outright, `evidence_source = review_protocol`, with no count corroboration. D16 applies across the label and review routes together | The FDA names the trial by its sponsor protocol number and the match is exact, so, as with a label-stated NCT (D17), there is nothing to corroborate. Tier C remains below it (D20) |
 
 ### Hard constraints
 
@@ -87,11 +105,219 @@ Pathways: **NDA** (§505(b), small molecule, Orange Book) · **ANDA** (§505(j),
 
 ---
 
+## 3a. D23 / D24 — which submissions are trial-relevant
+
+Decided 2026-09-24 after reading every Drugs@FDA table (`examine/01_drugsfda_tables/`) and a
+sample of FDA approval letters. All counts are **approved NDA/BLA submissions** in the
+2026-09-07 `drugsatfda.zip`. **Not yet implemented** — `service/approval_events.py` still applies
+D4, and every downstream count in §4 is still D4's.
+
+### Three fields that are easy to confuse
+
+| Field | Table | Per submission | What it says |
+|---|---|---|---|
+| **Submission class** | `Submissions.SubmissionClassCodeID` → `SubmissionClass_Lookup` (28 codes) | exactly 1 | *what kind* of submission: on ORIG the novelty (`TYPE 1` NME … `TYPE 10`), on SUPPL the area (`EFFICACY`, `LABELING`, `MANUF (CMC)`, `REMS` …) |
+| **Action type** | `Join_Submission_ActionTypes_Lookup` → `ActionTypes_Lookup` (59 ids) | 0..n | *what the approval changed*: 12 `Efficacy-*` subtypes plus Labeling/CMC/REMS ones. A FDA-published junction table, not one we build |
+| **Document type** | `ApplicationDocs.ApplicationDocsTypeID` → `ApplicationsDocsType_Lookup` (62) | 0..n | *what is attached*: 1 Letter, **2 Label**, 3 Review … Only 2 is used (D6) |
+
+The id `2` means Efficacy in the first two and Label in the third. Use the **code**
+(`SubmissionClassCode`, e.g. `TYPE 1`), not the id and not the description: two codes,
+`BIOSIMILAR` and `TYPE 10- BLA`, have an **empty** description in the lookup, so a
+description-keyed rule silently reads them as blank.
+
+### Why class, not action type
+
+- **Action type is empty on every original.** Of 5,879 NDA/BLA ORIGs, 5,202 join to id 46 (blank
+  description), 672 have no join row, 5 carry an empty id. Nothing else in Drugs@FDA describes an
+  original, so action type cannot scope ORIGs.
+- **On supplements, action type is a refinement of class.** Efficacy-class supplements carry
+  Efficacy-* actions 5,542 times; the 8 exceptions are 5 Efficacy-class rows with no efficacy action
+  and 3 `BIOSIMILAR`-class rows with one (2 New Indication, 1 Labeling Change w/ Clinical Data). No
+  Efficacy-class supplement's non-efficacy actions replace its efficacy one — Labeling-Package
+  Insert, REMS-* and Medication Guide appear only alongside.
+- **The subtype tags are noisy**, so fine selection among them buys little precision. From the
+  approval letters: VIREAD `021356` S38 is tagged *Manufacturing Change w/ Clinical Data* but
+  "provides for … pediatric patients 2 to less than 12 years"; TASIGNA `022068` S27 is tagged *New
+  Patient Population* but "provides for new indications". Keytruda `125514` S4 (2015-12-18) is
+  tagged *Accelerated Approval* and S5 (2015-10-02, NSCLC) *New Indication*; the first approval,
+  ORIG-1 2014-09-04, has no action type. Whether FDA's tag means "is an accelerated approval" or
+  "relates to an accelerated-approval commitment" is **unverified**; the approval letters
+  (document type 1) would settle it.
+
+### ORIG — by class code
+
+| Class code | ORIG | Decision |
+|---|---|---|
+| TYPE 1 · TYPE 1/4 | 1,764 · 74 | in — new molecular entity, the client's stated priority |
+| TYPE 2 · 2/3 · 2/4 | 172 · 17 · 8 | in |
+| TYPE 4 · 3/4 · 4/5 | 318 · 29 · 6 | in |
+| TYPE 3 | 1,646 | in — sometimes new trials, often bridging; P4 answers NONE where there is none |
+| TYPE 5 | 1,173 | in — mostly bridging, §14 often copied from the reference product |
+| TYPE 6 · 9 · 9- BLA · 10 · 10- BLA | 86 · 25 · 10 · 18 · 1 | in — a new indication by definition |
+| TYPE 7 | 46 | in |
+| EFFICACY | 40 | in |
+| **UNKNOWN** | 188 | **in** — not legacy noise: 70 are 2020s approvals FDA has not yet classed, including 351(k) biosimilars (TYENNE, AVTOZMA, VEGZELMA …); 27 applications carry 110 current links |
+| blank | 145 | in |
+| BIOEQUIV · BIOSIMILAR | 0 · 0 | in — no original carries either today; listed so a future release cannot silently drop them |
+| TYPE 8 (partial Rx→OTC) | 29 | **out** — 0 links today |
+| MEDGAS | 82 | **out** — no label PDF, 0 links |
+| S | 2 | **out** — a supplement code on an original |
+
+351(k) biosimilar originals are classed blank 46, TYPE 2 27, TYPE 5 20, EFFICACY 8, TYPE 3 5,
+TYPE 2/4 1 (94 Purple Book 351(k) BLAs) — never `BIOSIMILAR`, which exists only on supplements.
+
+### SUPPL — by class code, then action type
+
+| Class | SUPPL | Decision |
+|---|---|---|
+| EFFICACY | 5,547 | in, minus action-type exclusions below |
+| BIOSIMILAR | 42 | in — carries 2 New Indications and 1 Labeling Change w/ Clinical Data |
+| BIOEQUIV | 23 | in — 8 tagged Bioequivalence (PK); expected to yield no efficacy trial |
+| LABELING · MANUF (CMC) · REMS · S · UNKNOWN · stray TYPE n | 75,564 | out — no efficacy action in volume |
+
+Within the in-scope classes, by the supplement's efficacy actions:
+
+| Efficacy action(s) | n | Treatment |
+|---|---|---|
+| 8 New Indication · 3 Accelerated · 4 Confirmatory · 2 Efficacy · 7 New Dosing Regimen · 9 New Patient Population · 11 Pediatric · 54 Animal Rule | 3,942 | full pipeline (2,042 of them were already in D4) |
+| none, but class in scope | 67 | full pipeline |
+| **only 5 Labeling Change w/ Clinical Data or 6 Manufacturing Change w/ Clinical Data** | 1,520 (1,463 + 57; 1,363 with a label PDF) | **D24 guard** — P2 + label-stated NCT only |
+| only 10 New Route · 12 Rx→OTC | 83 (32 + 51) | **out** — the drug and its efficacy claim are unchanged; the new evidence is bridging or actual-use data, and an OTC Drug Facts label has no §14 |
+
+No supplement carries 5 or 6 together with another efficacy action.
+
+### Totals
+
+| | Events | With a label PDF |
+|---|---|---|
+| ORIG in scope | 5,766 | 2,910 |
+| SUPPL, full pipeline | 4,009 | 2,851 |
+| SUPPL, D24 guard | 1,520 | 1,363 |
+| **Trial-relevant (D23)** | **11,295** | 7,124 |
+| *was, under D4* | *7,921* | |
+
+113 originals leave scope (MEDGAS, TYPE 8, S), none of them linked. 3,487 supplements enter it (1,967 full pipeline + 1,520 D24 guard), a net change of +3,374. The set of applications barely moves (5,821 → 5,716: 107 applications whose only trial-relevant event was a MEDGAS or TYPE 8 original leave, 2 enter) and the set of active ingredients not at all (2,670 either way) — D23 adds approval events for drugs already in scope, it does not add drugs.
+
+### Considered and not chosen
+
+- **Action type for SUPPL, class for ORIG.** Accurate, but two rules over two fields; the class rule
+  with two exclusions says the same thing.
+- **Class alone, no exclusions.** Admits the 83 route/OTC supplements. Harmless but pointless.
+- **Excluding UNKNOWN.** Loses 110 links and most of the recent biosimilar originals.
+- **Excluding 5 and 6 outright.** Their trials would then be attributed by D16 to the next in-scope
+  supplement that repeats them.
+
+### Out of D23's reach, recorded so it is not mistaken for coverage
+
+- **ANDA generics** (78% of Orange Book product rows) have no trials of their own; they link to
+  trials only by inheriting their Reference Listed Drug's — a product-level join, not a scope rule.
+- **CBER biologics** are not in Drugs@FDA (F-P0-2), whatever the scope rule says. The Purple Book
+  file on disk *is* FDA's full listing (F-P0-3 corrected): 1,067 CBER product rows, with BLA
+  number, names, first licensure and a Supplement column that records product changes, not an
+  approval history. 82 CBER BLAs have a current openFDA label. There is no per-submission label
+  or submission table for CBER, and no document links in the Purple Book or `ApplicationDocs`.
+  **Open item, agreed 2026-09-24 — needed eventually, not started:** a CBER route of its own —
+  openFDA current label (82) → DailyMed label history by `set_id` → CBER product pages for
+  approval letters and the Summary Basis for Regulatory Action.
+- **Medical devices** (client brief, 2026-09-24) are in no source this project reads.
+
+---
+
+## 3b. D25–D27 — letters for indications, reviews for trials
+
+Decided 2026-09-24. Only **approved** submissions are considered; `ApplicationDocs` also holds 282
+documents on NDA/BLA submissions that are not approved (144 tentative-approval letters), and those
+are ignored. **Not yet implemented.**
+
+### Which document carries what
+
+| Doc type | In-scope submissions (D23) | Indication | Trial evidence | Used for |
+|---|---|---|---|---|
+| 1 Letter | 7,441 | ✅ "provides for …" in 8/9 sampled | ❌ mostly postmarketing requirements | **indication (D25)** |
+| 2 Label | 7,124 | ✅ §1 | ✅ §14 by prose | the existing label route |
+| 21 Summary Review | 750 | ✅ | ✅ protocol ids | **trials (D26)** |
+| 3 Review | 4,206 | ✅ | ✅ protocol ids, more of them | **trials (D26)** |
+| Pediatric Medical / Statistical / Clin-Pharm / CDTL / DD Summary / Medical Secondary / Addendum | ~300–480 each | ✅ | ✅ the pediatric studies | **trials (D26)** |
+| Pediatric Written Request, Amendments 1–15, Reissues | — | — | ❌ requests for *future* studies | excluded |
+| Medication Guide, REMS, PPI, Other | — | patient language | ❌ | excluded |
+
+### D25 — letters
+
+Coverage over the 11,295 in-scope submissions: 0.9% pre-1998 ORIG and 0.6% SUPPL; 85–98% after,
+95.2% overall since 1998. Of the 373 missing since 1998, 17 are filed under a sibling submission's
+combined letter and about half of a sampled six exist at the standard URL
+(`appletter/<year>/<appl>Orig1s<nnn>ltr.pdf`) without an `ApplicationDocs` row. Letter or label
+together cover 7,578 submissions. The extractor must accept both "provides for" and letters that
+word it otherwise, and must not stop at a decimal point ("Gel, 1.2%") — both failures were seen in
+the pilot.
+
+### D26 — reviews
+
+**Identity** is decided deterministically, the **role** by judges. The pipeline, per
+`docs/runbooks/review-trial-role.md`:
+
+1. Fetch; resolve a type-3 table of contents through its embedded `pdfFilenames` map or its
+   `pdfBaseName` + `pdfFiles` flags. **Skip any PDF with no text layer** (no fonts, under 2,000
+   characters) as `no_text_layer` — per file, not per year: 13 of 15 sampled 1998–2007 type-3
+   reviews were scans (producers *Acrobat Scan Plug-in*, *eCopy*), while a 2004 review was
+   born-digital and processed normally.
+2. Capture the token after `Study|Trial|Protocol [No.]` with letters **and** digits, any length,
+   repairing line-break splits. Bare numbers and words are dropped. **Abbreviations are not
+   expanded** (`KN555`, `104a`, `A2301` are lost by design).
+3. Match exactly one registry study through `orgStudyId` **or** a secondary id (`GOG-0240` is a
+   secondary id of NCT00803062, issued by NRG Oncology / CTEP).
+4. Guards, all required: start ≤ approval · lead sponsor matches the applicant **or** the trial names
+   the application's drug (collaborators such as NCI, and ownership changes such as
+   Zogenix → Recro) · the review package names the application's drug (catches
+   `ApplicationDocs` mislinks: NDA208551 Triferic carries an Epclusa summary review).
+5. D16 across routes: the earliest submission whose label **or** review names the trial keeps it.
+6. One unit per `(submission, NCT)`; two judges, a third on disagreement; six roles.
+
+| Role | Links? |
+|---|---|
+| PIVOTAL | ✅ tier A (D27) |
+| SUPPORTING | ✅ tier A (D27) |
+| PK_CLINPHARM · NOT_FOR_THIS_APPROVAL · FAILED · OTHER | context rows |
+
+**Measured on the pilot** (80 summary reviews + 40 type-3 submissions):
+
+| | Summary reviews | Type 3 |
+|---|---|---|
+| readable | 71 / 80 | 27 / 40 (the 2008+ ones; 13 older scans) |
+| submissions with ≥1 accepted trial | 15 (19%) | 15 (all 2008+; 60% of the 25 modern) |
+| distinct trials, identity correct | 30 / 30 | 40 / 40 |
+| judge agreement A = B | 66 / 70 overall; 4 tiebreaks | |
+| final roles | PIVOTAL 36 · SUPPORTING 2 · PK_CLINPHARM 14 · NOT_FOR_THIS_APPROVAL 5 · OTHER 13 | |
+| calibration | 3 / 4 — the miss (SIMPLE `GS-US-540-5773` → OTHER, expected NOT_FOR_THIS_APPROVAL) is non-linking either way | |
+
+A registry-date rule ("primary completion before approval") was tested and **rejected** as a role
+proxy: it catches the two ongoing confirmatory trials (APHINITY, ALEX) but also drops four pivotal
+trials of accelerated approvals granted on interim data (Imbruvica `PCYC-1104`, Zykadia `X2101`,
+Perjeta `WO20697`, remdesivir `GS-US-540-5823`). The role comes from FDA's wording.
+
+**Before a full run:** prompt v2 (the NOT_FOR_THIS_APPROVAL / OTHER wording, so earlier-approval
+recaps land in the former), the letter-sentence fixes above, and a re-run of the calibration units
+plus two possible misses (Tyvaso DPI `TIP-PH-101` → OTHER; Caplyta S6 `ITI-007-401` → OTHER).
+
+### D27 — tier
+
+D17 made a label-stated NCT tier A because the FDA named the trial. A review that names the trial
+by its sponsor protocol number, matched exactly and guarded, is the same kind of statement, so a
+PIVOTAL or SUPPORTING review link is tier A without count corroboration. The label route's
+count-based tiering (D17) is unchanged for judged §14 descriptions. On the pilot the review route
+also exposed two probable D16 misattributions in the label route: Imbruvica's `PCYC-1104` and
+Zykadia's `X2101` are named in the **original** approval's review but linked today to SUPPL-17 and
+SUPPL-9.
+
+---
+
 ## 4. Pipeline — six phases
 
 ```
 P0 spine        Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
-                trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921
+                trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921   (D4, as built)
+                D23, decided, not yet built: 5,766 ORIG + 4,009 SUPPL
+                                             + 1,520 D24 guard SUPPL = 11,295
 
 P1 normalize    biokde pubmedEntitiesFlat as synonym dictionary -> MeSH descriptor
                   FDA drug -> MeSH          FDA indication -> MeSH
@@ -126,6 +352,9 @@ NDA+BLA; add `action_type`, `orphan`, `review_priority`, `era`. New reader for t
 tables, same shape as `source/raw_table.py`.
 → `approval_events.tsv`. **Gate:** 87,055 events in scope; 11,426 indication-changing;
 **7,921 trial-relevant = 5,879 ORIG + 2,042 core SUPPL**. *(Met 2026-09-15.)*
+**[SUPERSEDED by D23, 2026-09-24]** New gate once D23 is built: 11,295 trial-relevant =
+5,766 ORIG + 4,009 full-pipeline SUPPL + 1,520 D24-guard SUPPL, with a `scope_basis` column naming
+the class code (and, for SUPPL, the efficacy actions) that admitted each row.
 
 **P1 — normalization layer.** *New: `service/normalize.py`, `dao/biokde.py`.* The Mongo client is
 pooled, constructed once in `main.py`, injected. Build four mappings, each with a coverage report.
@@ -215,6 +444,8 @@ space**; always resolve through `pubmedEntitiesFlat`.
 Supporting tables: `approval_events.tsv` (spine) · `label_trials.tsv` · the four P1 mapping tables ·
 **`unlinked_submissions.tsv`** with `reason` ∈ `no_label` \| `scanned` \| `no_section_14` \|
 `no_drug_mapping` \| `no_candidates` \| `agent_none` \| `pre_registration_era` \| `not_trial_driven`.
+*(This list is the original plan; the reasons `assemble.py` actually emits are in CLAUDE.md's pipeline
+section. D24 adds `label_change_not_judged`.)*
 
 ---
 
@@ -296,8 +527,8 @@ above is wrong and more agent calls will not fix it.
 | # | Difficulty | Status | Evidence |
 |---|---|---|---|
 | Δ1 | Attribute an approval to a submission | **SOLVED** | Action types published |
-| Δ2 | Know which submissions are trial-driven | **SOLVED** | Same source; originals = all 5,879 |
-| Δ3 | Accelerated + confirmatory status | **SOLVED** | Structured field |
+| Δ2 | Know which submissions are trial-driven | **REVISED by D23 (2026-09-24)** | Was: same source, originals = all 5,879. Now: submission class code for both, see §3a |
+| Δ3 | Accelerated + confirmatory status | **REOPENED (2026-09-24)** | Was "structured field". Originals carry no action type, so an accelerated ORIG is invisible, and the SUPPL tags disagree with Keytruda's history (§3a). Approval letters would settle it |
 | Δ4 | Get a point-in-time label | **SOLVED** | 29,788 per-submission PDFs |
 | Δ5 | §14 polarity | **SOLVED, BUILT** | 2,679 links judged |
 | Δ6 | §14 text extraction | **MOSTLY SOLVED** | 10/13 clean; scans detectable |

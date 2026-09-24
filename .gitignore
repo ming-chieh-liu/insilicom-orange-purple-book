@@ -41,3 +41,10 @@ adjudication/tiebreak_needed.txt
 adjudication/identify_units.jsonl
 adjudication/identify_judged.jsonl
 adjudication/identify_tiebreak_needed.txt
+
+# Unpacked raw data for manual inspection
+examine/
+
+# Review-trial-role judging units: rebuilt by the pilot builder, not curated
+adjudication/review_role_units.jsonl
+adjudication/review_role_tiebreak_needed.txt

@@ -33,6 +33,9 @@ Every gate in `docs/DESIGN.md` is met exactly, and reproduces from the file:
 | — originals | 5,879 | 5,879 |
 | — core supplements | 2,042 | 2,042 |
 
+*These gates are D4's. D23 (2026-09-24) replaces the trial-relevant scope; its gate is in
+`docs/DESIGN.md` §4 P0 and has not been measured against a rebuilt TSV yet.*
+
 Also checked and clean: **zero duplicate `(application, submission_type,
 submission_no)` keys**; `submission_no` is numeric on every row; no
 trial-relevant event has a blank `approval_date`; the action-type join carries
@@ -79,6 +82,15 @@ explicitly whether CBER BLAs are in scope. If they are, the Purple Book has to
 become an input rather than a documented-but-unread file.
 
 ### F-P0-3 — the Purple Book file is the wrong file, and unread · **medium**
+
+> **[CORRECTED 2026-09-24 — the "wrong file" half is false; "unread" still holds.]** The file is
+> byte-identical to FDA's own full download,
+> `accessdata.fda.gov/drugsatfda_docs/PurpleBook/2026/purplebook-search-August-data-download.csv`,
+> the only bulk Purple Book file FDA publishes (one per month). Its title names only section 1:
+> section 1 is the month's 29 changed rows (19 BLAs), and **section 2 is the full listing, 2,242
+> rows over 860 BLAs** — CDER 1,204 rows, CBER 1,067. It contains Keytruda, Humira, Rituxan,
+> Comirnaty, Kymriah and Recombivax, and 460 of Drugs@FDA's 482 BLAs. There is no fuller extract
+> to download. The text below is kept as written.
 
 `fda_raw/purplebook/purplebook-2026-08.csv` is the **"Purple Book Monthly
 Historical Data Changes Report — August 2026"**: one month of new, added and

@@ -26,18 +26,30 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 
 ## Standing decisions
 
+**Decisions are append-only.** Never delete or renumber one. A new decision takes the next free
+number and a date; when it changes an older one, the older bullet keeps its text and gains a marker
+at the front — `[SUPERSEDED by Dn, date]`, `[PARTIALLY SUPERSEDED by Dn, date — which part]`, or
+`[CLARIFIED date]` for a wording fix. No marker means in force. `docs/DESIGN.md` §3 is the full
+record and carries the same markers; the two must never disagree. A decision agreed but not yet in
+code says `not yet implemented` until it lands.
+
 - **D2 — the edge is trial → submission**, keyed `(ApplNo, SubmissionType, SubmissionNo)`.
   Keytruda melanoma was approved 2014-09-04 (accelerated, KEYNOTE-001) and again 2015-12-18
   (converted to regular, KEYNOTE-002/006). Same drug, same indication, two events, two trial sets.
   Application-grain linking destroys this.
 - **D3 — scope NDA + BLA, all years** (87,055 approved events). Era is a column, not a filter.
-- **D4 — trial-relevant set = 5,879 ORIG + 2,042 core SUPPL = 7,921.**
-- **D5 — which submissions are trial-driven is published data.** `ActionTypes_Lookup` +
-  `Join_Submission_ActionTypes_Lookup`: New Indication (1,894), Accelerated Approval (120),
-  Accelerated Approval Confirmatory Study (28). **Accelerated status and confirmatory conversion
-  are structured fields — no PDF parsing.**
-- **D6 — point-in-time labels come from `ApplicationDocs` type 2**, 29,788 per-submission label
-  PDFs (`…/2009/017881s010lbl.pdf`).
+- **[SUPERSEDED by D23, 2026-09-24]** **D4 — trial-relevant set = 5,879 ORIG + 2,042 core SUPPL
+  = 7,921.**
+- **[PARTIALLY SUPERSEDED by D23, 2026-09-24 — scope is chosen by submission class, not action
+  type; and the last sentence does not hold: originals carry no action type, so an accelerated
+  ORIG is invisible, and the subtype tags are noisy (DESIGN §3a)]** **D5 — which submissions are
+  trial-driven is published data.** `ActionTypes_Lookup` + `Join_Submission_ActionTypes_Lookup`:
+  New Indication (1,894), Accelerated Approval (120), Accelerated Approval Confirmatory Study (28).
+  **Accelerated status and confirmatory conversion are structured fields — no PDF parsing.**
+- **[CLARIFIED 2026-09-24 — "type 2" is `ApplicationDocsTypeID = 2` = `Label`; unrelated to
+  submission class id 2 or action type id 2, which both mean Efficacy]** **D6 — point-in-time
+  labels come from `ApplicationDocs` type 2**, 29,788 per-submission label PDFs
+  (`…/2009/017881s010lbl.pdf`).
 - **D7 — trials are identified from §14 prose, not NCT ids.** Only 1/6 originals carry an NCT;
   0.9% corpus-wide. This is the core problem the project exists to solve.
 - **D8 — enrollment count is the disambiguating key.** Across 5 drug+condition candidate sets,
@@ -74,18 +86,52 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
   ever find them. A shortlist failure looks exactly like a judging failure in the output —
   CHECKMATE-648 hid as one for two commits — so they are scored apart. Matching the label's trial
   name against the registry's acronym recovers only 170 of the 2,209, so the gap is elsewhere.
-- **D17 — the tier is the count.** A judged link reaches tier A only when the label's patient count
+- **[PARTIALLY SUPERSEDED by D27, 2026-09-24 — a second outright tier-A source is added: a review-route link judged PIVOTAL or SUPPORTING; count tiering still governs judged §14 descriptions]** **D17 — the tier is the count.** A judged link reaches tier A only when the label's patient count
   and the registry's agree within 15%; otherwise tier B, with both counts in the row. A label that
   states its own NCT id is tier A outright — the FDA said it, there is nothing to corroborate. This
   exists because a unit keyed `TABLE 3` carried a label "count" of 3 (a table number the extractor
   read as an enrollment) and its row was indistinguishable from CHECKMATE-648's 970 against 970.
-- **D16 — a trial is attributed to the EARLIEST submission whose label carries it.** Section 14 is
+- **[PARTIALLY SUPERSEDED by D26, 2026-09-24 — "whose label carries it" becomes "whose label OR review names it"; the rule itself is unchanged]** **D16 — a trial is attributed to the EARLIEST submission whose label carries it.** Section 14 is
   cumulative: a subsection is added at the approval it supported and then never removed.
   KEYNOTE-087 appears on **37** separate Keytruda submissions, 2017-05-10 through 2026-07-10; it
   supported the first (classical Hodgkin lymphoma). Attributing it to all 37 would make the
   deliverable's central claim 36 times wrongly. Later appearances are context, not evidence.
   **This applies to label-stated ids too, not only judged ones** — missing that branch linked
   KEYNOTE-189 to supplements four years after the one it supported, 3,123 rows of it.
+- **D23 — scope by submission class CODE, for both ORIG and SUPPL** (2026-09-24, **not yet
+  implemented**). Action type is empty on every original, so it cannot scope them; class is
+  populated on both. Key on `SubmissionClassCode` (`TYPE 1`), never the id or the description —
+  `BIOSIMILAR` and `TYPE 10- BLA` have empty descriptions. **ORIG in:** `EFFICACY, BIOEQUIV,
+  BIOSIMILAR, TYPE 1, 1/4, 2, 2/3, 2/4, 3, 3/4, 4, 4/5, 5, 6, 7, 9, 9- BLA, 10, 10- BLA, UNKNOWN`,
+  blank. **ORIG out:** `TYPE 8`, `MEDGAS`, `S`. **SUPPL in:** `EFFICACY, BIOSIMILAR, BIOEQUIV`, minus
+  supplements whose only efficacy action is 10 New Route or 12 Rx→OTC. `UNKNOWN` is in because it
+  is mostly 2020s approvals FDA has not yet classed, recent biosimilars among them — 110 links sit
+  on it. **11,295 events** (5,766 ORIG + 4,009 SUPPL + 1,520 D24), was 7,921. D4 dropped 3,506
+  efficacy supplements whose letters name trials, and D16 then gave those trials to the next
+  in-scope supplement — a false edge. Detail: `docs/DESIGN.md` §3a.
+- **D24 — "with clinical data" supplements are a D16 guard, not a judging target** (2026-09-24,
+  **not yet implemented**). Supplements whose only efficacy action is 5 Labeling Change With
+  Clinical Data or 6 Manufacturing Change With Clinical Data (1,520) go through P2 and link their
+  label-stated NCT ids, but P4 does not judge their prose. Unjudged units get reason
+  `label_change_not_judged`. They must be read so a trial first described there is not attributed
+  by D16 to a later supplement.
+- **D25 — approval letters are an indication source** (2026-09-24, **not yet implemented**).
+  `ApplicationDocsTypeID = 1`; the "provides for …" sentence states the approved indication of that
+  exact submission. Coverage 95.2% of in-scope submissions since 1998, ~0% before; adds 454 with no
+  label. **Not a trial source** — their study mentions are postmarketing requirements. The
+  extractor must handle other wordings and not stop at decimals ("Gel, 1.2%").
+- **D26 — FDA reviews are a trial source, parallel to the label route** (2026-09-24, **not yet
+  implemented**). Summary Review (21), Review (3, via its table of contents) and pediatric reviews;
+  never Pediatric Written Requests. Protocol id after `Study/Trial/Protocol` (letters + digits, any
+  length, **no abbreviation expansion**) → exactly one registry study by `orgStudyId` **or**
+  secondary id → guards (start ≤ approval · sponsor = applicant or trial names the drug · package
+  names the drug) → D16 across label and review → two judges assign a role
+  (`docs/prompts/review-trial-role.md`, `docs/runbooks/review-trial-role.md`). Skip a PDF with no
+  text layer, **per file, never by year**. Pilot: identity 70/70, judges agree 66/70.
+- **D27 — a review link judged PIVOTAL or SUPPORTING is tier A outright** (2026-09-24, **not yet
+  implemented**), `evidence_source = review_protocol`. The FDA named the trial by its sponsor
+  protocol number and the match is exact, so as with a label-stated NCT there is nothing to
+  corroborate. Tier C stays below it.
 
 ## Hard constraints
 
@@ -105,7 +151,9 @@ BLA 351(a) (biologic, Purple Book) · BLA 351(k) (biosimilar, Purple Book).
 
 P0 spine      Submissions + Applications + ActionTypes
               -> 87,055 approved NDA|BLA events
-              -> trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921
+              -> trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921  (D4, as built)
+              -> D23, not yet built: 5,766 ORIG + 4,009 SUPPL
+                                     + 1,520 D24-guard SUPPL = 11,295
                               |
 P1 normalize  FDA side  : ingredient -> MeSH via biokde synonyms (+ moiety fold)
               TRIAL side: derivedSection.*BrowseModule.meshes -- NLM's own
@@ -150,6 +198,7 @@ readable section 14 — that is the whole reason it exists. It does two jobs:
    (`no_label`, `judged_none`, `no_candidates`,
    `no_drug_resolved`) — **not** `not_yet_judged`, which means P4 has not looked
    yet, and **not** `later_appearance_of_the_same_trial`, which is D16 working.
+   Nor `label_change_not_judged` (D24): P4 skipped it by decision, it is not exhausted.
 2. **Cross-check, and this costs no agent calls.** For links the label route
    already produced, ask whether the graph's literature for that drug and
    disease mentions the same trial. Agreement between two independent sources is
