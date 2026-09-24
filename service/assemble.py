@@ -344,6 +344,9 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                 continue
             key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
             spine[key] = row
+    # D24: labeling/manufacturing changes *with clinical data* are read for D16
+    # but not judged. A spine written before ``trial_scope`` existed has none.
+    guard = {key for key, row in spine.items() if row.get("trial_scope") == "guard"}
 
     links: list[Link] = []
     unlinked: list[Unlinked] = []
@@ -355,6 +358,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     #: rows.
     emitted: set[tuple[str, str]] = set()
     units = list(read_jsonl(out_dir / "candidates.jsonl"))
+    guard_led = _guard_led_units(units, guard)
 
     # D16, in two steps, and over **both** branches together. A trial can be
     # named in prose on an early submission and by id on a later one --
@@ -430,6 +434,10 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                         if stem_ids
                         and set(str(unit.get("drug_mesh") or "").split(";"))
                         & stem_ids
+                        else "label_change_not_judged"
+                        if key in guard
+                        else "later_appearance_of_the_same_trial"
+                        if str(unit.get("unit_id") or "") in guard_led
                         else "not_yet_judged"
                         if unit.get("candidates")
                         else _why(unit),
@@ -565,6 +573,55 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         submissions_linked=len(linked_submissions),
         submissions_total=len(spine),
     )
+
+
+def _guard_led_units(
+    units: list[dict[str, object]], guard: set[str]
+) -> set[str]:
+    """Unit ids that are later appearances of a trial first carried by a guard.
+
+    P4 groups a label's trial descriptions by ``(application, trial)`` and
+    judges only the earliest (D16). When that earliest submission is a D24
+    guard, the whole group is withheld, so its later members never receive a
+    verdict. They are not waiting for a judge — the trial's first appearance is
+    on a submission that is deliberately not judged — so they are reported as
+    later appearances, not as ``not_yet_judged``. Units that state their own NCT
+    are left to the ordinary D16 path.
+
+    >>> units = [
+    ...     {"unit_id": "A|SUPPL|3|X", "application": "A", "submission_type": "SUPPL",
+    ...      "submission_no": "3", "approval_date": "2010-01-01"},
+    ...     {"unit_id": "A|SUPPL|9|X", "application": "A", "submission_type": "SUPPL",
+    ...      "submission_no": "9", "approval_date": "2015-01-01"},
+    ... ]
+    >>> sorted(_guard_led_units(units, {"A|SUPPL|3"}))
+    ['A|SUPPL|9|X']
+    >>> sorted(_guard_led_units(units, set()))
+    []
+    """
+    if not guard:
+        return set()
+    first: dict[tuple[str, str], dict[str, object]] = {}
+    members: dict[tuple[str, str], list[str]] = {}
+    for unit in units:
+        if unit.get("stated_nct"):
+            continue
+        unit_id = str(unit.get("unit_id") or "")
+        group = (str(unit.get("application") or ""), unit_id.rsplit("|", 1)[-1])
+        members.setdefault(group, []).append(unit_id)
+        held = first.get(group)
+        if held is None or str(unit.get("approval_date") or "") < str(
+            held.get("approval_date") or ""
+        ):
+            first[group] = unit
+    out: set[str] = set()
+    for group, head in first.items():
+        head_key = (
+            f"{head['application']}|{head['submission_type']}|{head['submission_no']}"
+        )
+        if head_key in guard:
+            out.update(u for u in members[group] if u != head.get("unit_id"))
+    return out
 
 
 def _why(unit: dict[str, object]) -> str:

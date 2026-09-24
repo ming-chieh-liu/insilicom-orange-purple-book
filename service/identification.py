@@ -92,7 +92,9 @@ def unit_id_for(
 
 
 def read_units(
-    path: Path, borrowed: frozenset[str] = frozenset()
+    path: Path,
+    borrowed: frozenset[str] = frozenset(),
+    guard: frozenset[str] = frozenset(),
 ) -> list[dict[str, object]]:
     """Every unit P3 wrote that still needs a judge, one per trial.
 
@@ -127,6 +129,15 @@ def read_units(
     Skipping them costs nothing real and saves 1,036 calls. They are recorded
     in ``unlinked_submissions.tsv`` as ``biosimilar_copied_label`` rather than
     dropped, so recall stays auditable.
+
+    **A D16-guard submission is grouped, then withheld (D24).** ``guard`` holds
+    the ``application|type|number`` keys whose ``trial_scope`` is ``guard`` —
+    labeling or manufacturing changes *with clinical data*. Their units take
+    part in the earliest-wins grouping like any other, and only then is a group
+    whose earliest unit is a guard dropped. Dropping them *before* grouping
+    would make the next in-scope supplement carrying the same trial look like
+    its first appearance, and a judge would then attribute the trial to it —
+    the misattribution the guard exists to prevent.
     """
     by_trial: dict[tuple[str, str], dict[str, object]] = {}
     seen = skipped = 0
@@ -153,15 +164,48 @@ def read_units(
             held.get("approval_date") or ""
         ):
             by_trial[key] = row
-    units = list(by_trial.values())
+    earliest = list(by_trial.values())
+    units = [unit for unit in earliest if submission_key(unit) not in guard]
     _log.info(
         "%d units carry a trial; %d distinct (application, trial) need a judge"
-        "; %d skipped as a biosimilar's borrowed section 14",
+        "; %d skipped as a biosimilar's borrowed section 14"
+        "; %d withheld as a D16 guard",
         seen,
         len(units),
         skipped,
+        len(earliest) - len(units),
     )
     return units
+
+
+def submission_key(unit: dict[str, object]) -> str:
+    """``application|submission_type|submission_no`` for a unit.
+
+    >>> submission_key({"application": "NDA000001", "submission_type": "SUPPL",
+    ...                 "submission_no": 7})
+    'NDA000001|SUPPL|7'
+    """
+    return (
+        f"{unit.get('application') or ''}|{unit.get('submission_type') or ''}"
+        f"|{unit.get('submission_no') or ''}"
+    )
+
+
+def guard_submissions(approval_events: Path) -> frozenset[str]:
+    """Submission keys whose ``trial_scope`` is ``guard`` (D24).
+
+    Read from ``approval_events.tsv`` rather than recomputed, so P0, P4 and P5
+    cannot disagree about which submissions are guards. A spine written before
+    the column existed yields no guards.
+    """
+    if not approval_events.is_file():
+        return frozenset()
+    with approval_events.open(encoding="utf-8") as handle:
+        return frozenset(
+            f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+            for row in csv.DictReader(handle, delimiter="\t")
+            if row.get("trial_scope") == "guard"
+        )
 
 
 def borrowed_ids(drug_map: Path) -> frozenset[str]:
@@ -464,7 +508,9 @@ __all__ = [
     "iter_json_lines",
     "prioritise",
     "read_judge_file",
+    "guard_submissions",
     "read_units",
+    "submission_key",
     "read_verdicts",
     "record_verdicts",
     "render_candidates",

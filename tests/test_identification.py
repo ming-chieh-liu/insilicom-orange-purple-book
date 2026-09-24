@@ -385,3 +385,66 @@ def test_borrowed_ids_reads_only_stem_rows(tmp_path: Path) -> None:
 
 def test_borrowed_ids_on_a_missing_file_is_empty(tmp_path: Path) -> None:
     assert identification.borrowed_ids(tmp_path / "nope.tsv") == frozenset()
+
+
+# ---------------------------------------------------------------------------
+# D24: a guard submission is grouped for D16, then withheld
+# ---------------------------------------------------------------------------
+
+
+def _guard_pair(tmp_path: Path) -> Path:
+    """One trial ("X") on two submissions of one application."""
+    early, late = ("3", "2010-01-01"), ("9", "2015-01-01")
+    rows = [
+        _unit(f"NDA000001|SUPPL|{no}|X", application="NDA000001",
+              submission_type="SUPPL", submission_no=no, approval_date=date)
+        for no, date in (early, late)
+    ]
+    p = tmp_path / "units.jsonl"
+    p.write_text("\n".join(json.dumps(r) for r in rows) + "\n", encoding="utf-8")
+    return p
+
+
+def test_a_trial_first_carried_by_a_guard_is_not_judged_anywhere(
+    tmp_path: Path,
+) -> None:
+    """Withholding the guard BEFORE grouping would make SUPPL 9 look like the
+    trial's first appearance, and a judge would attribute the trial to it."""
+    p = _guard_pair(tmp_path)
+    assert identification.read_units(p, guard=frozenset({"NDA000001|SUPPL|3"})) == []
+
+
+def test_a_guard_after_the_first_appearance_changes_nothing(tmp_path: Path) -> None:
+    p = _guard_pair(tmp_path)
+    units = identification.read_units(p, guard=frozenset({"NDA000001|SUPPL|9"}))
+    assert [u["unit_id"] for u in units] == ["NDA000001|SUPPL|3|X"]
+
+
+def test_without_guards_the_earliest_is_judged(tmp_path: Path) -> None:
+    p = _guard_pair(tmp_path)
+    assert [u["unit_id"] for u in identification.read_units(p)] == [
+        "NDA000001|SUPPL|3|X"
+    ]
+
+
+def test_guard_submissions_reads_only_guard_rows(tmp_path: Path) -> None:
+    spine = tmp_path / "approval_events.tsv"
+    spine.write_text(
+        "application\tsubmission_type\tsubmission_no\ttrial_relevant\ttrial_scope\n"
+        "NDA000001\tSUPPL\t3\ttrue\tguard\n"
+        "NDA000001\tSUPPL\t9\ttrue\tfull\n"
+        "NDA000001\tSUPPL\t12\tfalse\t\n",
+        encoding="utf-8",
+    )
+    assert identification.guard_submissions(spine) == frozenset({"NDA000001|SUPPL|3"})
+
+
+def test_a_spine_without_the_scope_column_has_no_guards(tmp_path: Path) -> None:
+    spine = tmp_path / "approval_events.tsv"
+    spine.write_text(
+        "application\tsubmission_type\tsubmission_no\ttrial_relevant\n"
+        "NDA000001\tSUPPL\t3\ttrue\n",
+        encoding="utf-8",
+    )
+    assert identification.guard_submissions(spine) == frozenset()
+    assert identification.guard_submissions(tmp_path / "absent.tsv") == frozenset()

@@ -6,32 +6,30 @@ approved submissions — one original and 108 efficacy supplements — spread ov
 ``first_approval`` per application collapses twelve years of separate FDA
 decisions into one date, and then attributes every trial to it.
 
-**Which events are trial-driven is published data.** Drugs@FDA's
-``ActionTypes_Lookup`` subdivides ``Efficacy`` into what the supplement actually
-did, and ``Join_Submission_ActionTypes_Lookup`` joins it to a submission. So a
-New Indication supplement is distinguishable from a new dosing regimen or a
-pediatric extrapolation without reading a single PDF, and — measured over the
-corpus, approved NDA+BLA only:
+**Which events are trial-driven is decided by the submission class code (D23).**
+Every submission carries exactly one ``SubmissionClassCode``; action types are
+recorded only on supplements — all 5,879 approved NDA/BLA originals join to a
+lookup row whose description is blank — so the class is the one field that
+describes both. An original is in scope when its class is one of
+:data:`ORIG_SCOPE_CODES` (a new molecule, ingredient, combination, dosage form,
+formulation or indication; ``UNKNOWN`` and blank included, since ``UNKNOWN`` is
+mostly recent approvals FDA has not yet classed). A supplement is in scope when
+its class is one of :data:`SUPPL_SCOPE_CODES`, unless its only efficacy actions
+are the two that leave the drug's efficacy claim unchanged
+(:data:`OUT_OF_SCOPE_ACTIONS`: a new route, an Rx-to-OTC switch).
 
-===================================================  =====
-Efficacy-New Indication                              1,894
-Efficacy-Labeling Change With Clinical Data          1,463
-Efficacy-New Patient Population                        794
-Efficacy-New Dosing Regimen                            534
-Efficacy-Accelerated Approval                          120
-Efficacy-Pediatric                                      77
-Efficacy-Accelerated Approval Confirmatory Study        28
-===================================================  =====
+**Two tiers of in-scope (D24).** A supplement whose only efficacy actions are
+:data:`GUARD_ACTIONS` — a labeling or manufacturing change *with clinical data*
+— rests on named studies but supports a label claim rather than a new use. It
+is ``trial_scope = guard``: P2 reads its label so that D16 sees the trials it
+carries, label-stated NCT ids link, and P4 does not judge its prose. Everything
+else in scope is ``trial_scope = full``.
 
-``Efficacy-Accelerated Approval`` and its ``Confirmatory Study`` counterpart are
-the two halves of the case that motivates submission-grain linking at all:
-Keytruda's melanoma indication was approved 2014-09-04 on KEYNOTE-001 and again
-2015-12-18 on KEYNOTE-002/006. Both are structured fields here.
-
-**Originals carry no action type.** All 5,879 approved NDA/BLA originals join to
-a lookup row whose description is blank. They are trial-driven regardless — an
-original approval is the approval that created the indication — so
-:data:`TRIAL_RELEVANT_ACTIONS` is checked *or* the submission is an ``ORIG``.
+Measured on the 2026-09-07 release, approved NDA/BLA: 5,766 originals + 4,009
+full supplements + 1,520 guard supplements = 11,295 trial-relevant events,
+against D4's 7,921. Match on the **code**, never the id (ids are release-local)
+nor the description: ``BIOSIMILAR`` and ``TYPE 10- BLA`` have an empty
+description in the lookup.
 
 **What this module does not claim.** An event is a date, a class and an action,
 not an indication. Only the label filed *with that submission* names what it was
@@ -70,15 +68,44 @@ ORIGINAL: str = "ORIG"
 #: are approved on bioequivalence studies, which are small and unregistered.
 SPINE_TYPES: frozenset[str] = frozenset({"NDA", "BLA"})
 
-#: The action types whose approval rests on trial evidence. Matched on the
-#: lookup's description for the same reason :data:`EFFICACY` is.
-TRIAL_RELEVANT_ACTIONS: frozenset[str] = frozenset(
+#: Original-submission class codes that are trial-relevant (D23). Everything a
+#: new approval can be except a partial Rx-to-OTC switch (``TYPE 8``), a medical
+#: gas (``MEDGAS``) and a supplement code misapplied to an original (``S``).
+#: ``BIOEQUIV`` and ``BIOSIMILAR`` occur on no original today; they are listed so
+#: a future release cannot silently drop them. The empty string is a blank class.
+ORIG_SCOPE_CODES: frozenset[str] = frozenset(
     {
-        "Efficacy-New Indication",
-        "Efficacy-Accelerated Approval",
-        "Efficacy-Accelerated Approval Confirmatory Study",
+        "EFFICACY", "BIOEQUIV", "BIOSIMILAR", "UNKNOWN", "",
+        "TYPE 1", "TYPE 1/4", "TYPE 2", "TYPE 2/3", "TYPE 2/4",
+        "TYPE 3", "TYPE 3/4", "TYPE 4", "TYPE 4/5", "TYPE 5",
+        "TYPE 6", "TYPE 7", "TYPE 9", "TYPE 9- BLA", "TYPE 10", "TYPE 10- BLA",
     }
 )
+
+#: Supplement class codes that can be trial-relevant (D23). ``BIOSIMILAR``
+#: carries real efficacy supplements (two new indications in this release).
+SUPPL_SCOPE_CODES: frozenset[str] = frozenset({"EFFICACY", "BIOSIMILAR", "BIOEQUIV"})
+
+#: Efficacy actions that leave the efficacy claim unchanged. A supplement whose
+#: efficacy actions are *only* these is out of scope (D23).
+OUT_OF_SCOPE_ACTIONS: frozenset[str] = frozenset(
+    {"Efficacy-New Route Of Administration", "Efficacy-Rx To OTC Switch"}
+)
+
+#: Efficacy actions whose supplement is in scope only as a D16 guard (D24).
+GUARD_ACTIONS: frozenset[str] = frozenset(
+    {
+        "Efficacy-Labeling Change With Clinical Data",
+        "Efficacy-Manufacturing Change With Clinical Data",
+    }
+)
+
+#: ``trial_scope`` values: the full pipeline, or P2 + label-stated ids only.
+SCOPE_FULL: str = "full"
+SCOPE_GUARD: str = "guard"
+
+#: Action descriptions of the efficacy family begin with this.
+EFFICACY_ACTION_PREFIX: str = "Efficacy"
 
 #: The only non-null property code in this snapshot.
 ORPHAN: str = "Orphan"
@@ -99,6 +126,12 @@ class EventRow(NamedTuple):
     orphan: str
     indication_changing: str
     trial_relevant: str
+    #: The submission's ``SubmissionClassCode`` (``TYPE 1``, ``EFFICACY``…).
+    class_code: str = ""
+    #: ``full``, ``guard`` or empty when not trial-relevant (D23, D24).
+    trial_scope: str = ""
+    #: Why the row is in or out of scope, for audit.
+    scope_basis: str = ""
 
 
 class EventsReport(NamedTuple):
@@ -116,6 +149,9 @@ class EventsReport(NamedTuple):
     by_action: tuple[tuple[str, int], ...]
     by_era: tuple[tuple[str, int], ...]
     most_supplemented: tuple[tuple[str, int], ...]
+    #: Supplements in scope only as a D16 guard; ``core_supplements`` counts the
+    #: full-pipeline ones.
+    guard_supplements: int = 0
 
 
 def era_of(approval_date: str) -> str:
@@ -145,13 +181,16 @@ def era_of(approval_date: str) -> str:
     return "2008+"
 
 
-def _classes(data: RawData) -> dict[str, str]:
-    """``SubmissionClassCodeID`` → its description, from the lookup table."""
-    out: dict[str, str] = {}
+def _classes(data: RawData) -> dict[str, tuple[str, str]]:
+    """``SubmissionClassCodeID`` → ``(SubmissionClassCode, description)``."""
+    out: dict[str, tuple[str, str]] = {}
     for row in read_rows(data.submission_class_lookup):
         code = (row.get("SubmissionClassCodeID") or "").strip()
         if code:
-            out[code] = (row.get("SubmissionClassCodeDescription") or "").strip()
+            out[code] = (
+                (row.get("SubmissionClassCode") or "").strip(),
+                (row.get("SubmissionClassCodeDescription") or "").strip(),
+            )
     return out
 
 
@@ -223,24 +262,58 @@ def is_indication_changing(submission_type: str, submission_class: str) -> bool:
     return submission_type.strip() == ORIGINAL or submission_class.strip() == EFFICACY
 
 
-def is_trial_relevant(submission_type: str, actions: frozenset[str] | set[str]) -> bool:
-    """Whether this approval rests on trial evidence.
+def scope_of(
+    submission_type: str, class_code: str, actions: frozenset[str] | set[str]
+) -> tuple[str, str]:
+    """``(trial_scope, scope_basis)`` for one approved submission (D23, D24).
 
-    An original always does. A supplement does when FDA recorded it as a new
-    indication, an accelerated approval, or a confirmatory study.
+    ``trial_scope`` is ``full``, ``guard`` or ``""`` (not trial-relevant).
 
-    >>> is_trial_relevant("ORIG", set())
+    >>> scope_of("ORIG", "TYPE 1", set())
+    ('full', 'ORIG class TYPE 1')
+    >>> scope_of("ORIG", "MEDGAS", set())
+    ('', 'ORIG class MEDGAS not in scope')
+    >>> scope_of("SUPPL", "EFFICACY", {"Efficacy-New Patient Population"})
+    ('full', 'SUPPL EFFICACY: Efficacy-New Patient Population')
+    >>> scope_of("SUPPL", "EFFICACY", {"Efficacy-Labeling Change With Clinical Data"})
+    ('guard', 'SUPPL EFFICACY: Efficacy-Labeling Change With Clinical Data')
+    >>> scope_of("SUPPL", "EFFICACY", {"Efficacy-Rx To OTC Switch"})
+    ('', 'SUPPL EFFICACY: only Efficacy-Rx To OTC Switch')
+    >>> scope_of("SUPPL", "LABELING", {"Labeling"})
+    ('', 'SUPPL class LABELING not in scope')
+    """
+    submission_type = submission_type.strip()
+    class_code = class_code.strip()
+    if submission_type == ORIGINAL:
+        if class_code in ORIG_SCOPE_CODES:
+            return SCOPE_FULL, f"ORIG class {class_code or '(blank)'}"
+        return "", f"ORIG class {class_code} not in scope"
+    if class_code not in SUPPL_SCOPE_CODES:
+        return "", f"SUPPL class {class_code or '(blank)'} not in scope"
+    efficacy = sorted(a for a in actions if a.startswith(EFFICACY_ACTION_PREFIX))
+    listed = "; ".join(efficacy) or "no efficacy action"
+    if efficacy and set(efficacy) <= OUT_OF_SCOPE_ACTIONS:
+        return "", f"SUPPL {class_code}: only {listed}"
+    if efficacy and set(efficacy) <= GUARD_ACTIONS:
+        return SCOPE_GUARD, f"SUPPL {class_code}: {listed}"
+    return SCOPE_FULL, f"SUPPL {class_code}: {listed}"
+
+
+def is_trial_relevant(
+    submission_type: str, class_code: str, actions: frozenset[str] | set[str]
+) -> bool:
+    """Whether this approval is in scope at all, guard or full.
+
+    >>> is_trial_relevant("ORIG", "UNKNOWN", set())
     True
-    >>> is_trial_relevant("SUPPL", {"Efficacy-New Indication"})
-    True
-    >>> is_trial_relevant("SUPPL", {"Efficacy-New Dosing Regimen"})
+    >>> is_trial_relevant("ORIG", "TYPE 8", set())
     False
-    >>> is_trial_relevant("SUPPL", {"Manufacturing (CMC)-Facility"})
+    >>> is_trial_relevant("SUPPL", "EFFICACY", {"Efficacy-New Indication"})
+    True
+    >>> is_trial_relevant("SUPPL", "MANUF (CMC)", {"Manufacturing (CMC)-Facility"})
     False
     """
-    if submission_type.strip() == ORIGINAL:
-        return True
-    return bool(TRIAL_RELEVANT_ACTIONS & set(actions))
+    return bool(scope_of(submission_type, class_code, actions)[0])
 
 
 def build(data: RawData, types: frozenset[str] | None = SPINE_TYPES) -> EventsReport:
@@ -281,8 +354,8 @@ def build(data: RawData, types: frozenset[str] | None = SPINE_TYPES) -> EventsRe
             continue
         submission_type = (row.get("SubmissionType") or "").strip()
         submission_no = (row.get("SubmissionNo") or "").strip()
-        submission_class = classes.get(
-            (row.get("SubmissionClassCodeID") or "").strip(), ""
+        class_code, submission_class = classes.get(
+            (row.get("SubmissionClassCodeID") or "").strip(), ("", "")
         )
         key = _key(digits, submission_type, submission_no)
         acted = actions.get(key, set())
@@ -290,7 +363,7 @@ def build(data: RawData, types: frozenset[str] | None = SPINE_TYPES) -> EventsRe
         for name in acted:
             by_action[name] += 1
         changing = is_indication_changing(submission_type, submission_class)
-        relevant = is_trial_relevant(submission_type, acted)
+        scope, basis = scope_of(submission_type, class_code, acted)
         parsed_date = fda_date.parse(
             row.get("SubmissionStatusDate") or "", direction=fda_date.PAST_ONLY
         )
@@ -312,7 +385,10 @@ def build(data: RawData, types: frozenset[str] | None = SPINE_TYPES) -> EventsRe
                 review_priority=(row.get("ReviewPriority") or "").strip(),
                 orphan="true" if key in orphans else "false",
                 indication_changing="true" if changing else "false",
-                trial_relevant="true" if relevant else "false",
+                trial_relevant="true" if scope else "false",
+                class_code=class_code,
+                trial_scope=scope,
+                scope_basis=basis,
             )
         )
     ordered = tuple(sorted(rows))
@@ -331,11 +407,15 @@ def build(data: RawData, types: frozenset[str] | None = SPINE_TYPES) -> EventsRe
         indication_changing=sum(1 for row in ordered if row.indication_changing == "true"),
         trial_relevant=len(relevant_rows),
         originals=sum(1 for row in relevant_rows if row.submission_type == ORIGINAL),
-        core_supplements=sum(1 for row in relevant_rows if row.submission_type != ORIGINAL),
+        core_supplements=sum(
+            1 for row in relevant_rows
+            if row.submission_type != ORIGINAL and row.trial_scope == SCOPE_FULL
+        ),
         by_class=tuple(by_class.most_common(10)),
         by_action=tuple(by_action.most_common(12)),
         by_era=tuple(sorted(by_era.items())),
         most_supplemented=tuple(per_application.most_common(5)),
+        guard_supplements=sum(1 for row in relevant_rows if row.trial_scope == SCOPE_GUARD),
     )
 
 
@@ -366,7 +446,8 @@ def render(report: EventsReport) -> str:
         "",
         f"  TRIAL-RELEVANT                           {report.trial_relevant:>9,}",
         f"    originals                              {report.originals:>9,}",
-        f"    core supplements                       {report.core_supplements:>9,}",
+        f"    supplements, full pipeline             {report.core_supplements:>9,}",
+        f"    supplements, D16 guard only (D24)      {report.guard_supplements:>9,}",
         "",
         "  by era:",
     ]
@@ -389,8 +470,14 @@ __all__ = [
     "EFFICACY",
     "ORIGINAL",
     "ORPHAN",
+    "EFFICACY_ACTION_PREFIX",
+    "GUARD_ACTIONS",
+    "ORIG_SCOPE_CODES",
+    "OUT_OF_SCOPE_ACTIONS",
+    "SCOPE_FULL",
+    "SCOPE_GUARD",
     "SPINE_TYPES",
-    "TRIAL_RELEVANT_ACTIONS",
+    "SUPPL_SCOPE_CODES",
     "EventRow",
     "EventsReport",
     "build",
@@ -399,4 +486,5 @@ __all__ = [
     "is_indication_changing",
     "is_trial_relevant",
     "render",
+    "scope_of",
 ]

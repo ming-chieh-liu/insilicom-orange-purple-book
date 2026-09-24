@@ -264,7 +264,7 @@ def main(argv: list[str] | None = None) -> int:
             ("application", "app_type", "submission_type", "submission_no",
              "submission_class", "action_type", "approval_date", "era",
              "review_priority", "orphan", "indication_changing",
-             "trial_relevant"),
+             "trial_relevant", "class_code", "trial_scope", "scope_basis"),
             events_report.rows,
         )
         print(approval_events.render(events_report))
@@ -454,9 +454,10 @@ def main(argv: list[str] | None = None) -> int:
             adjudication_dir / "identify_verdicts.jsonl"
         )
         id_borrowed = identification.borrowed_ids(out_dir / "drug_map.tsv")
+        id_guard = identification.guard_submissions(out_dir / "approval_events.tsv")
         id_prepare_pending = [
             unit
-            for unit in identification.read_units(units_source, id_borrowed)
+            for unit in identification.read_units(units_source, id_borrowed, id_guard)
             if unit["unit_id"] not in id_decided
         ]
         id_chosen = identification.prioritise(id_prepare_pending, args.limit)

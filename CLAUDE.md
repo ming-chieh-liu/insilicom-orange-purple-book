@@ -98,8 +98,8 @@ code says `not yet implemented` until it lands.
   deliverable's central claim 36 times wrongly. Later appearances are context, not evidence.
   **This applies to label-stated ids too, not only judged ones** — missing that branch linked
   KEYNOTE-189 to supplements four years after the one it supported, 3,123 rows of it.
-- **D23 — scope by submission class CODE, for both ORIG and SUPPL** (2026-09-24, **not yet
-  implemented**). Action type is empty on every original, so it cannot scope them; class is
+- **D23 — scope by submission class CODE, for both ORIG and SUPPL** (2026-09-24, **implemented
+  in code 2026-09-24; P0 gate met; `output/` not yet rebuilt**). Action type is empty on every original, so it cannot scope them; class is
   populated on both. Key on `SubmissionClassCode` (`TYPE 1`), never the id or the description —
   `BIOSIMILAR` and `TYPE 10- BLA` have empty descriptions. **ORIG in:** `EFFICACY, BIOEQUIV,
   BIOSIMILAR, TYPE 1, 1/4, 2, 2/3, 2/4, 3, 3/4, 4, 4/5, 5, 6, 7, 9, 9- BLA, 10, 10- BLA, UNKNOWN`,
@@ -110,7 +110,7 @@ code says `not yet implemented` until it lands.
   efficacy supplements whose letters name trials, and D16 then gave those trials to the next
   in-scope supplement — a false edge. Detail: `docs/DESIGN.md` §3a.
 - **D24 — "with clinical data" supplements are a D16 guard, not a judging target** (2026-09-24,
-  **not yet implemented**). Supplements whose only efficacy action is 5 Labeling Change With
+  **implemented in code 2026-09-24; `output/` not yet rebuilt**). Supplements whose only efficacy action is 5 Labeling Change With
   Clinical Data or 6 Manufacturing Change With Clinical Data (1,520) go through P2 and link their
   label-stated NCT ids, but P4 does not judge their prose. Unjudged units get reason
   `label_change_not_judged`. They must be read so a trial first described there is not attributed
@@ -132,6 +132,20 @@ code says `not yet implemented` until it lands.
   implemented**), `evidence_source = review_protocol`. The FDA named the trial by its sponsor
   protocol number and the match is exact, so as with a label-stated NCT there is nothing to
   corroborate. Tier C stays below it.
+- **D28 — every label link gets a role judgement at submission grain** (2026-09-24, **not yet
+  implemented**). A §14 mention is not support. The old polarity task ran once on *current* labels at
+  *application* grain and was never re-run: 1,055 of 3,361 links (31%) have no support check, and P4
+  identification never asks about support. New P4b step, before assembly, on the linked
+  submission's own §14 text, same six roles as D26; replaces `adjudication/verdicts.jsonl`. Only
+  `PIVOTAL`/`SUPPORTING` link.
+- **D29 — how the sources combine** (2026-09-24, **not yet implemented**). Direct sources first
+  (label-stated NCT, review protocol id). A §14 description whose trial name matches a protocol id or
+  acronym the same submission's review matched skips the shortlist. The shortlist serves only
+  descriptions no FDA document identifies; the graph route (tier C) serves what has no usable
+  document. Rows carry `sources` and `conflict` (`role_disagrees`, `attribution_moved`,
+  `judged_contradicts_direct`, `indication_mismatch`). Different trials from different routes for one
+  approval is normal, not a conflict. Detail: `docs/DESIGN.md` §3c, which also records the open
+  question on D17 tier A for judged links.
 
 ## Hard constraints
 
@@ -152,7 +166,7 @@ code says `not yet implemented` until it lands.
 P0 spine      Submissions + Applications + ActionTypes
               -> 87,055 approved NDA|BLA events
               -> trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921  (D4, as built)
-              -> D23, not yet built: 5,766 ORIG + 4,009 SUPPL
+              -> D23, built 2026-09-24: 5,766 ORIG + 4,009 SUPPL
                                      + 1,520 D24-guard SUPPL = 11,295
                               |
 P1 normalize  FDA side  : ingredient -> MeSH via biokde synonyms (+ moiety fold)
@@ -325,7 +339,7 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
   and only SUPPL 36 keeps the link; `NDA208419` SUPPL 2, 3 and 4 have three different PDFs and are
   three real claims. **An absent digest must count as distinct, never as shared** — grouping on the
   empty string collapses every tie into one link and reports nothing.
-- **Section-14 polarity was judged on the *current* openFDA labels, at application grain, but
+- **[SUPERSEDED by D28, 2026-09-24 — to be replaced by a submission-grain role judgement on every label link; measured 2026-09-24: 1,055 of 3,361 links (31%) have no polarity verdict at all]** **Section-14 polarity was judged on the *current* openFDA labels, at application grain, but
   filters links built from *per-submission* labels.** §14 is cumulative and pruned, so a trial
   pivotal in 2015 can sit under a "lack of efficacy" heading today, and the filter would drop a
   correct 2015 link on a 2026 reading. Coverage is 2,005 of 2,293 pairs; the disagreement rate

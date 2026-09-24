@@ -14,6 +14,7 @@ _APPLICATIONS = [
     "ApplNo\tApplType\tApplPublicNotes\tSponsorName",
     "000001\tNDA\t\tACME",
     "125514\tBLA\t\tMERCK SHARP DOHME",
+    "000002\tNDA\t\tGASCO",
     "000009\tANDA\t\tGENERICO",
     # A type no FDA file states: skipped, not guessed — so its submissions
     # cannot be keyed either.
@@ -40,6 +41,17 @@ _SUBMISSIONS = [
     "999999\t2\tSUPPL\t1\tAP\t2020-01-01 00:00:00\t\t",
     # A generic. In scope only when the caller asks for every application type.
     "000009\t1\tORIG\t1\tAP\t2010-05-05 00:00:00\t\t",
+    # D23 cases. An Efficacy-class new dosing regimen: in scope now.
+    "000001\t2\tSUPPL\t18\tAP\t2019-01-01 00:00:00\t\t",
+    # D24: a labeling change with clinical data -- in scope only as a guard.
+    "000001\t2\tSUPPL\t19\tAP\t2020-01-01 00:00:00\t\t",
+    # An Rx-to-OTC switch: the efficacy claim is unchanged, so out of scope.
+    "000001\t2\tSUPPL\t20\tAP\t2021-01-01 00:00:00\t\t",
+    # A medical gas original: out of scope, unlike every other original class.
+    "000002\t23\tORIG\t1\tAP\t2012-02-02 00:00:00\t\t",
+    # A BIOSIMILAR-class supplement carrying a new indication. The lookup gives
+    # this code an EMPTY description, so only the code can recognise it.
+    "125514\t28\tSUPPL\t5\tAP\t2016-01-01 00:00:00\t\t",
 ]
 
 _ACTION_LOOKUP = [
@@ -48,7 +60,9 @@ _ACTION_LOOKUP = [
     "3\tEfficacy-Accelerated Approval\tEFFICACY\tACCEL APP",
     "4\tEfficacy-Accelerated Approval Confirmatory Study\tEFFICACY\tCOMP EFF",
     "7\tEfficacy-New Dosing Regimen\tEFFICACY\tDOSING",
+    "5\tEfficacy-Labeling Change With Clinical Data\tEFFICACY\tLABEL W CLIN",
     "8\tEfficacy-New Indication\tEFFICACY\tINDICATION",
+    "12\tEfficacy-Rx To OTC Switch\tEFFICACY\tRX TO OTC",
     "13\tLabeling\tLABELING\tNOT APPLICABLE",
     # Id 46 has a blank description. It is the row every original joins to, so
     # a trial-relevant original cannot be recognised from its action type.
@@ -68,6 +82,10 @@ _JOIN_ACTIONS = [
     "SUPPL     \t5\t125514\t4\t3",
     # One submission, two recorded actions.
     "SUPPL     \t6\t125514\t4\t8",
+    "SUPPL     \t7\t000001\t18\t7",
+    "SUPPL     \t8\t000001\t19\t5",
+    "SUPPL     \t9\t000001\t20\t12",
+    "SUPPL     \t10\t125514\t5\t8",
 ]
 
 _PROPERTY_TYPE = [
@@ -95,6 +113,8 @@ _CLASS_LOOKUP = [
     "3\tLABELING\tLabeling",
     "4\tMANUF (CMC)\tManufacturing (CMC)",
     "7\tTYPE 1\tType 1 - New Molecular Entity",
+    "23\tMEDGAS\tMedical Gas",
+    "28\tBIOSIMILAR\t",
     # A blank id, which the real lookup carries: indexing it would map every
     # class-less submission onto whatever description sat beside the blank.
     "\t\tUnclassified",
@@ -158,15 +178,15 @@ def corpus(tmp_path: Path) -> RawData:
 def test_only_approved_submissions_become_events(corpus: RawData) -> None:
     """A tentative approval is not an approval."""
     report = approval_events.build(corpus)
-    assert report.submissions_seen == 9
-    assert report.approved == 8
+    assert report.submissions_seen == 14
+    assert report.approved == 13
     assert all(row.approval_date for row in report.rows)
 
 
 def test_a_submission_on_an_untypable_application_is_dropped(corpus: RawData) -> None:
     """999999 has no Applications.txt row, so it cannot be keyed."""
     report = approval_events.build(corpus)
-    assert len(report.rows) == 6
+    assert len(report.rows) == 11
     assert "999999" not in {row.application for row in report.rows}
 
 
@@ -207,7 +227,9 @@ def test_indication_changing_dates_are_sorted_per_application(
     corpus: RawData,
 ) -> None:
     dates = approval_events.indication_changing_dates(approval_events.build(corpus))
-    assert dates["NDA000001"] == ["1996-12-17", "2014-09-04"]
+    assert dates["NDA000001"] == [
+        "1996-12-17", "2014-09-04", "2019-01-01", "2020-01-01", "2021-01-01"
+    ]
     assert dates["BLA125514"] == ["2014-09-04", "2015-10-02"]
 
 
@@ -308,15 +330,63 @@ def test_a_new_indication_supplement_is_trial_relevant(corpus: RawData) -> None:
     assert by_key[("NDA000001", "14")].trial_relevant == "true"
 
 
-def test_a_new_dosing_regimen_supplement_is_not(corpus: RawData) -> None:
-    """The discrimination the submission class alone cannot make: submission 16
-    is an Efficacy supplement by class, but FDA recorded it as a dosing change,
-    so no new trial underwrote it."""
+def test_a_dosing_change_filed_as_manufacturing_is_not(corpus: RawData) -> None:
+    """Submission 16 carries a dosing action but a CMC class; D23 scopes by the
+    class code, so it stays out."""
     report = approval_events.build(corpus)
     by_key = {(r.application, r.submission_no): r for r in report.rows}
     row = by_key[("NDA000001", "16")]
-    assert row.action_type == "Efficacy-New Dosing Regimen"
+    assert row.class_code == "MANUF (CMC)"
     assert row.trial_relevant == "false"
+    assert row.trial_scope == ""
+
+
+def test_an_efficacy_dosing_regimen_is_now_in_scope(corpus: RawData) -> None:
+    """D4 excluded it; D23 includes every Efficacy supplement except route and
+    OTC switches, since a new dosing regimen can rest on its own trial."""
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    row = by_key[("NDA000001", "18")]
+    assert (row.trial_relevant, row.trial_scope) == ("true", "full")
+    assert row.scope_basis == "SUPPL EFFICACY: Efficacy-New Dosing Regimen"
+
+
+def test_a_labeling_change_with_clinical_data_is_a_guard(corpus: RawData) -> None:
+    """D24: read for D16, never judged."""
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    row = by_key[("NDA000001", "19")]
+    assert (row.trial_relevant, row.trial_scope) == ("true", "guard")
+    assert report.guard_supplements == 1
+
+
+def test_an_otc_switch_is_out_of_scope(corpus: RawData) -> None:
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    row = by_key[("NDA000001", "20")]
+    assert row.trial_relevant == "false"
+    assert row.scope_basis == "SUPPL EFFICACY: only Efficacy-Rx To OTC Switch"
+
+
+def test_a_medical_gas_original_is_out_of_scope(corpus: RawData) -> None:
+    """The one original class besides TYPE 8 and S that D23 drops."""
+    report = approval_events.build(corpus)
+    orig = next(r for r in report.rows if r.application == "NDA000002")
+    assert orig.class_code == "MEDGAS"
+    assert orig.trial_relevant == "false"
+    assert orig.indication_changing == "true"
+
+
+def test_a_biosimilar_class_is_recognised_by_code_not_description(
+    corpus: RawData,
+) -> None:
+    """``BIOSIMILAR`` has an empty description in the lookup; a rule keyed on
+    the description would read the submission as class-less and drop it."""
+    report = approval_events.build(corpus)
+    by_key = {(r.application, r.submission_no): r for r in report.rows}
+    row = by_key[("BLA125514", "5")]
+    assert (row.class_code, row.submission_class) == ("BIOSIMILAR", "")
+    assert row.trial_scope == "full"
 
 
 def test_an_original_is_trial_relevant_despite_a_blank_action(
@@ -336,30 +406,52 @@ def test_an_original_is_trial_relevant_despite_a_blank_action(
 
 def test_the_report_splits_relevance_by_submission_type(corpus: RawData) -> None:
     report = approval_events.build(corpus)
-    assert report.trial_relevant == report.originals + report.core_supplements
+    assert report.trial_relevant == (
+        report.originals + report.core_supplements + report.guard_supplements
+    )
 
 
 @pytest.mark.parametrize(
-    ("submission_type", "actions", "expected"),
+    ("submission_type", "class_code", "actions", "expected"),
     [
-        ("ORIG", set(), True),
-        ("ORIG", {"Labeling"}, True),
-        ("SUPPL", {"Efficacy-New Indication"}, True),
-        ("SUPPL", {"Efficacy-Accelerated Approval"}, True),
-        ("SUPPL", {"Efficacy-Accelerated Approval Confirmatory Study"}, True),
-        ("SUPPL", {"Efficacy-New Dosing Regimen"}, False),
-        ("SUPPL", {"Efficacy-Pediatric"}, False),
-        ("SUPPL", {"Efficacy-New Patient Population"}, False),
-        ("SUPPL", {"Manufacturing (CMC)-Facility"}, False),
-        ("SUPPL", set(), False),
-        # Several actions, one of which qualifies.
-        ("SUPPL", {"Labeling", "Efficacy-New Indication"}, True),
+        ("ORIG", "TYPE 1", set(), "full"),
+        ("ORIG", "TYPE 5", set(), "full"),
+        ("ORIG", "UNKNOWN", set(), "full"),
+        ("ORIG", "", set(), "full"),
+        ("ORIG", "TYPE 8", set(), ""),
+        ("ORIG", "MEDGAS", set(), ""),
+        ("ORIG", "S", set(), ""),
+        ("SUPPL", "EFFICACY", {"Efficacy-New Indication"}, "full"),
+        ("SUPPL", "EFFICACY", {"Efficacy-New Patient Population"}, "full"),
+        ("SUPPL", "EFFICACY", {"Efficacy-Pediatric"}, "full"),
+        ("SUPPL", "EFFICACY", {"Efficacy"}, "full"),
+        ("SUPPL", "EFFICACY", set(), "full"),
+        ("SUPPL", "EFFICACY", {"Efficacy-Labeling Change With Clinical Data"}, "guard"),
+        ("SUPPL", "EFFICACY",
+         {"Efficacy-Manufacturing Change With Clinical Data", "Labeling-Package Insert"},
+         "guard"),
+        ("SUPPL", "EFFICACY", {"Efficacy-New Route Of Administration"}, ""),
+        ("SUPPL", "EFFICACY", {"Efficacy-Rx To OTC Switch"}, ""),
+        # A guard action alongside a full one: the full one wins.
+        ("SUPPL", "EFFICACY",
+         {"Efficacy-Labeling Change With Clinical Data", "Efficacy-New Indication"},
+         "full"),
+        ("SUPPL", "BIOSIMILAR", {"Efficacy-New Indication"}, "full"),
+        ("SUPPL", "BIOEQUIV", {"Bioequivalence"}, "full"),
+        ("SUPPL", "LABELING", {"Labeling"}, ""),
+        ("SUPPL", "MANUF (CMC)", {"Efficacy-New Indication"}, ""),
+        ("SUPPL", "", {"Efficacy-New Indication"}, ""),
     ],
 )
-def test_the_trial_relevance_rule(
-    submission_type: str, actions: set[str], expected: bool
+def test_the_scope_rule(
+    submission_type: str, class_code: str, actions: set[str], expected: str
 ) -> None:
-    assert approval_events.is_trial_relevant(submission_type, actions) is expected
+    scope, basis = approval_events.scope_of(submission_type, class_code, actions)
+    assert scope == expected
+    assert basis
+    assert approval_events.is_trial_relevant(
+        submission_type, class_code, actions
+    ) is bool(expected)
 
 
 # ---------------------------------------------------------------------------
@@ -434,7 +526,7 @@ def test_every_type_is_available_on_request(corpus: RawData) -> None:
     their candidate dates."""
     report = approval_events.build(corpus, types=None)
     assert "ANDA" in {r.app_type for r in report.rows}
-    assert len(report.rows) == 7
+    assert len(report.rows) == 12
 
 
 def test_the_report_renders_the_new_sections(corpus: RawData) -> None:

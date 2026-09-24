@@ -517,3 +517,57 @@ def test_a_stated_id_is_unaffected_by_injection() -> None:
     """The FDA wrote the trial id on the label; how the candidate list was
     assembled afterwards does not weaken that."""
     assert assemble.tier_for("label_nct", "no_count", "", True) == "A"
+
+
+# ---------------------------------------------------------------------------
+# D24: guard submissions are read, not judged
+# ---------------------------------------------------------------------------
+
+_GUARD_SPINE = (
+    "application\tapp_type\tsubmission_type\tsubmission_no\tsubmission_class"
+    "\taction_type\tapproval_date\tera\treview_priority\torphan"
+    "\tindication_changing\ttrial_relevant\tclass_code\ttrial_scope\tscope_basis\n"
+    "NDA000001\tNDA\tSUPPL\t3\tEfficacy"
+    "\tEfficacy-Labeling Change With Clinical Data\t2010-01-01\t2008+\t\tfalse"
+    "\ttrue\ttrue\tEFFICACY\tguard\tSUPPL EFFICACY: guard\n"
+    "NDA000001\tNDA\tSUPPL\t9\tEfficacy\tEfficacy-New Indication\t2015-01-01"
+    "\t2008+\t\tfalse\ttrue\ttrue\tEFFICACY\tfull\tSUPPL EFFICACY: full\n"
+)
+
+
+def _guard_units() -> list[dict[str, object]]:
+    return [
+        _unit(unit_id=f"NDA000001|SUPPL|{no}|STUDY-A", application="NDA000001",
+              submission_no=no, approval_date=date, stated_nct="",
+              drug_mesh="MESH:D000001")
+        for no, date in (("3", "2010-01-01"), ("9", "2015-01-01"))
+    ]
+
+
+def test_a_guard_is_recorded_as_not_judged_by_decision(tmp_path: Path) -> None:
+    out, adj = tmp_path / "output", tmp_path / "adjudication"
+    out.mkdir()
+    adj.mkdir()
+    (out / "approval_events.tsv").write_text(_GUARD_SPINE, encoding="utf-8")
+    _write_units(out, _guard_units())
+    reasons = {
+        (u.submission_no, u.reason) for u in assemble.build(out, adj).unlinked
+    }
+    assert ("3", "label_change_not_judged") in reasons
+
+
+def test_a_later_appearance_of_a_guard_trial_is_not_waiting_for_a_judge(
+    tmp_path: Path,
+) -> None:
+    """P4 withheld the whole group, so SUPPL 9 will never get a verdict; calling
+    it not_yet_judged would make it look like pending work forever."""
+    out, adj = tmp_path / "output", tmp_path / "adjudication"
+    out.mkdir()
+    adj.mkdir()
+    (out / "approval_events.tsv").write_text(_GUARD_SPINE, encoding="utf-8")
+    _write_units(out, _guard_units())
+    reasons = {
+        (u.submission_no, u.reason) for u in assemble.build(out, adj).unlinked
+    }
+    assert ("9", "later_appearance_of_the_same_trial") in reasons
+    assert all(reason != "not_yet_judged" for _, reason in reasons)

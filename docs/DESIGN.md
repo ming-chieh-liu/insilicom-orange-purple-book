@@ -88,11 +88,13 @@ reflected in code says so (`not yet implemented`) until the code lands.
 | D22 | Use `meshes`, **never** `ancestors` | `ancestors` walks to the root: epinephrine → Hydrocarbons, PCOS → Neoplasms |
 | D20 | Tier C is **never promoted** above C | The question it answers — "is this plausibly evidence" — is weaker than P4's |
 | D15 | Combination regimens yield **one row per (trial, submission)** | KEYNOTE-189 approved pembrolizumab *with* chemo owned by other applications |
-| D23 | **2026-09-24 · not yet implemented.** The trial-relevant scope is chosen by **submission class code**, one rule for both submission types, with action type used only to exclude two supplement subtypes. ORIG: `EFFICACY, BIOEQUIV, BIOSIMILAR, TYPE 1, 1/4, 2, 2/3, 2/4, 3, 3/4, 4, 4/5, 5, 6, 7, 9, 9- BLA, 10, 10- BLA, UNKNOWN`, blank. SUPPL: `EFFICACY, BIOSIMILAR, BIOEQUIV`, minus supplements whose only efficacy action is 10 New Route or 12 Rx→OTC. **11,295 events** (was 7,921). Full detail, counts and rejected alternatives in §3a | Action type is empty on every original, so it cannot scope them; submission class is populated on both. D4 kept 3 of FDA's 12 efficacy subtypes and so dropped 3,506 efficacy supplements whose letters name trials, and D16 then attributed those trials to the next in-scope supplement — a false edge. Supersedes D4, partly D5 |
-| D24 | **2026-09-24 · not yet implemented.** Supplements whose only efficacy actions are **5 Labeling Change With Clinical Data** or **6 Manufacturing Change With Clinical Data** (1,520) are in scope as a **D16 guard**: P2 reads their label and label-stated NCT ids link, but P4 does not judge their prose descriptions. Unjudged units get the unlinked reason `label_change_not_judged` | They rest on named studies but support a label claim, not a new use. Their labels must be read so that a trial first described there is not later attributed to an in-scope supplement (D16); judging them is a separate, optional P4 run |
+| D23 | **2026-09-24 · implemented 2026-09-24 in `service/approval_events.py` (P0 gate met: 11,295); `output/` not yet rebuilt.** The trial-relevant scope is chosen by **submission class code**, one rule for both submission types, with action type used only to exclude two supplement subtypes. ORIG: `EFFICACY, BIOEQUIV, BIOSIMILAR, TYPE 1, 1/4, 2, 2/3, 2/4, 3, 3/4, 4, 4/5, 5, 6, 7, 9, 9- BLA, 10, 10- BLA, UNKNOWN`, blank. SUPPL: `EFFICACY, BIOSIMILAR, BIOEQUIV`, minus supplements whose only efficacy action is 10 New Route or 12 Rx→OTC. **11,295 events** (was 7,921). Full detail, counts and rejected alternatives in §3a | Action type is empty on every original, so it cannot scope them; submission class is populated on both. D4 kept 3 of FDA's 12 efficacy subtypes and so dropped 3,506 efficacy supplements whose letters name trials, and D16 then attributed those trials to the next in-scope supplement — a false edge. Supersedes D4, partly D5 |
+| D24 | **2026-09-24 · implemented 2026-09-24: `trial_scope` in P0, withheld after D16 grouping in `identification.read_units`, reasons in `assemble`; `output/` not yet rebuilt.** Supplements whose only efficacy actions are **5 Labeling Change With Clinical Data** or **6 Manufacturing Change With Clinical Data** (1,520) are in scope as a **D16 guard**: P2 reads their label and label-stated NCT ids link, but P4 does not judge their prose descriptions. Unjudged units get the unlinked reason `label_change_not_judged` | They rest on named studies but support a label claim, not a new use. Their labels must be read so that a trial first described there is not later attributed to an in-scope supplement (D16); judging them is a separate, optional P4 run |
 | D25 | **2026-09-24 · not yet implemented.** **Approval letters (`ApplicationDocsTypeID = 1`) are an indication source**, alongside label §1. A letter's "provides for …" sentence states the approved indication of that exact submission. Letters are **not** a trial source | Letters exist for 95.2% of in-scope submissions since 1998 (7,413 of 7,786) and for almost none before (28 of 3,509); they add 454 submissions that have no label PDF. Their study mentions are mostly postmarketing requirements. Detail §3b |
 | D26 | **2026-09-24 · not yet implemented.** **FDA review documents are a trial source**, as a route parallel to the label route: Summary Review (21), Review (3, resolved to its component PDFs) and the pediatric reviews. A protocol id is captured by regex after `Study/Trial/Protocol`, matched **exactly** to one registry study's `orgStudyId` or secondary id, passed through deterministic guards, then given a **role** by two judges (`docs/prompts/review-trial-role.md`). Abbreviated ids are not expanded. Readability is decided **per file** (no text layer → skipped), never by year | Precision over recall, by instruction. Pilot, 2026-09-24: identity 70/70 correct; judges agreed 66/70; the 38 PIVOTAL/SUPPORTING links were checked and confirmed plausible by the user (3 read in full). Detail §3b |
 | D27 | **2026-09-24 · not yet implemented.** A review-route link judged **PIVOTAL or SUPPORTING is tier A** outright, `evidence_source = review_protocol`, with no count corroboration. D16 applies across the label and review routes together | The FDA names the trial by its sponsor protocol number and the match is exact, so, as with a label-stated NCT (D17), there is nothing to corroborate. Tier C remains below it (D20) |
+| D28 | **2026-09-24 · not yet implemented.** **Every label-route link gets a role judgement at submission grain**, on the §14 text of the submission it is linked to, as a judging step before assembly (P4b) — for label-stated NCTs and shortlist-judged descriptions alike. It uses the review route's six-option design (`PIVOTAL`, `SUPPORTING`, `PK_CLINPHARM`, `NOT_FOR_THIS_APPROVAL`, `FAILED`, `OTHER`) with its own versioned prompt and runbook, and **replaces** the application-grain verdicts in `adjudication/verdicts.jsonl`. Only `PIVOTAL`/`SUPPORTING` link | A mention in §14 is not support. The existing polarity task ran once (2026-09-11/14) on *current* openFDA labels at *application* grain and was never re-run on the rebuilt pipeline's units: **1,055 of 3,361 links (31%) have no support check at all** (491 label-stated, 564 judged), and the other 69% were checked against a later, pruned label. P4 identification asks only "which trial is this", never whether it supported the approval. Supersedes in part the §4 statement that task 4b is "reused unchanged" |
+| D29 | **2026-09-24 · not yet implemented.** **How the sources combine.** (1) **Direct sources first**: a label-stated NCT and a review protocol id name the trial themselves. (2) A §14 description on submission S whose trial name equals a protocol id or acronym the review of S matched, and whose count agrees where both exist, is **identified by that match and skips the shortlist**. (3) The shortlist serves only descriptions no FDA document identifies. (4) The graph route (tier C) serves submissions with no usable label or review. Every link row carries `sources` (every route that named the trial) and `conflict`. Conflict rules in §3c | Direct sources are the FDA naming the trial; spending judge calls re-identifying what a review already named costs calls and creates avoidable disagreements. Different routes naming different trials for one approval is normal (an approval rests on several trials); what must be caught is the same trial given different roles or different submissions, and a judged pick contradicting a direct source |
 
 ### Hard constraints
 
@@ -109,8 +111,8 @@ reflected in code says so (`not yet implemented`) until the code lands.
 
 Decided 2026-09-24 after reading every Drugs@FDA table (`examine/01_drugsfda_tables/`) and a
 sample of FDA approval letters. All counts are **approved NDA/BLA submissions** in the
-2026-09-07 `drugsatfda.zip`. **Not yet implemented** — `service/approval_events.py` still applies
-D4, and every downstream count in §4 is still D4's.
+2026-09-07 `drugsatfda.zip`. **Implemented 2026-09-24** in `service/approval_events.py`; `output/` has not been rebuilt, so
+every downstream count in §4 is still D4's.
 
 ### Three fields that are easy to confuse
 
@@ -311,12 +313,64 @@ SUPPL-9.
 
 ---
 
+## 3c. D28 / D29 — support checks and how the sources combine
+
+Decided 2026-09-24. **Not yet implemented.**
+
+### Where each check sits
+
+```
+                 LABEL ROUTE                         REVIEW ROUTE (D26)
+identify   label-stated NCT        │ protocol id → exact registry match
+           or shortlist + judges   │   (guards; identity is deterministic)
+           (skipped when a same-   │
+            submission review id   │
+            already matches, D29)  │
+role       P4b role judge (D28)    │ role judge (D26)
+           submission grain, own   │ submission grain, review passages
+           §14 text                │
+                    └──────────── P5: D16 across both routes ────────────┘
+                                  sources · conflict · tier
+```
+
+P5 applies verdicts; it does not judge.
+
+### Conflict rules (D29)
+
+| Situation | Conflict? | Handling |
+|---|---|---|
+| Label and review name **different trials** for one submission | no — approvals rest on several trials | union; each trial keeps its own role |
+| Same (trial, submission), **roles disagree** (e.g. label `SUPPORTING`, review `FAILED` or `NOT_FOR_THIS_APPROVAL`) | **yes** | `conflict = role_disagrees`; not linked at tier A until resolved |
+| Same trial attributed to **different submissions** by the two routes (pilot: Imbruvica `PCYC-1104` named in the ORIG review, linked by the label route to SUPPL-17; Zykadia `X2101` likewise) | **yes** | D16 across routes keeps the earliest; `conflict = attribution_moved` |
+| A shortlist pick contradicts a direct source for the **same description** | **yes** | the direct source wins; the judged pick is dropped and recorded `conflict = judged_contradicts_direct` |
+| Letter indication not contained in the same submission's label §1 | **rare** | `conflict = indication_mismatch`; label §1 is cumulative, so containment, not equality, is the test |
+
+`sources` lists every route that named the trial for that submission — `label_nct`, `review_protocol`,
+`label_description`, `kg_abstract` — so agreement between independent routes is visible, and the
+D19 cross-check (tier A with a second source) is one column, not a separate table.
+
+**First measurement, free:** compare the 70 pilot review units with the label-route map for the same
+submissions — agreements, `attribution_moved`, and role disagreements — before either route is
+wired in.
+
+### Open item — tier A for shortlist-judged links (not decided)
+
+D17 promotes a judged link to tier A when label and registry counts agree within 15%. The P4 prompt
+tells the judge the count is "the strongest single signal", so the judge largely *chooses* on the
+count that D17 then *rewards* — the same evidence twice. 422 current tier-A links rest on it. The
+only precision measure is the withheld-answer pilot (≈90%, 104/115, all tiers, pre-cap-100). To do
+before deciding: score the withheld set by tier; if tier-A judged links fall short of the
+precision-first bar, tier A should require a signal the judge did not choose on (an exact
+name ↔ acronym/protocol-id match, or agreement with the review route).
+
+---
+
 ## 4. Pipeline — six phases
 
 ```
 P0 spine        Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
                 trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921   (D4, as built)
-                D23, decided, not yet built: 5,766 ORIG + 4,009 SUPPL
+                D23, built 2026-09-24:        5,766 ORIG + 4,009 SUPPL
                                              + 1,520 D24 guard SUPPL = 11,295
 
 P1 normalize    biokde pubmedEntitiesFlat as synonym dictionary -> MeSH descriptor
@@ -352,7 +406,7 @@ NDA+BLA; add `action_type`, `orphan`, `review_priority`, `era`. New reader for t
 tables, same shape as `source/raw_table.py`.
 → `approval_events.tsv`. **Gate:** 87,055 events in scope; 11,426 indication-changing;
 **7,921 trial-relevant = 5,879 ORIG + 2,042 core SUPPL**. *(Met 2026-09-15.)*
-**[SUPERSEDED by D23, 2026-09-24]** New gate once D23 is built: 11,295 trial-relevant =
+**[SUPERSEDED by D23, 2026-09-24]** New gate, **met 2026-09-24**: 11,295 trial-relevant =
 5,766 ORIG + 4,009 full-pipeline SUPPL + 1,520 D24-guard SUPPL, with a `scope_basis` column naming
 the class code (and, for SUPPL, the efficacy actions) that admitted each row.
 
@@ -379,7 +433,7 @@ report the tail.
 **P4 — agent judgement.** Task 4a is new and needs `docs/prompts/trial-identification.md` plus
 `docs/runbooks/identify-trial.md`. Two judges, disagreement to a third. **A wrong match fabricates
 an edge**, which is worse than a wrong polarity label, so `NONE` must be an easy, blameless answer.
-Task 4b is already built — `docs/runbooks/adjudicate-section-14.md`, 2,679 links judged — and is
+**[PARTIALLY SUPERSEDED by D28, 2026-09-24 — "reused unchanged" was implemented as reusing the task's *old verdicts*, not re-running the task on the rebuilt units; D28 replaces it with a submission-grain role judgement]** Task 4b is already built — `docs/runbooks/adjudicate-section-14.md`, 2,679 links judged — and is
 reused unchanged.
 → `adjudication/verdicts.jsonl`, append-only and git-tracked. **Gate:** 200-unit pilot,
 disagreement <25%.
