@@ -100,3 +100,12 @@ def test_read_chosen_keeps_only_chosen_rows_with_a_biokdeid(tmp_path: object) ->
     )
     assert inorm.read_chosen(path) == {"NDA1|ORIG|1": {("b1", "One")}}
     assert inorm.read_chosen(Path(str(tmp_path)) / "absent.tsv") == {}
+
+
+def test_an_agent_located_letter_ranks_below_the_keyword_letter_above_the_label() -> None:
+    located = _build(letters_located={"NDA000001|ORIG|1": "is indicated for gout"},
+                     label_section_1={"NDA000001|ORIG|1": "for acne vulgaris"})
+    assert [r.source for r in located.rows if r.chosen == "true"] == ["letter_located"]
+    keyword = _build(letters={"NDA000001|ORIG|1": "for the treatment of acne vulgaris"},
+                     letters_located={"NDA000001|ORIG|1": "is indicated for gout"})
+    assert [r.source for r in keyword.rows if r.chosen == "true"] == ["letter"]

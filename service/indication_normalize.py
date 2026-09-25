@@ -8,6 +8,8 @@ source                    raw text read by                            grain
 ========================  ==========================================  ==========
 ``letter``                P2b ``letter_indications.tsv`` (only        submission
                           sentences flagged indication-bearing)
+``letter_located``        agent-located letter spans, copied by code  submission
+                          (``adjudication/letter_indication_verdicts``)
 ``label_section_1``       P2a ``submission_indication_text.tsv``      submission
 ``label_14_heading``      P2a ``label_trials.tsv`` subsection         one trial
                           headings, keyed by the heading              description
@@ -45,12 +47,16 @@ from utility.logging import get_logger
 _log = get_logger(__name__)
 
 SOURCE_LETTER = "letter"
+#: A letter span located by the agents and copied by code (service.letter_locate).
+SOURCE_LETTER_LOCATED = "letter_located"
 SOURCE_LABEL_1 = "label_section_1"
 SOURCE_HEADING = "label_14_heading"
 SOURCE_OPENFDA = "openfda_current"
 
 #: Submission-level sources, in precedence order.
-PRECEDENCE: tuple[str, ...] = (SOURCE_LETTER, SOURCE_LABEL_1, SOURCE_OPENFDA)
+PRECEDENCE: tuple[str, ...] = (
+    SOURCE_LETTER, SOURCE_LETTER_LOCATED, SOURCE_LABEL_1, SOURCE_OPENFDA
+)
 
 #: Characters of source text kept per row.
 TEXT_KEEP: int = 600
@@ -124,6 +130,7 @@ def build(
     *,
     letters: dict[str, str],
     label_section_1: dict[str, str],
+    letters_located: dict[str, str] | None = None,
     headings: dict[str, list[str]],
     openfda: dict[str, set[str]],
     exact: dict[str, str],
@@ -144,7 +151,9 @@ def build(
         key = f"{application}|{submission_type}|{submission_no}"
         sub = (application, submission_type, submission_no)
         coded_submission = False
+        located = letters_located or {}
         for source, text in ((SOURCE_LETTER, letters.get(key, "")),
+                             (SOURCE_LETTER_LOCATED, located.get(key, "")),
                              (SOURCE_LABEL_1, label_section_1.get(key, ""))):
             if not text:
                 continue
@@ -248,6 +257,7 @@ __all__ = [
     "SOURCE_HEADING",
     "SOURCE_LABEL_1",
     "SOURCE_LETTER",
+    "SOURCE_LETTER_LOCATED",
     "SOURCE_OPENFDA",
     "IndicationReport",
     "IndicationRow",

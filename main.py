@@ -21,6 +21,7 @@ import csv
 import json
 import logging
 import sys
+from datetime import date
 from pathlib import Path
 from typing import Any
 
@@ -36,7 +37,8 @@ from config.settings import (
 from dao.biokde import BiokdeRepository, connection_uri
 from dao.graph_evidence import GraphEvidenceRepository
 from dao.tsv_repository import TsvRepository
-from source import mesh_descriptors, moiety, trial_studies
+from source import label_pdf, mesh_descriptors, moiety, trial_studies
+from source.raw_table import read_rows
 from service import (
     adjudication,
     assemble,
@@ -48,6 +50,7 @@ from service import (
     identification,
     indication_normalize,
     indications,
+    letter_locate,
     letters,
     graph_links,
     graph_trials,
@@ -77,6 +80,10 @@ MODES: dict[str, str] = {
     "MeSH descriptors via the Insilicom graph",
     "letters": "fetch each trial-relevant submission's approval letter, code the "
     "indication it states, and choose one indication source per submission (D25)",
+    "letter-locate-prepare": "write locate units and batches for letters the "
+    "keyword rule missed (see docs/runbooks/letter-indication.md)",
+    "letter-indication-combine": "pair locator/verifier answers, extract agreed "
+    "spans by code, record decided letters",
     "indication-normalize": "code every indication source (letter, label section 1, "
     "section-14 headings, openFDA fallback) into submission_indications.tsv (D30)",
     "labels": "fetch each trial-relevant submission's archived label and read "
@@ -594,6 +601,59 @@ def main(argv: list[str] | None = None) -> int:
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 
+    if args.mode == "letter-locate-prepare":
+        data = RawData(root=Path(args.fda_raw))
+        letters_tsv = Path(args.out) / "letter_indications.tsv"
+        if not letters_tsv.is_file():
+            print(f"{letters_tsv} not found — run --mode letters first")
+            return 1
+        with letters_tsv.open(encoding="utf-8") as handle:
+            letter_rows = list(csv.DictReader(handle, delimiter="\t"))
+        brands: dict[str, set[str]] = {}
+        for product in read_rows(data.products):
+            brands.setdefault((product.get("ApplNo") or "").strip().zfill(6), set()).add(
+                (product.get("DrugName") or "").strip()
+            )
+        cache = Path(args.letter_cache)
+
+        def _letter_text(url: str) -> str | None:
+            if not url or not label_pdf.is_cached(url, cache):
+                return None
+            got = label_pdf.extract_text(label_pdf.cache_path(url, cache))
+            return got[0] if got else None
+
+        adjudication_dir = Path(args.adjudication)
+        lp_report = letter_locate.prepare(
+            letter_rows,
+            _letter_text,
+            brands,
+            adjudication_dir / "letter_locate_units.jsonl",
+            adjudication_dir / "letter_indication_batches",
+            limit=args.limit,
+        )
+        print(
+            f"{lp_report.candidates:,} letters the keyword rule missed; "
+            f"{lp_report.units:,} units written ({lp_report.unreadable:,} unreadable); "
+            f"{len(lp_report.new_batches)} new locate batches"
+        )
+        for path in lp_report.new_batches:
+            print(f"  run locators A and B on {path.name}")
+        print("next: follow docs/runbooks/letter-indication.md")
+        return 0
+
+    if args.mode == "letter-indication-combine":
+        adjudication_dir = Path(args.adjudication)
+        lc_report = letter_locate.combine(
+            adjudication_dir / "letter_locate_units.jsonl",
+            adjudication_dir / "letter_indication_raw",
+            adjudication_dir / "letter_indication_batches",
+            adjudication_dir / "letter_verify_units.jsonl",
+            adjudication_dir / "letter_indication_verdicts.jsonl",
+            decided=date.today().isoformat(),
+        )
+        print(letter_locate.render(lc_report))
+        return 0
+
     if args.mode == "indication-normalize":
         data = RawData(root=Path(args.fda_raw))
         if not data.exists:
@@ -628,6 +688,9 @@ def main(argv: list[str] | None = None) -> int:
             if r.get("indication_bearing") == "true" and r.get("sentence")
         }
         label_text = {_key(r): r.get("text") or "" for r in _tsv("submission_indication_text.tsv")}
+        located_text = letter_locate.accepted_spans(
+            Path(args.adjudication) / "letter_indication_verdicts.jsonl"
+        )
         headings: dict[str, list[str]] = {}
         for r in _tsv("label_trials.tsv"):
             heading = (r.get("heading") or "").strip()
@@ -651,6 +714,7 @@ def main(argv: list[str] | None = None) -> int:
                 keys,
                 letters=letter_text,
                 label_section_1=label_text,
+                letters_located=located_text,
                 headings=headings,
                 openfda=openfda,
                 exact=exact,

@@ -1,7 +1,7 @@
 # Runbook — agent-located indications in approval letters
 
 **For:** the main agent · **Prompts:** `docs/prompts/letter-indication-locate.md` (v1),
-`docs/prompts/letter-indication-verify.md` (v1) · **Written:** 2026-09-24 · **Status:** pilot
+`docs/prompts/letter-indication-verify.md` (v1) · **Written:** 2026-09-24 · **Status:** wired (`letter-locate-prepare`, `letter-indication-combine`); pilot passed, full run pending the user's hand check
 
 ## What this does and why
 
@@ -22,6 +22,28 @@ dermatitis"). This task finds them without letting an agent write the indication
 Only a span both locators agreed on (or a tiebreak chose) **and** both verifiers (or a tiebreak)
 accepted becomes the submission's indication, recorded with `source = approval_letter_located` so it
 stays distinguishable from the keyword route.
+
+## How to run it
+
+```bash
+PY=/data/mliu/miniforge3/envs/clinical-trials-claude/bin/python
+$PY main.py --mode letters                        # read letters (needs FDA; throttled)
+$PY main.py --mode letter-locate-prepare [--limit N]
+#   → adjudication/letter_locate_units.jsonl + letter_indication_batches/locate-batch-NNN.ids
+#   run locators A and B per batch (prompt: letter-indication-locate.md), save answers as
+#   adjudication/letter_indication_raw/locate-batch-NNN-{A,B}.txt
+$PY main.py --mode letter-indication-combine
+#   → pairs answers, code extracts agreed spans, writes verify batches and any tiebreak
+#   batches, records decided letters; prints exactly what to run next. Run verifiers
+#   (verify-batch-NNN-{A,B}.txt) and tiebreaks (…-tiebreak-batch-NNN-C.txt), then
+#   re-run combine until it reports "nothing pending".
+$PY main.py --mode indication-normalize           # accepted spans become source letter_located
+```
+
+`letter-locate-prepare` writes every candidate letter to the units file but batches only letters
+not already in a batch file, so re-running it never judges a letter twice. `combine` is idempotent:
+it re-reads every answer file and appends a verdict only when a letter's outcome is new or changed
+(last row wins).
 
 ## Work units
 
