@@ -337,6 +337,15 @@ def stub_network(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> dict[str, s
         return None if body is None else (body, 10, 1_000)
 
     monkeypatch.setattr(section14.label_pdf, "fetch", _fetch)
+    # P2 now fetches through polite_fetch, which asks label_pdf.fetch_status;
+    # route it to the same stub, and skip the one-second pause between requests.
+    monkeypatch.setattr(section14.label_pdf, "fetch_status",
+                        lambda url, root: (lambda p: (p, "") if p else (None, "not_found"))(
+                            _fetch(url, root)))
+    real_fetch_all = section14.polite_fetch.fetch_all
+    monkeypatch.setattr(section14.polite_fetch, "fetch_all",
+                        lambda urls, root, **kw: real_fetch_all(
+                            urls, root, **{**kw, "sleep": lambda _s: None}))
     monkeypatch.setattr(section14.label_pdf, "extract_text", _extract)
     return texts
 
@@ -373,9 +382,13 @@ def test_a_scanned_label_is_counted_and_skipped(
 def test_an_unreadable_pdf_is_counted_not_fatal(
     corpus: RawData, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    monkeypatch.setattr(
-        section14.label_pdf, "fetch", lambda url, root: Path("/nowhere.pdf")
-    )
+    def _cached(url: str, root: Path) -> tuple[Path, str]:
+        path = root / "label.pdf"
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_bytes(b"%PDF")          # a PDF, but one with no readable text
+        return path, ""
+
+    monkeypatch.setattr(section14.label_pdf, "fetch_status", _cached)
     monkeypatch.setattr(section14.label_pdf, "extract_text", lambda path: None)
     report = section14.build(corpus, tmp_path / "cache", parsers=1)
     assert report.unreadable == 1
@@ -386,9 +399,22 @@ def test_a_failed_download_is_counted(
     corpus: RawData, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """One unreachable label must not cost the rest of the run."""
-    monkeypatch.setattr(section14.label_pdf, "fetch", lambda url, root: None)
+    monkeypatch.setattr(section14.label_pdf, "fetch_status",
+                        lambda url, root: (None, "not_found"))
     report = section14.build(corpus, tmp_path / "cache", parsers=1)
     assert report.failed == 1
+
+
+def test_offline_sends_nothing_and_counts_what_it_could_not_read(
+    corpus: RawData, tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The rebuild re-extracts from the cache; nothing may reach FDA."""
+    def _refuse(url: str, root: Path) -> tuple[None, str]:
+        raise AssertionError("offline must not fetch")
+
+    monkeypatch.setattr(section14.label_pdf, "fetch_status", _refuse)
+    report = section14.build(corpus, tmp_path / "cache", parsers=1, offline=True)
+    assert report.failed == 1 and report.descriptions == ()
     assert report.fetched == 0
 
 

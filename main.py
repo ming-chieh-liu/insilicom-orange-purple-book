@@ -203,13 +203,7 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--offline",
         action="store_true",
-        help="letters: read only cached files; send no request to FDA",
-    )
-    parser.add_argument(
-        "--workers",
-        type=int,
-        default=6,
-        help="labels: concurrent downloads (network-bound; parsing stays serial)",
+        help="letters, labels, reviews: read only cached files; send no request to FDA",
     )
     parser.add_argument(
         "--parsers",
@@ -950,8 +944,8 @@ def main(argv: list[str] | None = None) -> int:
             data,
             Path(args.label_cache),
             limit=args.limit,
-            workers=args.workers,
-            parsers=args.parsers
+            parsers=args.parsers,
+            offline=args.offline,
         )
         repository = TsvRepository(args.out)
         repository.save(

@@ -41,17 +41,13 @@ from __future__ import annotations
 
 import hashlib
 import re
-from concurrent.futures import (
-    ProcessPoolExecutor,
-    ThreadPoolExecutor,
-    as_completed,
-)
+from concurrent.futures import ProcessPoolExecutor, as_completed
 from pathlib import Path
 from typing import NamedTuple
 
 from config.settings import RawData
 from service import approval_events
-from source import label_pdf
+from source import label_pdf, polite_fetch
 from source.raw_table import read_rows
 from utility import application_number as appno
 from utility.logging import get_logger
@@ -484,15 +480,19 @@ def build(
     data: RawData,
     cache_root: Path,
     limit: int | None = None,
-    workers: int = 6,
     parsers: int = 16,
+    offline: bool = False,
 ) -> LabelsReport:
     """Fetch every trial-relevant submission's label and read it.
 
     One PDF can serve several submissions, so downloads are deduplicated by
-    URL — 4,416 submissions cost 4,169 fetches. Fetching is threaded because it
-    is entirely network-bound; parsing stays single-threaded, where it is CPU
-    bound and pdfplumber is not worth the contention.
+    URL — 4,416 submissions cost 4,169 fetches.
+
+    **Fetching is polite, not threaded** (:mod:`source.polite_fetch`): one
+    request a second, a breaker after repeated refusals, the cache first.
+    It used to run six concurrent downloads with no breaker — the pattern that
+    had FDA refuse this address for four hours on the letter run. ``offline``
+    reads the cache only and sends nothing. Parsing is CPU-bound and pooled.
     """
     # The drug's own names, so a table column reading "ABILIFY 15" is not
     # mistaken for a trial called ABILIFY 15.
@@ -545,19 +545,11 @@ def build(
 
     urls = list(dict.fromkeys(document.url for document in wanted))
     _log.info("%d submissions, %d distinct PDFs", len(wanted), len(urls))
-    cached: dict[str, Path] = {}
-    failed = 0
-    with ThreadPoolExecutor(max_workers=workers) as downloads:
-        pending_fetch = {
-            downloads.submit(label_pdf.fetch, url, cache_root): url for url in urls
-        }
-        for finished_fetch in as_completed(pending_fetch):
-            path = finished_fetch.result()
-            if path is None:
-                failed += 1
-            else:
-                cached[pending_fetch[finished_fetch]] = path
-    _log.info("%d cached, %d failed", len(cached), failed)
+    fetched = polite_fetch.fetch_all(urls, cache_root, offline=offline)
+    cached: dict[str, Path] = dict(fetched.cached)
+    failed = len(fetched.failed) + len(fetched.refused)
+    _log.info("%d cached, %d failed, %d not fetched (offline, refused or breaker)",
+              len(cached), len(fetched.failed), len(fetched.refused))
 
     # Parsing, not downloading, is the cost: ~3.7 s a label single-threaded,
     # which is 4.5 hours over the whole set. It is CPU-bound, so a process pool
