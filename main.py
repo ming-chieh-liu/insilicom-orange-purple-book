@@ -52,6 +52,7 @@ from service import (
     indications,
     letter_locate,
     letters,
+    review_role,
     review_trials,
     graph_links,
     graph_trials,
@@ -83,6 +84,10 @@ MODES: dict[str, str] = {
     "indication it states, and choose one indication source per submission (D25)",
     "reviews": "fetch each trial-relevant submission's FDA reviews, match the "
     "protocol ids they cite to registry trials, and write role units (D26)",
+    "review-role-prepare": "batch the review-route units without a current-prompt "
+    "verdict, calibration units first (see docs/runbooks/review-trial-role.md)",
+    "review-role-combine": "pair the role judges' answers, batch tiebreaks, record "
+    "decided units",
     "letter-locate-prepare": "write locate units and batches for letters the "
     "keyword rule missed (see docs/runbooks/letter-indication.md)",
     "letter-indication-combine": "pair locator/verifier answers, extract agreed "
@@ -674,6 +679,23 @@ def main(argv: list[str] | None = None) -> int:
                 handle.write(json.dumps(rv_unit) + "\n")
         print(review_trials.render(rv_report, fetch_stats))
         print(f"\nwritten to {repository.out_dir}/ and {units_path}")
+        return 0
+
+    if args.mode in ("review-role-prepare", "review-role-combine"):
+        adjudication_dir = Path(args.adjudication)
+        version = f"v{review_role.PROMPT_VERSION}"
+        role_units = adjudication_dir / "review_role_units.jsonl"
+        role_batches = adjudication_dir / "review_role_batches" / version
+        role_verdicts = adjudication_dir / "review_role_verdicts.jsonl"
+        if args.mode == "review-role-prepare":
+            role_report = review_role.prepare(role_units, role_batches, role_verdicts,
+                                              limit=args.limit)
+        else:
+            role_report = review_role.combine(
+                role_units, adjudication_dir / "review_role_raw" / version, role_batches,
+                role_verdicts, decided_on=date.today().isoformat(),
+            )
+        print(review_role.render(role_report))
         return 0
 
     if args.mode == "letter-locate-prepare":

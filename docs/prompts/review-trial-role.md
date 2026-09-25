@@ -1,6 +1,13 @@
 # Prompt — role of a trial named in an FDA review
 
-**Version:** 1 · **Created:** 2026-09-24 · **Runbook:** `docs/runbooks/review-trial-role.md`
+**Version:** 2 · **Created:** 2026-09-24 · **v2:** 2026-09-25 · **Runbook:** `docs/runbooks/review-trial-role.md`
+
+*v1 → v2 (2026-09-25): the pilot's one calibration miss was the SIMPLE trial (`GS-US-540-5773`),
+evidence for Veklury's 2020 approval named in the review of a 2022 supplement — expected
+NOT_FOR_THIS_APPROVAL, answered OTHER, because v1's OTHER ("anything else … background mention")
+read as a fit for a recap. v2 puts "supported an earlier approval" first in NOT_FOR_THIS_APPROVAL
+with an example, and says in OTHER that it does not cover those cases. Nothing else changed.
+Verdicts record `prompt_version`; v1 and v2 answers are kept in separate folders.*
 
 The judge prompt. One judgement = one `(submission, nct_id)` unit, built only where a protocol id
 in an FDA review document matched exactly one registered trial and passed every deterministic
@@ -42,13 +49,17 @@ PK_CLINPHARM           - a pharmacokinetic, pharmacodynamic, bioavailability,
                          bioequivalence, food-effect, drug-interaction or
                          organ-impairment study.
 NOT_FOR_THIS_APPROVAL  - named but not evidence for THIS approval: it supported an
-                         earlier approval, is ongoing, is a confirmatory or
-                         postmarketing study, or is required after approval.
+                         EARLIER approval (for example the original indication,
+                         when this approval adds a new one), or it is ongoing,
+                         a confirmatory or postmarketing study, or required
+                         after approval.
 FAILED                 - presented as failing its primary endpoint or as showing
                          no benefit.
-OTHER                  - anything else: safety-only, design or background mention,
-                         another product's study, or the text gives no basis to
-                         judge.
+OTHER                  - anything else that is not one of the cases above:
+                         safety-only, design or background mention, another
+                         product's study, or the text gives no basis to judge.
+                         A study that supported an earlier approval is
+                         NOT_FOR_THIS_APPROVAL, not OTHER.
 
 RULES:
 - Judge ONLY from the TEXT and the APPROVAL BEING JUDGED above. Do not use outside

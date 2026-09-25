@@ -1,8 +1,28 @@
 # Runbook — role of trials named in FDA review documents
 
-**For:** the main agent · **Prompt:** `docs/prompts/review-trial-role.md` (v1)
-**Written:** 2026-09-24 · **Status:** pilot. Unit building lives in scratch scripts until the pilot
-passes; nothing here is wired into `main.py` yet.
+**For:** the main agent · **Prompt:** `docs/prompts/review-trial-role.md` (v2)
+**Written:** 2026-09-24 · **Status:** wired 2026-09-25 (`reviews`, `review-role-prepare`,
+`review-role-combine`); v1 pilot passed (70 units); v2 not yet run.
+
+## How to run it
+
+```bash
+PY=/data/mliu/miniforge3/envs/clinical-trials-claude/bin/python
+$PY main.py --mode reviews                 # fetch (1 req/s, breaker), extract, match, guard
+#   → output/review_trial_mentions.tsv (every id-shaped mention + outcome)
+#   → adjudication/review_role_units.jsonl (one unit per submission × trial, earliest only)
+$PY main.py --mode review-role-prepare [--limit N]
+#   → adjudication/review_role_batches/v2/role-batch-NNN.ids, calibration units first
+#   run judges A and B per batch; save answers as
+#   adjudication/review_role_raw/v2/role-batch-NNN-{A,B}.txt
+$PY main.py --mode review-role-combine
+#   → records agreed units in adjudication/review_role_verdicts.jsonl (prompt_version 2),
+#     writes role-tiebreak-batch-NNN.ids; save the third judge's answers as
+#     role-tiebreak-batch-NNN-C.txt and re-run combine until "nothing pending"
+```
+
+A unit counts as decided only with a verdict under the **current** prompt version, so the v1 pilot's
+units are judged again under v2; v1 and v2 answers live in separate folders.
 
 ## What this does and why
 
