@@ -571,3 +571,66 @@ def test_a_later_appearance_of_a_guard_trial_is_not_waiting_for_a_judge(
     }
     assert ("9", "later_appearance_of_the_same_trial") in reasons
     assert all(reason != "not_yet_judged" for _, reason in reasons)
+
+
+# ---------------------------------------------------------------------------
+# The review route joins the same D16 (D26, D27, D29)
+# ---------------------------------------------------------------------------
+
+
+def _reviews(adj: Path, verdicts: list[tuple[str, str, int]]) -> None:
+    (adj / "review_role_units.jsonl").write_text(
+        "\n".join(json.dumps({"unit_id": u, "protocol_id": f"P-{u[-3:]}"}) for u, _, _ in verdicts)
+        + "\n", encoding="utf-8")
+    (adj / "review_role_verdicts.jsonl").write_text(
+        "\n".join(json.dumps({"unit_id": u, "final": role, "prompt_version": v})
+                  for u, role, v in verdicts) + "\n", encoding="utf-8")
+
+
+def test_a_review_only_link_is_tier_a(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _reviews(adj, [("BLA125514|SUPPL|45|NCT09999999", "PIVOTAL", 2)])
+    link = next(l for l in assemble.build(out, adj).links if l.nct_id == "NCT09999999")
+    assert (link.evidence_tier, link.evidence_source, link.sources) == ("A", "review_protocol", "review_protocol")
+    assert link.trial_name == "P-999" and link.submission_no == "45"
+
+
+def test_both_routes_on_one_submission_merge_into_one_row(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "SUPPORTING", 2)])
+    links = [l for l in assemble.build(out, adj).links if l.nct_id == "NCT02578680"]
+    assert len(links) == 1
+    assert links[0].sources == "label_nct;review_protocol" and links[0].conflict == ""
+
+
+def test_an_earlier_review_moves_the_link_and_says_so(workspace: tuple[Path, Path]) -> None:
+    """The label first names the trial on SUPPL 45; the review of SUPPL 35 --
+    four months earlier -- already names it as pivotal. D16 across both routes
+    gives the link to SUPPL 35 and the row records that the routes disagreed."""
+    out, adj = workspace
+    _write_units(out, [_unit(unit_id="BLA125514|SUPPL|45|KEYNOTE-189", submission_no="45",
+                             approval_date="2018-12-19")])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL", 2)])
+    report = assemble.build(out, adj)
+    links = [l for l in report.links if l.nct_id == "NCT02578680"]
+    assert [(l.submission_no, l.evidence_source, l.conflict) for l in links] == [
+        ("35", "review_protocol", "attribution_moved")
+    ]
+    assert report.attribution_moved == 1
+    assert ("45", "later_appearance_of_the_same_trial") in {
+        (u.submission_no, u.reason) for u in report.unlinked
+    }
+    assert "attribution moved" in assemble.render(report)
+
+
+def test_non_linking_roles_are_context_and_v1_is_ignored(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT00000777", "PK_CLINPHARM", 2),
+                   ("BLA125514|SUPPL|35|NCT00000888", "PIVOTAL", 1),
+                   ("BLA125514|SUPPL|99|NCT00000999", "PIVOTAL", 2)])  # not trial-relevant
+    report = assemble.build(out, adj)
+    assert [(c.nct_id, c.role) for c in report.review_context] == [("NCT00000777", "PK_CLINPHARM")]
+    assert {l.nct_id for l in report.links} == {"NCT02578680"}

@@ -424,6 +424,11 @@ def main(argv: list[str] | None = None) -> int:
         recall = validate.shortlist_recall(units_path)
         tiers = validate.tier_breakdown(out_dir / "trial_submission_map.tsv")
         print(validate.render(recall, tiers))
+        routes, moved = validate.route_agreement(out_dir / "trial_submission_map.tsv")
+        print("\n  ROUTES — which sources named each link (D26, D29)")
+        for sources, count in routes:
+            print(f"    {sources or '(none recorded)':<38}{count:>9,}")
+        print(f"    attribution moved between routes       {moved:>9,}")
         if args.limit:
             adjudication_dir = Path(args.adjudication)
             truth = validate.withhold(
@@ -466,8 +471,15 @@ def main(argv: list[str] | None = None) -> int:
             ("nct_id", "application", "submission_type", "submission_no",
              "approval_date", "action_type", "indication_mesh", "indication_term",
              "drug_mesh", "trial_name", "label_enrollment", "registry_enrollment",
-             "evidence_tier", "evidence_source", "count_check", "drug_basis", "injected"),
+             "evidence_tier", "evidence_source", "count_check", "drug_basis", "injected",
+             "sources", "conflict"),
             assemble_report.links,
+        )
+        repository.save(
+            "review_trial_context",
+            ("nct_id", "application", "submission_type", "submission_no",
+             "protocol_id", "role"),
+            assemble_report.review_context,
         )
         repository.save(
             "unlinked_submissions",

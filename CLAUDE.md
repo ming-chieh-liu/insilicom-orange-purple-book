@@ -120,16 +120,16 @@ code says `not yet implemented` until it lands.
   exact submission. Coverage 95.2% of in-scope submissions since 1998, ~0% before; adds 454 with no
   label. **Not a trial source** — their study mentions are postmarketing requirements. The
   extractor must handle other wordings and not stop at decimals ("Gel, 1.2%").
-- **D26 — FDA reviews are a trial source, parallel to the label route** (2026-09-24, **not yet
-  implemented**). Summary Review (21), Review (3, via its table of contents) and pediatric reviews;
+- **D26 — FDA reviews are a trial source, parallel to the label route** (2026-09-24, **implemented
+  in code 2026-09-25; review download running, role run pending**). Summary Review (21), Review (3, via its table of contents) and pediatric reviews;
   never Pediatric Written Requests. Protocol id after `Study/Trial/Protocol` (letters + digits, any
   length, **no abbreviation expansion**) → exactly one registry study by `orgStudyId` **or**
   secondary id → guards (start ≤ approval · sponsor = applicant or trial names the drug · package
   names the drug) → D16 across label and review → two judges assign a role
   (`docs/prompts/review-trial-role.md`, `docs/runbooks/review-trial-role.md`). Skip a PDF with no
   text layer, **per file, never by year**. Pilot: identity 70/70, judges agree 66/70.
-- **D27 — a review link judged PIVOTAL or SUPPORTING is tier A outright** (2026-09-24, **not yet
-  implemented**), `evidence_source = review_protocol`. The FDA named the trial by its sponsor
+- **D27 — a review link judged PIVOTAL or SUPPORTING is tier A outright** (2026-09-24, **implemented
+  in code 2026-09-25; `output/` not yet rebuilt**), `evidence_source = review_protocol`. The FDA named the trial by its sponsor
   protocol number and the match is exact, so as with a label-stated NCT there is nothing to
   corroborate. Tier C stays below it.
 - **D28 — every label link gets a role judgement at submission grain** (2026-09-24, **not yet

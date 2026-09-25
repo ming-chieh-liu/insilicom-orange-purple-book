@@ -218,6 +218,34 @@ def tier_breakdown(map_path: Path) -> tuple[tuple[str, int], ...]:
     return tuple(sorted(counts.items()))
 
 
+def route_agreement(map_path: Path) -> tuple[tuple[tuple[str, int], ...], int]:
+    r"""How the label and review routes relate in the deliverable (D26, D29).
+
+    Returns ``(links by the set of routes that named them, links whose
+    attribution moved because the routes disagreed on the earliest submission)``.
+    A link both routes named is independent corroboration; a moved attribution
+    is a place where one route would have put the trial on the wrong approval.
+
+    >>> import tempfile
+    >>> path = Path(tempfile.mkdtemp()) / "m.tsv"
+    >>> _ = path.write_text("sources\tconflict\nlabel_nct\t\nlabel_nct;review_protocol\t\n"
+    ...                     "review_protocol\tattribution_moved\n", encoding="utf-8")
+    >>> route_agreement(path)
+    ((('label_nct', 1), ('label_nct;review_protocol', 1), ('review_protocol', 1)), 1)
+    >>> route_agreement(path.parent / "absent.tsv")
+    ((), 0)
+    """
+    from collections import Counter
+
+    if not map_path.is_file():
+        return (), 0
+    with map_path.open(encoding="utf-8") as handle:
+        rows = list(csv.DictReader(handle, delimiter="\t"))
+    counts = Counter(row.get("sources") or row.get("evidence_source") or "" for row in rows)
+    moved = sum(1 for row in rows if row.get("conflict") == "attribution_moved")
+    return tuple(sorted(counts.items())), moved
+
+
 def render(recall: Recall, tiers: tuple[tuple[str, int], ...]) -> str:
     """The validation report, as ``--mode validate`` prints it."""
     lines = [
@@ -247,6 +275,7 @@ __all__ = [
     "render",
     "score",
     "shortlist_recall",
+    "route_agreement",
     "tier_breakdown",
     "withhold",
 ]

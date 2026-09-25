@@ -40,7 +40,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from service import identification
+from service import identification, judging, review_role
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -92,6 +92,23 @@ class Link(NamedTuple):
     #: ``true`` when the trial entered the shortlist through the literature
     #: rather than the drug filter. See :func:`tier_for`.
     injected: str = ""
+    #: Every route that named this trial for this submission (D29):
+    #: ``label_nct`` · ``label_description`` · ``review_protocol``.
+    sources: str = ""
+    #: ``attribution_moved`` when the label and review routes' earliest
+    #: submissions for this trial differ; D16 across both routes decided.
+    conflict: str = ""
+
+
+class ReviewContext(NamedTuple):
+    """A trial a review names in a role that makes no link (D26)."""
+
+    nct_id: str
+    application: str
+    submission_type: str
+    submission_no: str
+    protocol_id: str
+    role: str
 
 
 class Unlinked(NamedTuple):
@@ -283,7 +300,9 @@ __all__ = [
     "render",
     "counts_agree",
     "read_jsonl",
+    "ReviewContext",
     "refuted_pairs",
+    "review_judgements",
     "tier_for",
 ]
 
@@ -298,6 +317,8 @@ class AssembleReport(NamedTuple):
     by_reason: tuple[tuple[str, int], ...]
     submissions_linked: int
     submissions_total: int
+    review_context: tuple[ReviewContext, ...] = ()
+    attribution_moved: int = 0
 
     @property
     def coverage(self) -> float:
@@ -309,6 +330,25 @@ class AssembleReport(NamedTuple):
         0.0
         """
         return self.submissions_linked / self.submissions_total if self.submissions_total else 0.0
+
+
+def review_judgements(adjudication_dir: Path) -> list[tuple[str, str, str, str]]:
+    """``(submission key, nct, role, protocol id)`` for every review-route unit
+    decided under the current role prompt (D26, D27)."""
+    protocol = {
+        str(u["unit_id"]): str(u.get("protocol_id") or "")
+        for u in judging.read_jsonl(adjudication_dir / "review_role_units.jsonl")
+    }
+    out: list[tuple[str, str, str, str]] = []
+    for unit_id, row in judging.recorded(adjudication_dir / "review_role_verdicts.jsonl").items():
+        if row.get("prompt_version") != review_role.PROMPT_VERSION:
+            continue
+        role = str(row.get("final") or "")
+        if role not in review_role.ROLES or unit_id.count("|") != 3:
+            continue
+        key, nct = unit_id.rsplit("|", 1)
+        out.append((key, nct, role, protocol.get(unit_id, "")))
+    return out
 
 
 def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
@@ -377,6 +417,27 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         when = str(unit.get("approval_date") or "")
         if pair not in earliest or when < earliest[pair]:
             earliest[pair] = when
+    label_earliest = dict(earliest)
+    # D16 across routes (D26): a trial a review names in a linking role counts
+    # as appearing at that review's submission, so whichever route saw it
+    # first decides where the link goes.
+    judged_reviews = review_judgements(adjudication_dir)
+    review_links = [
+        (key, nct, protocol) for key, nct, role, protocol in judged_reviews
+        if role in review_role.LINKING and key in spine
+    ]
+    review_earliest: dict[tuple[str, str], str] = {}
+    for key, nct, _protocol in review_links:
+        pair = (key.split("|", 1)[0], nct)
+        when = spine[key].get("approval_date", "")
+        if pair not in review_earliest or when < review_earliest[pair]:
+            review_earliest[pair] = when
+        if pair not in earliest or when < earliest[pair]:
+            earliest[pair] = when
+    moved = {
+        pair for pair in label_earliest
+        if pair in review_earliest and review_earliest[pair] != label_earliest[pair]
+    }
 
     # Step two: among the submissions tied at that date, the **label** decides
     # how many survive. FDA routinely approves several supplements on one day,
@@ -531,9 +592,51 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                 count_check=check,
                 drug_basis=basis,
                 injected="true" if was_injected else "",
+                sources=source,
+                conflict="attribution_moved"
+                if (str(unit["application"]), nct) in moved else "",
             )
         )
         linked_submissions.add(key)
+
+    # Review-route links (D27): tier A outright, merged into a label link that
+    # already names the same trial for the same submission.
+    position = {(link.nct_id, f"{link.application}|{link.submission_type}|{link.submission_no}"): i
+                for i, link in enumerate(links)}
+    for key, nct, protocol in review_links:
+        application = key.split("|", 1)[0]
+        when = spine[key].get("approval_date", "")
+        if earliest.get((application, nct)) != when:
+            continue
+        conflict = "attribution_moved" if (application, nct) in moved else ""
+        if (nct, key) in position:
+            held = links[position[(nct, key)]]
+            links[position[(nct, key)]] = held._replace(
+                sources=";".join(dict.fromkeys([*held.sources.split(";"), "review_protocol"])),
+                evidence_tier=TIER_STATED,
+                conflict=held.conflict or conflict,
+            )
+            continue
+        _, submission_type, submission_no = key.split("|")
+        links.append(Link(
+            nct_id=nct, application=application, submission_type=submission_type,
+            submission_no=submission_no, approval_date=when,
+            action_type=spine[key].get("action_type", ""), indication_mesh="",
+            indication_term="", drug_mesh="", trial_name=protocol, label_enrollment="",
+            registry_enrollment="", evidence_tier=TIER_STATED,
+            evidence_source="review_protocol", count_check="no_count",
+            sources="review_protocol", conflict=conflict,
+        ))
+        position[(nct, key)] = len(links) - 1
+        linked_submissions.add(key)
+    context_rows: list[ReviewContext] = []
+    for key, nct, role, protocol in judged_reviews:
+        if role in review_role.LINKING:
+            continue
+        application, submission_type, submission_no = key.split("|")
+        context_rows.append(ReviewContext(nct, application, submission_type, submission_no,
+                                          protocol, role))
+    context = tuple(sorted(context_rows))
 
     # Only submissions that produced **no unit at all** get a catch-all row.
     # A submission whose units each failed for a stated reason is already
@@ -572,6 +675,8 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         by_reason=tuple(Counter(u.reason for u in unlinked).most_common()),
         submissions_linked=len(linked_submissions),
         submissions_total=len(spine),
+        review_context=context,
+        attribution_moved=sum(1 for link in links if link.conflict == "attribution_moved"),
     )
 
 
@@ -637,6 +742,8 @@ def render(report: AssembleReport) -> str:
         "Trial → submission map",
         "",
         f"  links                                    {len(report.links):>9,}",
+        f"    attribution moved between routes (D16) {report.attribution_moved:>9,}",
+        f"  review-named trials kept as context      {len(report.review_context):>9,}",
         "",
         "  by evidence tier:",
     ]
