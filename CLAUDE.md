@@ -132,12 +132,16 @@ code says `not yet implemented` until it lands.
   in code 2026-09-25; `output/` not yet rebuilt**), `evidence_source = review_protocol`. The FDA named the trial by its sponsor
   protocol number and the match is exact, so as with a label-stated NCT there is nothing to
   corroborate. Tier C stays below it.
-- **D28 — every label link gets a role judgement at submission grain** (2026-09-24, **not yet
-  implemented**). A §14 mention is not support. The old polarity task ran once on *current* labels at
+- **D28 — every label link gets a role judgement at submission grain** (2026-09-24, **implemented
+  in code 2026-09-25; not yet piloted**). A §14 mention is not support. The old polarity task ran once on *current* labels at
   *application* grain and was never re-run: 1,055 of 3,361 links (31%) have no support check, and P4
   identification never asks about support. New P4b step, before assembly, on the linked
   submission's own §14 text, same six roles as D26; replaces `adjudication/verdicts.jsonl`. Only
-  `PIVOTAL`/`SUPPORTING` link.
+  `PIVOTAL`/`SUPPORTING` link. As built: units from P5's links with no support filter
+  (`label-role-units`, cached labels only), prompt `docs/prompts/label-trial-role.md` v1, runbook
+  `docs/runbooks/label-trial-role.md`; a non-linking role leaves the link out as
+  `label_role_<role>`; where no role exists yet the old polarity verdict still filters, and P5
+  counts those links — D28 is complete when that count is 0.
 - **D29 — how the sources combine** (2026-09-24, **implemented in code 2026-09-25; `output/` not yet rebuilt**). Direct sources first
   (label-stated NCT, review protocol id). A §14 description whose trial name matches a protocol id or
   acronym the same submission's review matched skips the shortlist. The shortlist serves only
@@ -146,7 +150,7 @@ code says `not yet implemented` until it lands.
   `judged_contradicts_direct`, `indication_mismatch`). Different trials from different routes for one
   approval is normal, not a conflict. As built: a description resolved by name gets `evidence_source =
   review_name_match`, tier A; a `role_disagrees` row is held at tier B; the label side of a role
-  disagreement is the old polarity verdict until D28 lands. Detail: `docs/DESIGN.md` §3c, which also records the open
+  disagreement is the D28 role, falling back to the old polarity verdict where D28 has not judged. Detail: `docs/DESIGN.md` §3c, which also records the open
   question on D17 tier A for judged links.
 - **D30 — indications: read once, normalise once, one table** (2026-09-24, **implemented in
   code 2026-09-24; `output/` not yet rebuilt**). Readers emit raw text (label §1 + §14 headings, letter sentence, reviews later);
@@ -203,9 +207,9 @@ P3  CT.gov (600,762) by drug + start < approval,       |  six roles; PIVOTAL|  |
 P4  "which candidate is this description?"             |          |       -> PMIDs -> NCT
     two judges, third on disagreement                  |          |       P4c "plausibly
     counts agree -> TIER A · diverge -> TIER B         |          |       evidence?" 2 judges
-P4b [D28 not yet implemented: role of every label      |          |       -> TIER C, never
-     link at submission grain; old application-grain   |          |          promoted
-     polarity verdicts still applied]                  |          |            |
+P4b D28 role judges on each label link, own label   |          |       -> TIER C, never
+    §14, six roles, 2 judges + 3rd; only PIVOTAL|      |          |          promoted
+    SUPPORTING link (old polarity = fallback)          |          |            |
       +------------------------------------------------+----------+------------+
                               |
 P5 assemble   D16 earliest-wins across label AND review -> trial_submission_map.tsv

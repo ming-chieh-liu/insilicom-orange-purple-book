@@ -792,3 +792,65 @@ def test_a_review_identified_unit_does_not_take_part_in_guard_grouping() -> None
          "submission_no": "2", "approval_date": "2021"},
     ]
     assert assemble._guard_led_units(units, {"A|SUPPL|1"}) == set()
+
+
+# ---------------------------------------------------------------------------
+# D28 — label-link roles replace the old polarity verdicts
+# ---------------------------------------------------------------------------
+
+
+def _label_roles(adj: Path, rows: list[tuple[str, str]], version: int = 1) -> None:
+    (adj / "label_role_verdicts.jsonl").write_text("\n".join(
+        json.dumps({"unit_id": u, "final": role, "prompt_version": version}) for u, role in rows
+    ) + "\n", encoding="utf-8")
+
+
+def test_a_label_role_that_does_not_link_drops_the_link_with_its_role(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED")])
+    report = assemble.build(out, adj)
+    assert report.links == ()
+    assert "label_role_failed" in {u.reason for u in report.unlinked}
+
+
+def test_a_label_role_overrides_the_old_polarity_verdict(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
+                     "final": "NOT_SUPPORTING"}])
+    _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL")])
+    report = assemble.build(out, adj)
+    assert len(report.links) == 1 and report.label_role_missing == 0
+
+
+def test_a_role_under_an_old_prompt_version_is_ignored(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED")], version=0)
+    report = assemble.build(out, adj)
+    assert len(report.links) == 1 and report.label_role_missing == 1
+    assert "label links without a D28 role yet" in assemble.render(report)
+
+
+def test_unit_building_sees_links_no_filter_has_touched(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
+                     "final": "NOT_SUPPORTING"}])
+    _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED")])
+    assert len(assemble.build(out, adj, apply_label_roles=False).links) == 1
+
+
+def test_a_label_role_rejecting_what_the_review_links_is_role_disagrees(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "NOT_FOR_THIS_APPROVAL")])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "SUPPORTING", 2)])
+    [link] = assemble.build(out, adj).links
+    assert (link.sources, link.conflict, link.evidence_tier) == (
+        "review_protocol", "role_disagrees", "B")

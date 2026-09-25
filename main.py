@@ -50,6 +50,7 @@ from service import (
     identification,
     indication_normalize,
     indications,
+    label_role,
     letter_locate,
     letters,
     review_role,
@@ -88,6 +89,12 @@ MODES: dict[str, str] = {
     "verdict, calibration units first (see docs/runbooks/review-trial-role.md)",
     "review-role-combine": "pair the role judges' answers, batch tiebreaks, record "
     "decided units",
+    "label-role-units": "write adjudication/label_role_units.jsonl: every label "
+    "link P5 would make, with its own submission's section-14 passages (D28)",
+    "label-role-prepare": "batch the label-link units without a current-prompt "
+    "verdict (see docs/runbooks/label-trial-role.md)",
+    "label-role-combine": "pair the label-role judges' answers, batch tiebreaks, "
+    "record decided units",
     "letter-locate-prepare": "write locate units and batches for letters the "
     "keyword rule missed (see docs/runbooks/letter-indication.md)",
     "letter-indication-combine": "pair locator/verifier answers, extract agreed "
@@ -661,14 +668,7 @@ def main(argv: list[str] | None = None) -> int:
                 word = part.strip().upper().split(" ")[0] if part.strip() else ""
                 if len(word) >= 5:
                     drug_names.setdefault(digits, set()).add(word)
-        sentences: dict[str, str] = {}
-        letters_tsv = Path(args.out) / "letter_indications.tsv"
-        if letters_tsv.is_file():
-            with letters_tsv.open(encoding="utf-8") as handle:
-                for row in csv.DictReader(handle, delimiter="\t"):
-                    if row.get("sentence"):
-                        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
-                        sentences[key] = row["sentence"]
+        sentences = label_role.read_sentences(Path(args.out))
         rv_report = review_trials.build(
             [(r.application, r.submission_type, r.submission_no, r.approval_date) for r in in_scope],
             review_texts,
@@ -708,6 +708,58 @@ def main(argv: list[str] | None = None) -> int:
                 role_verdicts, decided_on=date.today().isoformat(),
             )
         print(review_role.render(role_report))
+        return 0
+
+    if args.mode == "label-role-units":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the label links need the bulk data tree")
+            return 1
+        adjudication_dir = Path(args.adjudication)
+        unfiltered = assemble.build(Path(args.out), adjudication_dir, apply_label_roles=False)
+        lr_targets = label_role.targets_of(unfiltered.links)
+        lr_sections = label_role.read_sections(
+            label_role.label_urls(data, {t.key for t in lr_targets}),
+            Path(args.label_cache), parsers=args.parsers,
+        )
+        lr_brands: dict[str, set[str]] = {}
+        for product in read_rows(data.products):
+            lr_brands.setdefault((product.get("ApplNo") or "").strip().zfill(6), set()).add(
+                (product.get("DrugName") or "").strip()
+            )
+        lr_sentences = label_role.read_sentences(Path(args.out))
+        lr_dates = {
+            f"{l.application}|{l.submission_type}|{l.submission_no}": l.approval_date
+            for l in unfiltered.links
+        }
+        lr_approvals = {
+            key: label_role.approval_line(key, when, lr_brands.get(key.split("|")[0][-6:], set()),
+                                          lr_sentences.get(key, ""))
+            for key, when in lr_dates.items()
+        }
+        lr_report = label_role.build_units(lr_targets, lr_sections, lr_approvals)
+        lr_path = adjudication_dir / "label_role_units.jsonl"
+        with lr_path.open("w", encoding="utf-8") as handle:
+            for lr_unit in lr_report.units:
+                handle.write(json.dumps(lr_unit) + "\n")
+        print(label_role.render_units(lr_report, lr_path))
+        return 0
+
+    if args.mode in ("label-role-prepare", "label-role-combine"):
+        adjudication_dir = Path(args.adjudication)
+        lr_version = f"v{label_role.PROMPT_VERSION}"
+        lr_units = adjudication_dir / "label_role_units.jsonl"
+        lr_batches = adjudication_dir / "label_role_batches" / lr_version
+        lr_verdicts = adjudication_dir / "label_role_verdicts.jsonl"
+        if args.mode == "label-role-prepare":
+            lr_role_report = label_role.prepare(lr_units, lr_batches, lr_verdicts,
+                                                limit=args.limit)
+        else:
+            lr_role_report = label_role.combine(
+                lr_units, adjudication_dir / "label_role_raw" / lr_version, lr_batches,
+                lr_verdicts, decided_on=date.today().isoformat(),
+            )
+        print(label_role.render(lr_role_report))
         return 0
 
     if args.mode == "letter-locate-prepare":

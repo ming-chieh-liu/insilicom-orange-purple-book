@@ -40,7 +40,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from service import identification, judging, review_role
+from service import identification, judging, label_role, review_role
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -349,6 +349,8 @@ class AssembleReport(NamedTuple):
     review_context: tuple[ReviewContext, ...] = ()
     attribution_moved: int = 0
     by_conflict: tuple[tuple[str, int], ...] = ()
+    #: Label links with no D28 role yet; the old polarity verdict filtered them.
+    label_role_missing: int = 0
 
     @property
     def coverage(self) -> float:
@@ -445,8 +447,14 @@ def review_judgements(adjudication_dir: Path) -> list[tuple[str, str, str, str]]
     return out
 
 
-def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
-    """Join the candidate units, the verdicts and the spine into the map."""
+def build(out_dir: Path, adjudication_dir: Path, *,
+          apply_label_roles: bool = True) -> AssembleReport:
+    """Join the candidate units, the verdicts and the spine into the map.
+
+    ``apply_label_roles=False`` skips every support filter on label links — the
+    D28 role and the old polarity verdict alike — and is how D28's units are
+    built: every link P5 would make, judged where it is attributed.
+    """
     from collections import Counter
 
     verdicts = identification.read_verdicts(
@@ -457,6 +465,11 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     # reading "Lack of Efficacy in Cardiovascular Outcomes Trials"; a regex
     # sees a trial id, and only a reader sees that it failed.
     refuted = refuted_pairs(adjudication_dir / "verdicts.jsonl")
+    # D28: the role each label link plays in its own submission's label. Where
+    # it exists it replaces the polarity verdict above, which read today's
+    # label per application; the old verdict is the fallback until D28 has
+    # judged every link.
+    label_roles = label_role.read_roles(adjudication_dir / "label_role_verdicts.jsonl")
     # Which MeSH ids were reached only by stripping a biologic suffix. Read
     # from drug_map rather than recomputed, so P5 and P3 cannot disagree about
     # which drugs are stem-sourced.
@@ -491,9 +504,10 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     #: Carcinoma" -- which is two units and would otherwise be two identical
     #: rows.
     emitted: set[tuple[str, str]] = set()
-    #: ``(trial, submission)`` the old polarity verdicts dropped, so a review
-    #: judging the same pair as evidence is recorded as a disagreement.
-    refuted_at: set[tuple[str, str]] = set()
+    #: ``(trial, submission)`` the label side rejected -- a D28 role that does not
+    #: link, or the old polarity verdict -- so a review judging it evidence is a
+    #: recorded disagreement.
+    label_rejected: set[tuple[str, str]] = set()
     units = list(read_jsonl(out_dir / "candidates.jsonl"))
     guard_led = _guard_led_units(units, guard)
 
@@ -654,8 +668,17 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
             for c in raw_candidates
         )
 
-        if (nct, str(unit["application"])) in refuted:
-            refuted_at.add((nct, key))
+        role = label_roles.get((key, nct))
+        if not apply_label_roles:
+            rejection = ""
+        elif role is not None:
+            rejection = "" if role in review_role.LINKING else f"label_role_{role.lower()}"
+        elif (nct, str(unit["application"])) in refuted:
+            rejection = "judged_not_supporting"
+        else:
+            rejection = ""
+        if rejection:
+            label_rejected.add((nct, key))
             unlinked.append(
                 Unlinked(
                     str(unit["application"]),
@@ -663,7 +686,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                     str(unit["submission_no"]),
                     when,
                     name,
-                    "judged_not_supporting",
+                    rejection,
                 )
             )
             continue
@@ -719,7 +742,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         if earliest.get((application, nct)) != when:
             continue
         conflict = ATTRIBUTION_MOVED if (application, nct) in moved else ""
-        if (nct, key) in refuted_at:
+        if (nct, key) in label_rejected:
             conflict = add_conflict(conflict, ROLE_DISAGREES)
         if (nct, key) in position:
             held = links[position[(nct, key)]]
@@ -754,7 +777,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
 
     # D29 role_disagrees: the label route links a trial the same submission's
     # review judged as *not* evidence for it (FAILED, NOT_FOR_THIS_APPROVAL…),
-    # or the review links one the label's polarity verdict refuted. Either way
+    # or the review links one the label side rejected (D28 role, else old polarity). Either way
     # the row stays, but not at tier A until someone resolves it.
     non_linking = {(key, nct) for key, nct, role, _ in judged_reviews
                    if role not in review_role.LINKING}
@@ -763,7 +786,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         key = f"{link.application}|{link.submission_type}|{link.submission_no}"
         conflict = link.conflict
         if (key, link.nct_id) in non_linking or (
-            (link.nct_id, key) in refuted_at and "review_protocol" in link.sources
+            (link.nct_id, key) in label_rejected and "review_protocol" in link.sources
         ):
             conflict = add_conflict(conflict, ROLE_DISAGREES)
         if key in mismatched:
@@ -812,6 +835,12 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         review_context=context,
         attribution_moved=sum(
             1 for link in links if ATTRIBUTION_MOVED in link.conflict.split(";")
+        ),
+        label_role_missing=sum(
+            1 for link in links
+            if set(link.sources.split(";")) & label_role.LABEL_SOURCES
+            and (f"{link.application}|{link.submission_type}|{link.submission_no}",
+                 link.nct_id) not in label_roles
         ),
         by_conflict=tuple(Counter(
             part for link in links for part in link.conflict.split(";") if part
@@ -883,6 +912,7 @@ def render(report: AssembleReport) -> str:
         f"  links                                    {len(report.links):>9,}",
         f"    attribution moved between routes (D16) {report.attribution_moved:>9,}",
         f"  review-named trials kept as context      {len(report.review_context):>9,}",
+        f"  label links without a D28 role yet       {report.label_role_missing:>9,}",
         "",
         "  by evidence tier:",
     ]
