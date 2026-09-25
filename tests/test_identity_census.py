@@ -398,3 +398,10 @@ def test_every_file_has_the_row_count_the_config_declares(
     """A truncated or re-formatted download shows up here, not downstream."""
     for label, actual, declared in real_report.row_counts:
         assert actual == declared, f"{label}: read {actual}, declared {declared}"
+
+
+def test_a_mixed_case_caller_name_resolves_and_keeps_its_spelling(synthetic: RawData) -> None:
+    """Products writes some ingredients mixed-case ('OnabotulinumtoxinA'); the
+    lookup must fold case but return the caller's own key, which callers index on."""
+    hits, _ = identity_census.resolve_uniis(synthetic, {"Denosumab", "aspirin", "NOPE"})
+    assert hits == {"Denosumab": {"4EQZ6YO2HI"}, "aspirin": {"R16CO5Y76E"}}

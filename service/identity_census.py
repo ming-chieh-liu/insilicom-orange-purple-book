@@ -141,12 +141,17 @@ def resolve_uniis(
     The registry is 1,050,022 rows; only hits are kept, so memory stays at the
     ~2,800 names we asked about rather than the whole file.
     """
+    # The registry is upper-case; Products is not ("OnabotulinumtoxinA",
+    # "brolucizumab-dbll"). Compare case-folded, but key the result on the
+    # caller's own spelling, which is what callers look up.
+    by_upper: dict[str, set[str]] = {}
+    for name in names:
+        by_upper.setdefault(name.strip().upper(), set()).add(name)
     hits: dict[str, set[str]] = {}
     ambiguous = 0
     for row in read_rows(data.unii_names):
-        key = row["NAME"].strip().upper()
-        if key in names:
-            hits.setdefault(key, set()).add(row["UNII"].strip())
+        for name in by_upper.get(row["NAME"].strip().upper(), ()):
+            hits.setdefault(name, set()).add(row["UNII"].strip())
     for key, uniis in hits.items():
         if len(uniis) > 1:
             ambiguous += 1
