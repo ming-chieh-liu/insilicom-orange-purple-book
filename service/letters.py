@@ -42,14 +42,17 @@ _log = get_logger(__name__)
 #: "proposes to add …" and "proposes a new indication", "is indicated
 #: for/to/as/in", and the general form "the application / supplement / sNDA /
 #: sBLA + an action verb" ("adds the following new indication", "proposes the
-#: use of", "provides efficacy and safety data for", "provides an update").
+#: use of", "provides efficacy and safety data for", "provides an update"), and
+#: the pre-2010 form "Your request to supplement your biologics license
+#: application for X to expand the indication to include … has been approved".
 START = re.compile(
     r"\b(?:provides?|provided)\s+(?:for\b[:\s]*|updates?\b|revisions?\b)"
     r"|\bpropos(?:es|ed)\s+(?:to\s+(?:add|expand|extend|revise|update|include|change)\b"
     r"|an?\s+(?:new\s+)?indications?\b)"
     r"|\b(?:application|supplement|sNDA|sBLA|NDA|BLA)\s+"
     r"(?:provides|proposes|adds|updates|revises|expands|extends|includes|requests|seeks)\b"
-    r"|\b(?:is|are)\s+(?:now\s+)?indicated\s+(?:for|as|in|to)\s+",
+    r"|\b(?:is|are)\s+(?:now\s+)?indicated\s+(?:for|as|in|to)\s+"
+    r"|\byour\s+request\s+to\s+supplement\b",
     re.IGNORECASE,
 )
 
@@ -188,6 +191,10 @@ def indication_sentence(text: str) -> str:
     >>> indication_sentence("Opdivo is indicated for the following: 1. Non-small cell "
     ...     "lung cancer. 2. Melanoma. APPROVAL & LABELING")
     'is indicated for the following: 1. Non-small cell lung cancer. 2. Melanoma'
+    >>> indication_sentence("Dear Dr. Steck: Your request to supplement your biologics "
+    ...     "license application for adalimumab to expand the indication to include "
+    ...     "psoriatic arthritis has been approved. Sincerely")
+    'Your request to supplement your biologics license application for adalimumab to expand the indication to include psoriatic arthritis has been approved'
     >>> indication_sentence("Please refer to your application.")
     ''
     """
