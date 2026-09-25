@@ -45,8 +45,8 @@ def test_whether_two_counts_corroborate(
         # The FDA stated the id itself; there is nothing to corroborate.
         ("label_nct", "no_count", "A"),
         ("label_nct", "counts_diverge", "A"),
-        # A judged link reaches A only with a matching count.
-        ("label_description", "counts_agree", "A"),
+        # D32: a judged link is tier B whatever the counts say.
+        ("label_description", "counts_agree", "B"),
         ("label_description", "counts_diverge", "B"),
         ("label_description", "no_count", "B"),
     ],
@@ -185,7 +185,8 @@ def test_a_judged_link_with_agreeing_counts_reaches_tier_a(
     )
     link = assemble.build(out, adj).links[0]
     assert link.evidence_source == "label_description"
-    assert link.evidence_tier == "A"
+    # D32: agreeing counts are recorded, not promoted.
+    assert (link.evidence_tier, link.count_check) == ("B", "counts_agree")
 
 
 def test_a_judged_link_whose_counts_diverge_is_demoted(
@@ -318,8 +319,9 @@ def test_a_stated_id_is_unaffected_by_a_stem_sourced_drug() -> None:
     assert assemble.tier_for("label_nct", "no_count", "stem") == "A"
 
 
-def test_an_ordinary_drug_still_reaches_tier_a_on_agreeing_counts() -> None:
-    assert assemble.tier_for("label_description", "counts_agree", "") == "A"
+def test_agreeing_counts_no_longer_promote_a_judged_link() -> None:
+    """D32: the judge chose on the count, so the count cannot also be the proof."""
+    assert assemble.tier_for("label_description", "counts_agree", "") == "B"
 
 
 # ---------------------------------------------------------------------------

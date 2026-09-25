@@ -86,7 +86,7 @@ code says `not yet implemented` until it lands.
   ever find them. A shortlist failure looks exactly like a judging failure in the output —
   CHECKMATE-648 hid as one for two commits — so they are scored apart. Matching the label's trial
   name against the registry's acronym recovers only 170 of the 2,209, so the gap is elsewhere.
-- **[PARTIALLY SUPERSEDED by D27, 2026-09-24 — a second outright tier-A source is added: a review-route link judged PIVOTAL or SUPPORTING; count tiering still governs judged §14 descriptions]** **D17 — the tier is the count.** A judged link reaches tier A only when the label's patient count
+- **[SUPERSEDED by D32, 2026-09-25 — a judged link is tier B whatever the counts; counts are information only]** **[PARTIALLY SUPERSEDED by D27, 2026-09-24 — a second outright tier-A source is added: a review-route link judged PIVOTAL or SUPPORTING; count tiering still governs judged §14 descriptions]** **D17 — the tier is the count.** A judged link reaches tier A only when the label's patient count
   and the registry's agree within 15%; otherwise tier B, with both counts in the row. A label that
   states its own NCT id is tier A outright — the FDA said it, there is nothing to corroborate. This
   exists because a unit keyed `TABLE 3` carried a label "count" of 3 (a table number the extractor
@@ -150,8 +150,7 @@ code says `not yet implemented` until it lands.
   `judged_contradicts_direct`, `indication_mismatch`). Different trials from different routes for one
   approval is normal, not a conflict. As built: a description resolved by name gets `evidence_source =
   review_name_match`, tier A; a `role_disagrees` row is held at tier B; the label side of a role
-  disagreement is the D28 role, falling back to the old polarity verdict where D28 has not judged. Detail: `docs/DESIGN.md` §3c, which also records the open
-  question on D17 tier A for judged links.
+  disagreement is the D28 role, falling back to the old polarity verdict where D28 has not judged. Detail: `docs/DESIGN.md` §3c; its open question on D17 tier A for judged links was settled by D32.
 - **D30 — indications: read once, normalise once, one table** (2026-09-24, **implemented in
   code 2026-09-24; `output/` not yet rebuilt**). Readers emit raw text (label §1 + §14 headings, letter sentence, reviews later);
   one step codes all of it with one coder (exact disease name, then MeSH sweep) into `MESH:D…` +
@@ -174,6 +173,16 @@ code says `not yet implemented` until it lands.
   the unit's own candidates), then a pick becomes a tier-C `kg_abstract` link only where no other
   route links that trial for the application; where one does for the same submission, it only adds
   `kg_abstract` to `sources`.
+- **D32 — the tier says how the trial's identity was established** (2026-09-25, **implemented in
+  code 2026-09-25; `output/` not yet rebuilt**). **A**: an FDA document names the trial by an
+  identifier — label-stated NCT, review protocol id (D27), or a label trial name matching an id the
+  same submission's review named (D29). **B**: an agent inferred which registry trial the §14 prose
+  describes (P4 shortlist pick), **whatever the patient counts say**. **C**: literature graph,
+  never promoted (D14). Agents still judge a trial's *role* inside tier A (D26, D28); a role check
+  decides whether a link exists, not its tier. The counts stay on every row as information. Why:
+  the P4 prompt tells the judge the count is its strongest signal, so D17 rewarded the evidence
+  the judge chose on; and a ±15% match was unique in only 45 of 2,363 known cases. On the rebuilt
+  scope 366 judged links move A → B; submissions with a tier-A link 1,709 → 1,448.
 
 ## Hard constraints
 
@@ -221,7 +230,7 @@ P3  CT.gov (600,762) by drug + start < approval,       |  six roles; PIVOTAL|  |
       |                                                |          |       P3c pubmedRelations
 P4  "which candidate is this description?"             |          |       -> PMIDs -> NCT
     two judges, third on disagreement                  |          |       P4c "plausibly
-    counts agree -> TIER A · diverge -> TIER B         |          |       evidence?" 2 judges
+    -> TIER B whatever the counts (D32)              |          |       evidence?" 2 judges
 P4b D28 role judges on each label link, own label   |          |       -> TIER C, never
     §14, six roles, 2 judges + 3rd; only PIVOTAL|      |          |          promoted
     SUPPORTING link (old polarity = fallback)          |          |            |

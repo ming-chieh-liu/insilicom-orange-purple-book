@@ -54,7 +54,6 @@ COUNT_TOLERANCE: float = 0.15
 
 #: Evidence tiers. A is corroborated, B is judged, C is the graph's backstop.
 TIER_STATED: str = "A"
-TIER_CORROBORATED: str = "A"
 TIER_JUDGED: str = "B"
 TIER_GRAPH: str = "C"
 
@@ -175,55 +174,32 @@ def tier_for(
     drug_basis: str = "",
     injected: bool = False,
 ) -> str:
-    """The tier a link earns.
+    """The tier a link earns: **how the trial's identity was established** (D32).
 
-    A label that names its own trial is tier A outright — there is nothing to
-    corroborate, the FDA stated it. A judged link reaches tier A only when the
-    counts agree.
+    Tier A when an FDA document names the trial by an identifier — the NCT id
+    printed on the label, or (D29) the label's trial name matching a protocol id
+    the same submission's FDA review named. Review-only links are tier A by D27
+    and are built without this function.
 
-    **A stem-derived drug never reaches tier A by count agreement.** When the
-    FDA name carried a biologic suffix that resolved to nothing, retrieval fell
-    back to the suffix-stripped stem, which for a biosimilar is a *different*
-    product — its reference. The candidate pool is then dominated by the
-    reference product's trials, and agreeing patient counts are exactly what a
-    wrong match in that pool looks like. A 351(k) rests on its own trials
-    (D11), so the claim stays at tier B and the basis is written on the row.
-    A label that stated the id outright is unaffected: the FDA said it.
+    Tier B for everything an agent **inferred**: a §14 description matched to a
+    shortlisted registry trial by two judges. Whatever the patient counts say.
+    D17 used to promote a judged link to A when the label's and the registry's
+    counts agreed within 15%, but the P4 prompt tells the judge the count is
+    its strongest signal — so the judge chose on the count and the tier then
+    rewarded the same count; and a ±15% match was unique in only 45 of 2,363
+    known cases. The counts stay on the row (``count_check``, both
+    enrollments) as information; they no longer set the tier. ``drug_basis``
+    and ``injected`` are likewise recorded, not decisive: a judged link is B
+    already.
 
-    >>> tier_for("label_nct", "no_count")
-    'A'
-    >>> tier_for("label_description", "counts_agree")
-    'A'
-    >>> tier_for("label_description", "counts_diverge")
-    'B'
-    >>> tier_for("label_description", "no_count")
-    'B'
-    >>> tier_for("label_description", "counts_agree", "stem")
-    'B'
-    >>> tier_for("label_nct", "no_count", "stem")
-    'A'
-
-    **An injected candidate never reaches tier A either.** It entered the
-    shortlist because the literature named it, not because it passed the drug
-    filter — one of only two hard facts the pool rests on. The judge still
-    identified it from the label's own prose, so the link is real, but it rests
-    on one fewer independent check.
-
+    >>> tier_for("label_nct", "no_count"), tier_for("review_name_match", "counts_diverge", "stem")
+    ('A', 'A')
+    >>> tier_for("label_description", "counts_agree"), tier_for("label_description", "no_count")
+    ('B', 'B')
     >>> tier_for("label_description", "counts_agree", "", True)
     'B'
-
-    **A description a same-submission review identified is direct too** (D29):
-    the FDA named the trial by its protocol id and the label names it the same
-    way, so the drug filter was never involved.
-
-    >>> tier_for("review_name_match", "counts_diverge", "stem")
-    'A'
     """
-    if evidence_source in DIRECT_SOURCES:
-        return TIER_STATED
-    if drug_basis == "stem" or injected:
-        return TIER_JUDGED
-    return TIER_CORROBORATED if count_check == "counts_agree" else TIER_JUDGED
+    return TIER_STATED if evidence_source in DIRECT_SOURCES else TIER_JUDGED
 
 
 #: The one polarity verdict that means the label presents a trial as evidence.
@@ -322,7 +298,6 @@ def _registry_counts(unit: dict[str, object]) -> dict[str, str]:
 
 __all__ = [
     "COUNT_TOLERANCE",
-    "TIER_CORROBORATED",
     "TIER_GRAPH",
     "TIER_JUDGED",
     "TIER_STATED",
