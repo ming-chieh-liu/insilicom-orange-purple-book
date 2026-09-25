@@ -31,6 +31,9 @@ def _row(**kw: str) -> dict[str, str]:
         "nct_id": "", "acronym": "", "enrollment": "", "excerpt": "",
     }
     base.update(kw)
+    if base["nct_id"] and base["acronym"] and not base["excerpt"]:
+        # A pairing the text itself shows (see candidates.split_pairings).
+        base["excerpt"] = f"{base['acronym']} ({base['nct_id']})"
     return base
 
 
@@ -403,7 +406,8 @@ def _run_pass(
         "application\tsubmission_type\tsubmission_no\tsection\theading\tnct_id"
         "\tacronym\tenrollment\tdesign\texcerpt\n"
         "BLA125514\tSUPPL\t35\t14.2\tNSCLC\t\tKEYNOTE-189\t616\trandomized\ttext\n"
-        "BLA125514\tSUPPL\t36\t14.2\tNSCLC\tNCT99999999\tKEYNOTE-407\t500\t\ttext\n",
+        "BLA125514\tSUPPL\t36\t14.2\tNSCLC\tNCT99999999\tKEYNOTE-407\t500\t\t"
+        "KEYNOTE-407 (NCT99999999)\n",
         encoding="utf-8",
     )
     for name in ("trial_drug_map", "trial_condition_map"):
@@ -660,8 +664,9 @@ def test_the_biosimilar_key_only_ranks_and_never_filters() -> None:
 # ---------------------------------------------------------------------------
 
 
-def _desc(acronym: str, nct: str = "", enrollment: str = "", excerpt: str = "x"
+def _desc(acronym: str, nct: str = "", enrollment: str = "", excerpt: str = ""
           ) -> dict[str, str]:
+    excerpt = excerpt or (f"{acronym} ({nct})" if acronym and nct else "x")
     return {
         "application": "BLA125514", "submission_type": "SUPPL",
         "submission_no": "16", "section": "14.1", "heading": "Melanoma",
@@ -966,3 +971,22 @@ def test_an_injected_trial_still_respects_the_date_bound() -> None:
         from_graph=frozenset({"NCT00000001"}),
     )
     assert got == ()
+
+
+def test_an_id_written_beside_another_trial_is_not_given_the_first_name() -> None:
+    """The heading run into the sentence: KEYNOTE-204 came first, but the id
+    belongs to KEYNOTE-087, written right before it. The id keeps the name
+    beside it; KEYNOTE-204 keeps its own unit, without an id, for a judge."""
+    text = ("Progression-Free Survival in KEYNOTE-204 KEYNOTE-087 The efficacy of "
+            "KEYTRUDA was investigated in KEYNOTE-087 (NCT02453594), a multicenter trial")
+    out = candidates.collapse([_desc("KEYNOTE-204", "NCT02453594", excerpt=text)])
+    by_name = {row["acronym"]: row["nct_id"] for row in out}
+    assert by_name == {"KEYNOTE-087": "NCT02453594", "KEYNOTE-204": ""}
+
+
+def test_an_id_the_excerpt_does_not_show_is_not_paired_with_its_name() -> None:
+    """Unverifiable (the sentence was cut at 600 characters): the id still
+    stands, keyed on itself; the name goes to a judge."""
+    out = candidates.collapse([_desc("KEYNOTE-045", "NCT03924895", excerpt="Table 78 ...")])
+    assert {(row["acronym"], row["nct_id"]) for row in out} == {
+        ("", "NCT03924895"), ("KEYNOTE-045", "")}

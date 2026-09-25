@@ -33,7 +33,11 @@ class _Collection:
         self.queries.append(query)
 
         def matches(row: dict[str, Any], clause: dict[str, Any]) -> bool:
-            return all(row.get(k) == v for k, v in clause.items())
+            return all(
+                row.get(k) in v["$in"] if isinstance(v, dict) and "$in" in v
+                else row.get(k) == v
+                for k, v in clause.items()
+            )
 
         plain = {k: v for k, v in query.items() if k != "$or"}
         return [
@@ -592,3 +596,12 @@ def test_the_drug_only_limit_stops_the_pass(workspace: Path) -> None:
         limit=1,
     )
     assert report.events_considered == 1
+
+
+def test_abstracts_are_found_whether_pmid_is_stored_as_text_or_number() -> None:
+    repo = _repository([], [
+        {"pmid": "1", "abstract": "NCT00000001", "articleTitle": "a", "publicationType": []},
+        {"pmid": 2, "abstract": "NCT00000002", "articleTitle": "b", "publicationType": []},
+    ])
+    assert [(m.pmid, m.nct_id) for m in repo.mentions_in(["2", "1", "2", "x9"])] == [
+        ("2", "NCT00000002"), ("1", "NCT00000001")]

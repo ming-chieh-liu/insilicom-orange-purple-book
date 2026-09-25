@@ -919,3 +919,26 @@ def test_a_later_none_verdict_withdraws_a_graph_pick(workspace: tuple[Path, Path
     _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT07777777", 2),
                        ("BLA125514|SUPPL|45", "NONE", 2)])
     assert all(l.evidence_tier != "C" for l in assemble.build(out, adj).links)
+
+
+def test_the_graph_cross_check_corroborates_without_a_judge(
+    workspace: tuple[Path, Path],
+) -> None:
+    """D19: the literature for this application names the linked trial."""
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    (out / "graph_trials.tsv").write_text(
+        "application\tnct_id\tmentions\nBLA125514\tNCT02578680\t3\nBLA125514\tNCT0000009\t1\n",
+        encoding="utf-8")
+    [link] = assemble.build(out, adj).links
+    assert link.sources == "label_nct;kg_literature" and link.evidence_tier == "A"
+
+
+def test_the_cross_check_is_silent_when_the_literature_does_not_name_it(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    (out / "graph_trials.tsv").write_text(
+        "application\tnct_id\tmentions\nBLA999999\tNCT02578680\t3\n", encoding="utf-8")
+    assert assemble.build(out, adj).links[0].sources == "label_nct"

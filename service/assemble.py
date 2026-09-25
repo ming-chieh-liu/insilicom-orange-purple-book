@@ -67,6 +67,11 @@ ROLE_DISAGREES = "role_disagrees"
 JUDGED_CONTRADICTS_DIRECT = "judged_contradicts_direct"
 INDICATION_MISMATCH = "indication_mismatch"
 
+#: D19 cross-check: the literature the graph connects to this application's
+#: drug and indication names this trial (``graph_trials.tsv``). No judge — a
+#: set-membership test — so it corroborates a link and never makes one.
+KG_LITERATURE = "kg_literature"
+
 #: Letter-derived indication sources, and the label source they must sit inside.
 LETTER_SOURCES: frozenset[str] = frozenset({"letter", "letter_located"})
 LABEL_INDICATION_SOURCE = "label_section_1"
@@ -108,7 +113,9 @@ class Link(NamedTuple):
     #: rather than the drug filter. See :func:`tier_for`.
     injected: str = ""
     #: Every route that named this trial for this submission (D29):
-    #: ``label_nct`` · ``label_description`` · ``review_protocol``.
+    #: ``label_nct`` · ``label_description`` · ``review_protocol`` ·
+    #: ``kg_abstract`` (a judged tier-C pick) · ``kg_literature`` (the D19
+    #: cross-check: the graph's literature for this drug names the trial).
     sources: str = ""
     #: D29, ``;``-joined: ``attribution_moved`` (the routes' earliest
     #: submissions differ; D16 across both decided) · ``role_disagrees`` (label
@@ -327,6 +334,7 @@ __all__ = [
     "counts_agree",
     "read_jsonl",
     "ReviewContext",
+    "KG_LITERATURE",
     "add_conflict",
     "chosen_indications",
     "indication_mismatches",
@@ -819,8 +827,16 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     non_linking = {(key, nct) for key, nct, role, _ in judged_reviews
                    if role not in review_role.LINKING}
     mismatched = indication_mismatches(out_dir)
+    literature: dict[str, set[str]] = {}
+    for row in _read_tsv(out_dir / "graph_trials.tsv"):
+        literature.setdefault(row["application"], set()).add(row["nct_id"])
     for i, link in enumerate(links):
         key = f"{link.application}|{link.submission_type}|{link.submission_no}"
+        if (link.evidence_source != graph_judging.EVIDENCE_SOURCE
+                and link.nct_id in literature.get(link.application, ())):
+            link = link._replace(sources=";".join(
+                dict.fromkeys([*link.sources.split(";"), KG_LITERATURE])))
+            links[i] = link
         conflict = link.conflict
         if (key, link.nct_id) in non_linking or (
             (link.nct_id, key) in label_rejected and "review_protocol" in link.sources

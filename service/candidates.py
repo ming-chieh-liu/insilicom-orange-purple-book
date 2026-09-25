@@ -47,7 +47,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from config.settings import RawData, TrialArchive
-from service import approval_events, normalize
+from service import approval_events, normalize, section14
 from source import trial_studies
 from utility.logging import get_logger
 
@@ -390,6 +390,73 @@ def _name_of(row: dict[str, str]) -> str:
     return row.get("acronym") or row.get("nct_id") or row.get("heading") or ""
 
 
+#: How close before a registry id a trial name must end to be that id's name.
+#: ``KEYNOTE-087 (NCT02453594)`` is 2 characters; a heading that ran into the
+#: sentence (``… Survival in KEYNOTE-204 KEYNOTE-087 … (NCT02453594)``) is not.
+PAIR_WINDOW: int = 40
+
+
+def paired_name(excerpt: str, nct: str) -> str | None:
+    """The trial name written immediately before ``nct``; ``""`` when none is,
+    ``None`` when the id is not in the excerpt at all.
+
+    >>> paired_name("investigated in KEYNOTE-087 (NCT02453594), a trial", "NCT02453594")
+    'KEYNOTE-087'
+    >>> paired_name("Survival in KEYNOTE-204 KEYNOTE-087 The efficacy of X was "
+    ...             "investigated in the study (NCT02453594)", "NCT02453594")
+    ''
+    >>> paired_name("CHECKMATE-577 advanced ESCC CHECKMATE-648 (NCT 03143153) was", "NCT03143153")
+    'CHECKMATE-648'
+    >>> paired_name("no id here", "NCT00000001") is None
+    True
+    """
+    found = re.search(r"NCT\s?" + re.escape(nct[3:]), excerpt)
+    if not found:
+        return None
+    before = excerpt[: found.start()]
+    names = [
+        m.group(1) for m in section14.ACRONYM.finditer(before)
+        if m.end() >= found.start() - PAIR_WINDOW and not m.group(1).startswith("NCT")
+    ]
+    return names[-1] if names else ""
+
+
+def split_pairings(rows: list[dict[str, str]]) -> list[dict[str, str]]:
+    """Undo the extractor's first-name pairing where the text contradicts it.
+
+    Section 14 extraction pairs a sentence's registry id with the sentence's
+    **first** trial name, and PDF headings run into sentences — so SOLO-2 was
+    paired with Study 19's id, CHECKMATE-577 with CHECKMATE-648's, KEYNOTE-204
+    with KEYNOTE-087's. Measured: of 3,091 rows carrying both, 1,073 have the
+    id more than 40 characters from the name or outside the excerpt, and every
+    one of the 21 "wrong" judge picks in the P4 precision test traced here.
+
+    A row whose id is not written right after its name becomes two: the id with
+    the name that *is* beside it (or alone, keyed on the id), and the name
+    without the id. The id still links (the FDA printed it on this label); the
+    name still gets its own unit for a judge.
+
+    >>> text = "Progression-Free Survival – SOLO-2 Study 19 The efficacy of Lynparza was evaluated in Study 19 (NCT00753545)"
+    >>> [(r["acronym"], r["nct_id"]) for r in split_pairings(
+    ...     [{"acronym": "SOLO-2", "nct_id": "NCT00753545", "excerpt": text}])]
+    [('', 'NCT00753545'), ('SOLO-2', '')]
+    >>> split_pairings([{"acronym": "KEYNOTE-189", "nct_id": "NCT02578680",
+    ...                  "excerpt": "in KEYNOTE-189 (NCT02578680)"}])[0]["acronym"]
+    'KEYNOTE-189'
+    """
+    out: list[dict[str, str]] = []
+    for row in rows:
+        nct, name = row.get("nct_id") or "", row.get("acronym") or ""
+        if nct and name:
+            beside = paired_name(row.get("excerpt") or "", nct)
+            if beside != name:
+                out.append({**row, "acronym": beside or ""})
+                out.append({**row, "nct_id": ""})
+                continue
+        out.append(row)
+    return out
+
+
 def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     """One row per ``(submission, trial)``, keeping the most informative.
 
@@ -415,6 +482,7 @@ def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     judge; P5's ``(trial, submission)`` grain guard absorbs the answer if the
     judge picks one already linked.
     """
+    rows = split_pairings(rows)
     # Which distinct stated ids each (submission, trial-name) group holds.
     ids_in_group: dict[tuple[str, ...], set[str]] = {}
     for row in rows:
@@ -715,6 +783,8 @@ __all__ = [
     "pick_indication",
     "read_indications",
     "collapse",
+    "paired_name",
+    "split_pairings",
     "graph_supported",
     "looks_biosimilar",
     "names_match",

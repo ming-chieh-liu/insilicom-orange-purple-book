@@ -47,6 +47,9 @@ PMID_IN_LOCATION = re.compile(r"^(\d+)\.")
 #: not rank its evidence — so this is a budget, not a ranking.
 ABSTRACT_BUDGET: int = 400
 
+#: PMIDs per ``pubmedDocs`` query.
+LOOKUP_BATCH: int = 500
+
 
 #: ``pubmedRelations.relationship_type`` for **negative correlation** — the
 #: drug lowers, treats or cures the disease (D31). The graph stores the type as
@@ -187,31 +190,27 @@ class GraphEvidenceRepository:
         return sorted(out, key=lambda e: (-e.score, e.disease_biokdeid))
 
     def mentions_in(self, pmids: Iterable[str]) -> list[Mention]:
-        """Registry ids printed in these abstracts.
+        """Registry ids printed in these abstracts, in the order given.
 
-        One document lookup per PMID: the collection is indexed on ``pmid`` but
-        stores it as a string in some rows and an int in others, so both are
-        tried rather than assuming.
+        The collection stores ``pmid`` as a string in some rows and an int in
+        others, so both forms are asked for. Asked in batches of
+        :data:`LOOKUP_BATCH` with ``$in`` — one round trip per PMID made a
+        150-submission drug-only evaluation run past 30 minutes (D31 walks up to
+        400 abstracts per unit).
         """
+        wanted = list(dict.fromkeys(str(p) for p in pmids))
+        found: dict[str, dict[str, Any]] = {}
+        for start in range(0, len(wanted), LOOKUP_BATCH):
+            chunk = wanted[start:start + LOOKUP_BATCH]
+            forms: list[object] = [*chunk, *(int(p) for p in chunk if p.isdigit())]
+            for document in self._documents.find(
+                {"pmid": {"$in": forms}},
+                {"_id": 0, "pmid": 1, "abstract": 1, "articleTitle": 1, "publicationType": 1},
+            ):
+                found.setdefault(str(document.get("pmid")), document)
         out: list[Mention] = []
-        for pmid in pmids:
-            document = self._documents.find_one(
-                {"pmid": pmid},
-                {"_id": 0, "abstract": 1, "articleTitle": 1, "publicationType": 1},
-            )
-            if document is None:
-                try:
-                    document = self._documents.find_one(
-                        {"pmid": int(pmid)},
-                        {
-                            "_id": 0,
-                            "abstract": 1,
-                            "articleTitle": 1,
-                            "publicationType": 1,
-                        },
-                    )
-                except (TypeError, ValueError):
-                    document = None
+        for pmid in wanted:
+            document = found.get(pmid)
             if document is None:
                 continue
             title = str(document.get("articleTitle") or "")
@@ -222,12 +221,11 @@ class GraphEvidenceRepository:
             for nct in dict.fromkeys(NCT.findall(text)):
                 out.append(
                     Mention(
-                        nct_id=nct, pmid=str(pmid), title=title[:200],
+                        nct_id=nct, pmid=pmid, title=title[:200],
                         publication_types=kinds,
                     )
                 )
         return out
-
 
 __all__ = [
     "ABSTRACT_BUDGET",
