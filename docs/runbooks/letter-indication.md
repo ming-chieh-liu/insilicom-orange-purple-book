@@ -1,7 +1,7 @@
 # Runbook — agent-located indications in approval letters
 
 **For:** the main agent · **Prompts:** `docs/prompts/letter-indication-locate.md` (v1),
-`docs/prompts/letter-indication-verify.md` (v1) · **Written:** 2026-09-24 · **Status:** wired (`letter-locate-prepare`, `letter-indication-combine`); pilot passed, full run pending the user's hand check
+`docs/prompts/letter-indication-verify.md` (v1) · **Written:** 2026-09-24 · **Status:** wired (`letter-locate-prepare`, `letter-indication-combine`); pilot passed and hand-checked by the user 2026-09-25; full run cleared
 
 ## What this does and why
 
@@ -82,3 +82,16 @@ accepted span and of a sample of `NONE`s against the letter.
 
 20 letters from the local cache: 10 `no_sentence`, 10 with `indication_bearing = false`. No request
 is sent to FDA. The full run waits for the pilot's hand check.
+
+## Pilot record
+
+Run 2026-09-24 on 20 cached letters (10 `no_sentence`, 10 not indication-bearing); prompts v1.
+Locators agreed 20/20 (9 NONE, 11 spans, 0 invalid ids); verifiers agreed 11/11 (10 accepted,
+1 rejected — Humira S409, a dosing recommendation for adolescents). **Hand-checked by the user
+2026-09-25 (`examine/letter_check/CHECK.md`): accepted.** The check surfaced a keyword-rule defect —
+"is indicated for:" (colon) and "is indicated with" were missed, so Erelzi and Anktiva reached the
+agents needlessly; fixed in `6c72267` (+23 letters served by the rule on the cached set). Stage 2
+(terms) showed two coder limits outside this task: generic top-level descriptors riding along
+("Neoplasms" from "papillary tumors") and abbreviations absent from MeSH entry terms ("follicular
+NHL" coded nothing).
+
