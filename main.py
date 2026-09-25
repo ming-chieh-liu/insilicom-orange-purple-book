@@ -201,6 +201,12 @@ def build_parser() -> argparse.ArgumentParser:
         help="where FDA review documents are cached (gitignored, rebuildable)",
     )
     parser.add_argument(
+        "--only-without-indication",
+        action="store_true",
+        help="letter-locate-prepare: only letters of submissions that have no chosen "
+        "indication in submission_indications.tsv (run indication-normalize first)",
+    )
+    parser.add_argument(
         "--offline",
         action="store_true",
         help="letters, labels, reviews: read only cached files; send no request to FDA",
@@ -809,6 +815,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         with letters_tsv.open(encoding="utf-8") as handle:
             letter_rows = list(csv.DictReader(handle, delimiter="\t"))
+        if args.only_without_indication:
+            letter_rows = letter_locate.without_indication(
+                letter_rows, Path(args.out) / "submission_indications.tsv")
         brands: dict[str, set[str]] = {}
         for product in read_rows(data.products):
             brands.setdefault((product.get("ApplNo") or "").strip().zfill(6), set()).add(

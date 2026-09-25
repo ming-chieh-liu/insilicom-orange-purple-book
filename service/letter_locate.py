@@ -16,6 +16,7 @@ letter.
 
 from __future__ import annotations
 
+import csv
 import json
 import re
 from collections.abc import Callable, Iterable, Iterator
@@ -225,6 +226,28 @@ class CombineReport(NamedTuple):
     newly_recorded: int
 
 
+def without_indication(
+    letter_rows: list[dict[str, str]], indications: Path
+) -> list[dict[str, str]]:
+    """The letters whose submission has no chosen indication from any source.
+
+    The agent is worth running for coverage only there: measured 25 Sep, 653 of
+    the 3,568 letters the keyword rule missed belong to such submissions; the
+    rest already carry an indication from their label's section 1 or today's
+    label. An absent table keeps every row, so nothing is dropped by accident.
+    """
+    if not indications.is_file():
+        return letter_rows
+    with indications.open(encoding="utf-8") as handle:
+        covered = {
+            (r["application"], r["submission_type"], r["submission_no"])
+            for r in csv.DictReader(handle, delimiter="\t")
+            if r.get("chosen") == "true" and r.get("mesh_id")
+        }
+    return [r for r in letter_rows
+            if (r["application"], r["submission_type"], r["submission_no"]) not in covered]
+
+
 def prepare(
     letter_rows: Iterable[dict[str, str]],
     text_of: Callable[[str], str | None],
@@ -383,6 +406,7 @@ def render(report: CombineReport) -> str:
 
 
 __all__ = [
+    "without_indication",
     "CombineReport",
     "PrepareReport",
     "combine",

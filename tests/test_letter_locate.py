@@ -137,3 +137,16 @@ def test_a_missing_units_file_combines_to_nothing(tmp_path: Path) -> None:
     assert ll.recorded(p["verdicts"]) == {}
     p["verdicts"].write_text(json.dumps({"unit_id": U1, "final": "accepted"}) + "\n")
     assert ll.accepted_spans(p["verdicts"]) == {}  # no text, no span
+
+
+def test_only_letters_of_submissions_without_an_indication_are_kept(tmp_path: Path) -> None:
+    rows = [{"application": a, "submission_type": "ORIG", "submission_no": "1"} for a in ("A", "B", "C")]
+    table = tmp_path / "submission_indications.tsv"
+    table.write_text(
+        "application\tsubmission_type\tsubmission_no\tmesh_id\tchosen\n"
+        "A\tORIG\t1\tMESH:D1\ttrue\n"      # covered
+        "B\tORIG\t1\tMESH:D2\tfalse\n"     # a row, but not the chosen one
+        "C\tORIG\t1\t\ttrue\n",            # chosen but uncoded
+        encoding="utf-8")
+    assert [r["application"] for r in ll.without_indication(rows, table)] == ["B", "C"]
+    assert ll.without_indication(rows, tmp_path / "absent.tsv") == rows
