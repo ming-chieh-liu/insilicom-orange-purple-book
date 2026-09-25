@@ -388,7 +388,9 @@ def test_a_name_the_submissions_review_resolved_skips_the_shortlist(
     ))
     assert report.to_judge == 0 and report.review_identified == 1
     unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
-    assert (unit.review_nct, unit.candidates) == ("NCT02578680", ())
+    assert unit.review_nct == "NCT02578680" and not unit.needs_judgement
+    # still shortlisted: P6 scores shortlist recall on identified units (D18)
+    assert [c.nct_id for c in unit.candidates] == ["NCT02578680"]
     assert "identified by the submission's review" in candidates.render(report)
 
 

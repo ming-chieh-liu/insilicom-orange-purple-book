@@ -796,11 +796,12 @@ def build(
         # D29: a direct FDA identification skips the shortlist entirely.
         resolved = "" if stated else review_match(row.get("acronym", ""),
                                                    reviewed.get(key, {}))
-        if stated or resolved:
-            shortlisted: tuple[Candidate, ...] = ()
-        elif not drug_mesh:
+        # A unit already identified (stated id, or D29) still gets a shortlist:
+        # P4 skips it, but P6 scores shortlist recall on exactly these units
+        # (D18) -- they are the only ones whose answer is known for free.
+        if not drug_mesh:
             no_drug += 1
-            shortlisted = ()
+            shortlisted: tuple[Candidate, ...] = ()
         else:
             shortlisted = shortlist(
                 drug_mesh,
