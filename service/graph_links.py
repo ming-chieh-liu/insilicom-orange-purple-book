@@ -32,6 +32,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from dao.graph_evidence import ABSTRACT_BUDGET, GraphEvidenceRepository, Mention
+from service import indication_normalize
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -238,11 +239,16 @@ def build(
         for r in _read_tsv(out_dir / "indication_map.tsv")
         if r["biokdeid"]
     }
+    # D30: each submission's own chosen indication (letter, else its label's
+    # section 1, else today's label), with its biokdeid. Only when that table
+    # is absent does the application-level current label stand in.
+    chosen = indication_normalize.read_chosen(out_dir / "submission_indications.tsv")
     by_application: dict[str, set[tuple[str, str]]] = defaultdict(set)
-    for row in _read_tsv(out_dir / "indications.tsv"):
-        found = disease_of.get(row["mesh_id"])
-        if found:
-            by_application[row["application"]].add(found)
+    if not chosen:
+        for row in _read_tsv(out_dir / "indications.tsv"):
+            found = disease_of.get(row["mesh_id"])
+            if found:
+                by_application[row["application"]].add(found)
     units: list[GraphUnit] = []
     considered = with_drug = with_disease = with_edge = with_candidates = 0
     sizes: Counter[int] = Counter()
@@ -257,7 +263,9 @@ def build(
             for name in ingredients.get(row["application"], frozenset())
             if name in drug_of
         }
-        diseases = by_application.get(row["application"], set())
+        diseases = chosen.get(key, set()) if chosen else by_application.get(
+            row["application"], set()
+        )
         if drugs:
             with_drug += 1
         if diseases:

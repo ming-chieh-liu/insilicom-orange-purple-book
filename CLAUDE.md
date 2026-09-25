@@ -146,8 +146,8 @@ code says `not yet implemented` until it lands.
   `judged_contradicts_direct`, `indication_mismatch`). Different trials from different routes for one
   approval is normal, not a conflict. Detail: `docs/DESIGN.md` §3c, which also records the open
   question on D17 tier A for judged links.
-- **D30 — indications: read once, normalise once, one table** (2026-09-24, **not yet
-  implemented**). Readers emit raw text (label §1 + §14 headings, letter sentence, reviews later);
+- **D30 — indications: read once, normalise once, one table** (2026-09-24, **implemented in
+  code 2026-09-24; `output/` not yet rebuilt**). Readers emit raw text (label §1 + §14 headings, letter sentence, reviews later);
   one step codes all of it with one coder (exact disease name, then MeSH sweep) into `MESH:D…` +
   `biokdeid` and writes `submission_indications.tsv` (source · source_key · text · ids · `chosen`).
   P3 reads per-trial heading indications from it; the graph route reads chosen submission

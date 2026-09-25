@@ -1,7 +1,7 @@
 """Approval letters as the per-submission indication source (D25).
 
-Each in-scope approval's letter is fetched, its "provides for …" sentence
-extracted, and the diseases it names coded to MeSH. The sentence states what
+Each in-scope approval's letter is fetched and its "provides for …" sentence
+extracted and flagged as indication-bearing or not. The sentence states what
 *that* approval covers — "the use of Veklury … for the treatment of COVID-19 in
 … patients who are not hospitalized" — where the label's section 1 is
 cumulative and says everything the drug is approved for by then.
@@ -15,9 +15,9 @@ cumulative and says everything the drug is approved for by then.
 * A full stop inside a number — ``Veltin … Gel, 1.2%/0.025%`` — which is not
   the end of the sentence. The pilot's extractor stopped there.
 
-**Precedence (D25).** :func:`combine` assigns each in-scope submission one
-indication source: its letter, else the section 1 of the label filed with it,
-else the current openFDA label's section 1 for the application.
+**This module reads; it does not code (D30).** The sentence goes out as raw
+text; :mod:`service.indication_normalize` codes it, with every other indication
+source, into one table.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from config.settings import RawData
-from service import approval_events, indications
+from service import approval_events
 from source import approval_letter, label_pdf
 from utility import application_number as appno
 from utility.logging import get_logger
@@ -91,8 +91,6 @@ INDICATION_BEARING = re.compile(
 #: A clause longer than this is a failed parse, not an indication.
 MAX_SENTENCE: int = 1_500
 
-#: Characters of sentence text kept in the merged table.
-TEXT_KEEP: int = 600
 
 WHITESPACE = re.compile(r"\s+")
 
@@ -120,11 +118,6 @@ REQUEST_INTERVAL: float = 1.0
 #: address, every further request is wasted and can lengthen the ban.
 BREAKER: int = 5
 
-#: Indication sources, in precedence order.
-SOURCE_LETTER = "approval_letter"
-SOURCE_LABEL = "label_section_1"
-SOURCE_OPENFDA = "openfda_current_label"
-SOURCE_NONE = "none"
 
 
 class LetterIndication(NamedTuple):
@@ -139,22 +132,8 @@ class LetterIndication(NamedTuple):
     shared_letter: str
     status: str
     sentence: str
-    indication_mesh: str
-    indication_terms: str
     #: Whether the sentence states an indication (:data:`INDICATION_BEARING`).
     indication_bearing: str = "false"
-
-
-class SubmissionIndicationRow(NamedTuple):
-    """The indication chosen for one submission, and where it came from."""
-
-    application: str
-    submission_type: str
-    submission_no: str
-    source: str
-    indication_mesh: str
-    indication_terms: str
-    text: str
 
 
 class LetterReport(NamedTuple):
@@ -286,7 +265,6 @@ def _shared(url: str, users: int) -> bool:
 def build(
     data: RawData,
     cache_root: Path,
-    index: indications.TermIndex,
     *,
     parsers: int = 1,
     guess_missing: bool = True,
@@ -404,7 +382,6 @@ def build(
         if chosen is None:
             chosen = ("", False, NO_LETTER, "")
         url, guessed, status, sentence = chosen
-        codes = sorted(indications.code(sentence, index)) if sentence else []
         rows.append(
             LetterIndication(
                 application=row.application,
@@ -416,8 +393,6 @@ def build(
                 shared_letter="true" if url and _shared(url, users.get(url, 1)) else "false",
                 status=status,
                 sentence=sentence,
-                indication_mesh=";".join(codes),
-                indication_terms=";".join(index.names.get(c, c) for c in codes),
                 indication_bearing="true" if is_indication(sentence) else "false",
             )
         )
@@ -434,72 +409,17 @@ def build(
     )
 
 
-def combine(
-    letters: tuple[LetterIndication, ...] | list[LetterIndication],
-    label_texts: dict[str, str],
-    app_indications: dict[str, set[str]],
-    index: indications.TermIndex,
-) -> list[SubmissionIndicationRow]:
-    """One indication per in-scope submission, by D25's precedence.
-
-    ``label_texts`` is section 1 of each submission's own label, keyed
-    ``application|type|number``; ``app_indications`` is the current openFDA
-    label's coded section 1, keyed by application. A source that codes to no
-    disease gives way to the next.
-
-    >>> ix = indications.TermIndex({"acne vulgaris": "D000152", "gout": "D006073"},
-    ...                            {"D000152": "Acne Vulgaris", "D006073": "Gout"}, 2, 0)
-    >>> letter = LetterIndication("NDA000001", "ORIG", "1", "2010-01-01", "u", "false",
-    ...                           "false", "ok", "provides for acne vulgaris",
-    ...                           "D000152", "Acne Vulgaris", "true")
-    >>> [r.source for r in combine([letter], {}, {}, ix)]
-    ['approval_letter']
-    >>> labeling_only = letter._replace(indication_bearing="false")
-    >>> [r.source for r in combine([labeling_only], {"NDA000001|ORIG|1": "for gout"}, {}, ix)]
-    ['label_section_1']
-    >>> blank = letter._replace(status="no_letter", sentence="", indication_mesh="")
-    >>> [r.source for r in combine([blank], {"NDA000001|ORIG|1": "for gout"}, {}, ix)]
-    ['label_section_1']
-    >>> [r.source for r in combine([blank], {}, {"NDA000001": {"D006073"}}, ix)]
-    ['openfda_current_label']
-    >>> [r.source for r in combine([blank], {}, {}, ix)]
-    ['none']
-    """
-    out: list[SubmissionIndicationRow] = []
-    for letter in letters:
-        key = f"{letter.application}|{letter.submission_type}|{letter.submission_no}"
-        source, codes, text = SOURCE_NONE, [], ""
-        if letter.indication_mesh and letter.indication_bearing == "true":
-            source, codes, text = SOURCE_LETTER, letter.indication_mesh.split(";"), letter.sentence
-        elif label_texts.get(key) and indications.code(label_texts[key], index):
-            source = SOURCE_LABEL
-            codes = sorted(indications.code(label_texts[key], index))
-            text = label_texts[key]
-        elif app_indications.get(letter.application):
-            source, codes = SOURCE_OPENFDA, sorted(app_indications[letter.application])
-        out.append(
-            SubmissionIndicationRow(
-                application=letter.application,
-                submission_type=letter.submission_type,
-                submission_no=letter.submission_no,
-                source=source,
-                indication_mesh=";".join(codes),
-                indication_terms=";".join(index.names.get(c, c) for c in codes),
-                text=WHITESPACE.sub(" ", text)[:TEXT_KEEP],
-            )
-        )
-    return out
-
-
-def render(report: LetterReport, merged: list[SubmissionIndicationRow]) -> str:
+def render(report: LetterReport) -> str:
     """The pass report, as ``--mode letters`` prints it."""
     total = len(report.rows)
+    bearing = sum(1 for r in report.rows if r.indication_bearing == "true")
     lines = [
-        "Approval letters — the per-submission indication source (D25)",
+        "Approval letters — the per-submission indication text (D25, D30)",
         "",
         f"  in-scope submissions                     {total:>9,}",
         f"  distinct letters cached                  {report.distinct_letters:>9,}",
         f"  letters found at a guessed address       {report.guessed_found:>9,}",
+        f"  indication-bearing sentences             {bearing:>9,}",
         "",
         "  by status:",
     ]
@@ -508,10 +428,6 @@ def render(report: LetterReport, merged: list[SubmissionIndicationRow]) -> str:
     lines += ["", "  by era and status:"]
     for name, count in report.by_era_status:
         lines.append(f"    {name:<38}{count:>9,}")
-    by_source = Counter(row.source for row in merged)
-    lines += ["", "  indication source chosen per submission:"]
-    for source in (SOURCE_LETTER, SOURCE_LABEL, SOURCE_OPENFDA, SOURCE_NONE):
-        lines.append(f"    {source:<38}{by_source.get(source, 0):>9,}")
     return "\n".join(lines)
 
 
@@ -528,16 +444,10 @@ __all__ = [
     "OK",
     "REQUEST_INTERVAL",
     "SCANNED",
-    "SOURCE_LABEL",
-    "SOURCE_LETTER",
-    "SOURCE_NONE",
-    "SOURCE_OPENFDA",
     "UNREADABLE",
     "LetterIndication",
     "LetterReport",
-    "SubmissionIndicationRow",
     "build",
-    "combine",
     "indication_sentence",
     "is_indication",
     "render",

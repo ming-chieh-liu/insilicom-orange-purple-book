@@ -36,6 +36,7 @@ from pathlib import Path
 from typing import NamedTuple
 
 from dao.graph_evidence import ABSTRACT_BUDGET, GraphEvidenceRepository
+from service import indication_normalize
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -116,11 +117,18 @@ def build(
         for row in _read_tsv(out_dir / "indication_map.tsv")
         if row["biokdeid"]
     }
+    # D30: the union of the application's submissions' chosen indications,
+    # already carrying biokdeids; the application-level current label only
+    # when that table is absent.
     by_application: dict[str, set[str]] = defaultdict(set)
-    for row in _read_tsv(out_dir / "indications.tsv"):
-        found = disease_of.get(row["mesh_id"])
-        if found:
-            by_application[row["application"]].add(found)
+    chosen = indication_normalize.read_chosen(out_dir / "submission_indications.tsv")
+    for submission, chosen_diseases in chosen.items():
+        by_application[submission.split("|", 1)[0]].update(b for b, _ in chosen_diseases)
+    if not chosen:
+        for row in _read_tsv(out_dir / "indications.tsv"):
+            found = disease_of.get(row["mesh_id"])
+            if found:
+                by_application[row["application"]].add(found)
 
     rows: list[GraphTrial] = []
     with_drug = with_disease = with_edge = with_trials = 0

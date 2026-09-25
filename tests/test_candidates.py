@@ -86,53 +86,34 @@ def test_collapsing_nothing_yields_nothing() -> None:
 # ---------------------------------------------------------------------------
 
 
-@pytest.fixture
-def term_index() -> indications.TermIndex:
-    return indications.TermIndex(
-        by_term={
-            "small cell lung cancer": "D055752",
-            "lung cancer": "D008175",
-            "melanoma": "D008545",
-        },
-        names={
-            "D055752": "Small Cell Lung Carcinoma",
-            "D008175": "Lung Neoplasms",
-            "D008545": "Melanoma",
-        },
-        max_words=4,
-        collisions=0,
-    )
+def test_the_heading_wins_when_it_names_one_disease() -> None:
+    assert candidates.pick_indication(["MESH:D002289"], ["MESH:D008545"]) == "MESH:D002289"
 
 
-def test_an_exact_heading_wins(term_index: indications.TermIndex) -> None:
-    """The graph's synonyms are precise where the sweep returns a parent."""
-    exact = {"non-small cell lung cancer": "MESH:D002289"}
-    assert (
-        candidates.code_heading("Non-Small Cell Lung Cancer", exact, term_index)
-        == "MESH:D002289"
-    )
-
-
-def test_a_qualified_heading_falls_back_to_the_sweep(
-    term_index: indications.TermIndex,
-) -> None:
-    """Most headings carry qualifiers, so the exact lookup answers only 19%."""
-    assert candidates.code_heading("Advanced Melanoma", {}, term_index) == "D008545"
-
-
-def test_an_ambiguous_heading_codes_to_nothing(
-    term_index: indications.TermIndex,
-) -> None:
+def test_an_ambiguous_heading_codes_to_nothing() -> None:
     """Two diseases in one heading is not evidence for either."""
-    got = candidates.code_heading("Melanoma and Lung Cancer", {}, term_index)
-    assert got == ""
+    assert candidates.pick_indication(["MESH:D008545", "MESH:D008175"], []) == ""
 
 
-def test_a_heading_naming_no_disease_codes_to_nothing(
-    term_index: indications.TermIndex,
-) -> None:
-    """Some '14.N' lines are trial names, not indications — ARISTOTLE, ATHENA."""
-    assert candidates.code_heading("ARISTOTLE", {}, term_index) == ""
+def test_a_heading_naming_no_disease_falls_back_to_the_submission() -> None:
+    """Some '14.N' lines are trial names, not indications — ARISTOTLE, ATHENA.
+    The submission's chosen indication (letter or label §1) stands in (D30)."""
+    assert candidates.pick_indication([], ["MESH:D002289"]) == "MESH:D002289"
+    assert candidates.pick_indication([], []) == ""
+
+
+def test_read_indications_splits_headings_from_chosen(tmp_path: Path) -> None:
+    (tmp_path / "submission_indications.tsv").write_text(
+        "application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext"
+        "\tmesh_id\tbiokdeid\tterm\tchosen\n"
+        "BLA125514\tSUPPL\t35\tlabel_14_heading\tNSCLC\tNSCLC\tMESH:D002289\tb\tt\tfalse\n"
+        "BLA125514\tSUPPL\t35\tletter\t\tx\tMESH:D002289\tb\tt\ttrue\n"
+        "BLA125514\tSUPPL\t35\tlabel_section_1\t\tx\tMESH:D008545\tb\tt\tfalse\n",
+        encoding="utf-8",
+    )
+    headings, chosen = candidates.read_indications(tmp_path)
+    assert headings == {("BLA125514|SUPPL|35", "NSCLC"): ["MESH:D002289"]}
+    assert chosen == {"BLA125514|SUPPL|35": ["MESH:D002289"]}
 
 
 # ---------------------------------------------------------------------------
@@ -431,14 +412,8 @@ def test_the_pass_shortlists_and_counts(
         "ingredients_of",
         lambda data, apps: {"BLA125514": frozenset({"PEMBROLIZUMAB"})},
     )
-    monkeypatch.setattr(
-        candidates.indications,
-        "build_index",
-        lambda vocabulary: indications.TermIndex({}, {}, 1, 0),
-    )
-
     report = candidates.build(
-        object(), object(), object(), out  # type: ignore[arg-type]
+        object(), object(), out  # type: ignore[arg-type]
     )
     assert report.descriptions == 2
     assert report.collapsed == 2

@@ -8,14 +8,7 @@ from pathlib import Path
 import pytest
 
 from config.settings import RawData
-from service import indications, letters
-
-_INDEX = indications.TermIndex(
-    {"acne vulgaris": "D000152", "gout": "D006073", "covid 19": "D000086382"},
-    {"D000152": "Acne Vulgaris", "D006073": "Gout", "D000086382": "COVID-19"},
-    2,
-    0,
-)
+from service import letters
 
 _APPLICATIONS = ["ApplNo\tApplType\tApplPublicNotes\tSponsorName",
                  "000001\tNDA\t\tACME", "000002\tNDA\t\tOLDCO"]
@@ -120,7 +113,7 @@ def stubbed(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
 
 
 def test_every_status_is_reached(data: RawData, stubbed: Path) -> None:
-    report = letters.build(data, stubbed, _INDEX, parsers=1)
+    report = letters.build(data, stubbed, parsers=1)
     by_key = {(r.application, r.submission_no): r for r in report.rows}
     assert by_key[("NDA000001", "1")].status == "ok"
     assert by_key[("NDA000001", "2")].status == "ok"
@@ -133,20 +126,20 @@ def test_every_status_is_reached(data: RawData, stubbed: Path) -> None:
 
 
 def test_a_decimal_does_not_end_the_indication(data: RawData, stubbed: Path) -> None:
-    row = next(r for r in letters.build(data, stubbed, _INDEX, parsers=1).rows
+    row = next(r for r in letters.build(data, stubbed, parsers=1).rows
                if r.submission_no == "1" and r.application == "NDA000001")
     assert row.sentence.endswith("in patients 12 years and older")
-    assert row.indication_mesh == "D000152"
+    assert row.indication_bearing == "true"
 
 
 def test_a_guessed_letter_is_marked_and_html_is_discarded(
     data: RawData, stubbed: Path
 ) -> None:
-    report = letters.build(data, stubbed, _INDEX, parsers=1)
+    report = letters.build(data, stubbed, parsers=1)
     row = next(r for r in report.rows if r.submission_no == "3")
     assert row.url_guessed == "true"
     assert row.letter_url.endswith("000001s003ltr.pdf")
-    assert row.indication_terms == "COVID-19"
+    assert "covid-19" in row.sentence
     assert report.guessed_found == 1
     assert not any(
         p.read_bytes().startswith(b"<html>") for p in stubbed.rglob("*") if p.is_file()
@@ -163,28 +156,14 @@ def test_a_bare_for_disease_sentence_is_not_trusted_as_an_indication() -> None:
     )
 
 
-def test_the_merge_prefers_the_letter_then_falls_back(
-    data: RawData, stubbed: Path
-) -> None:
-    report = letters.build(data, stubbed, _INDEX, parsers=1)
-    merged = letters.combine(
-        report.rows,
-        {"NDA000001|SUPPL|5": "1 INDICATIONS AND USAGE for gout"},
-        {"NDA000001": {"D006073"}},
-        _INDEX,
-    )
-    source = {(r.application, r.submission_no): r.source for r in merged}
-    assert source[("NDA000001", "1")] == "approval_letter"
-    assert source[("NDA000001", "5")] == "label_section_1"
-    assert source[("NDA000001", "6")] == "openfda_current_label"
-    assert source[("NDA000002", "1")] == "none"
-    rendered = letters.render(report, merged)
-    assert "approval_letter" in rendered and "by era and status" in rendered
+def test_the_report_renders(data: RawData, stubbed: Path) -> None:
+    rendered = letters.render(letters.build(data, stubbed, parsers=1))
+    assert "indication-bearing sentences" in rendered and "by era and status" in rendered
 
 
 def test_requests_are_spaced_out(data: RawData, stubbed: Path) -> None:
     """The unthrottled first run was banned after ~1,500 letters."""
-    letters.build(data, stubbed, _INDEX, parsers=1, interval=0.5)
+    letters.build(data, stubbed, parsers=1, interval=0.5)
     calls = letters._CALLS  # type: ignore[attr-defined]
     fetches = [c for c in calls if not c.startswith("sleep")]
     assert calls.count("sleep 0.5") == len(fetches) - 1
@@ -193,10 +172,10 @@ def test_requests_are_spaced_out(data: RawData, stubbed: Path) -> None:
 def test_a_second_run_reads_the_cache_and_asks_nothing(
     data: RawData, stubbed: Path
 ) -> None:
-    letters.build(data, stubbed, _INDEX, parsers=1)
+    letters.build(data, stubbed, parsers=1)
     calls = letters._CALLS  # type: ignore[attr-defined]
     calls.clear()
-    report = letters.build(data, stubbed, _INDEX, parsers=1, offline=True)
+    report = letters.build(data, stubbed, parsers=1, offline=True)
     assert calls == []
     by_key = {(r.application, r.submission_no): r.status for r in report.rows}
     assert by_key[("NDA000001", "1")] == "ok"
@@ -216,7 +195,7 @@ def test_repeated_refusals_stop_the_run_and_mark_the_rest_blocked(
 
     monkeypatch.setattr(letters.label_pdf, "fetch_status", refuse)
     monkeypatch.setattr(letters, "_sleep", lambda seconds: None)
-    report = letters.build(data, tmp_path / "c", _INDEX, parsers=1)
+    report = letters.build(data, tmp_path / "c", parsers=1)
     assert len(asked) == letters.BREAKER
     statuses = {r.status for r in report.rows}
     assert "fetch_failed" not in statuses
@@ -231,7 +210,7 @@ def test_the_parallel_parser_branch_runs_with_nothing_to_parse(
     and the branch runs empty: what it proves is that such a run still reports
     every submission rather than crashing."""
     report = letters.build(
-        data, tmp_path / "empty", _INDEX, parsers=2, guess_missing=False, offline=True
+        data, tmp_path / "empty", parsers=2, guess_missing=False, offline=True
     )
     assert len(report.rows) == 8
     assert {r.status for r in report.rows} <= {"not_fetched", "no_letter"}

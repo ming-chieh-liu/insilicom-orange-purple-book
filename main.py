@@ -46,6 +46,7 @@ from service import (
     attribution,
     identity_census,
     identification,
+    indication_normalize,
     indications,
     letters,
     graph_links,
@@ -76,6 +77,8 @@ MODES: dict[str, str] = {
     "MeSH descriptors via the Insilicom graph",
     "letters": "fetch each trial-relevant submission's approval letter, code the "
     "indication it states, and choose one indication source per submission (D25)",
+    "indication-normalize": "code every indication source (letter, label section 1, "
+    "section-14 headings, openFDA fallback) into submission_indications.tsv (D30)",
     "labels": "fetch each trial-relevant submission's archived label and read "
     "its section 14 into trial descriptions",
     "candidates": "narrow the trial registry to a judgeable shortlist per "
@@ -542,10 +545,6 @@ def main(argv: list[str] | None = None) -> int:
         if not data.exists:
             print(f"{data.root} not found — candidates need the bulk data tree")
             return 1
-        vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
-        if not vocabulary.exists:
-            print(f"{vocabulary.descriptors} not found — pass --mesh")
-            return 1
         archive = TrialArchive(root=Path(args.trial_archive))
         if not archive.study_shards:
             print(f"{archive.root} has no {archive.study_glob}")
@@ -555,7 +554,7 @@ def main(argv: list[str] | None = None) -> int:
             if not (out_dir / needed).is_file():
                 print(f"{out_dir / needed} not found — run labels and normalize first")
                 return 1
-        candidates_report = candidates.build(data, archive, vocabulary, out_dir)
+        candidates_report = candidates.build(data, archive, out_dir)
         units_path = out_dir / "candidates.jsonl"
         with units_path.open("w", encoding="utf-8") as handle:
             for unit in candidates_report.units:
@@ -577,53 +576,98 @@ def main(argv: list[str] | None = None) -> int:
         if not data.exists:
             print(f"{data.root} not found — the letters need the bulk data tree")
             return 1
-        vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
-        if not vocabulary.exists:
-            print(f"{vocabulary.descriptors} not found — pass --mesh")
-            return 1
-        term_index = indications.build_index(vocabulary)
         letters_report = letters.build(
             data,
             Path(args.letter_cache),
-            term_index,
             parsers=args.parsers,
             offline=args.offline,
-        )
-        out_dir = Path(args.out)
-        label_texts: dict[str, str] = {}
-        label_tsv = out_dir / "submission_indication_text.tsv"
-        if label_tsv.is_file():
-            with label_tsv.open(encoding="utf-8") as handle:
-                for row in csv.DictReader(handle, delimiter="\t"):
-                    key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
-                    label_texts[key] = row.get("text") or ""
-        app_indications: dict[str, set[str]] = {}
-        openfda_tsv = out_dir / "indications.tsv"
-        if openfda_tsv.is_file():
-            with openfda_tsv.open(encoding="utf-8") as handle:
-                for row in csv.DictReader(handle, delimiter="\t"):
-                    if row.get("mesh_id"):
-                        app_indications.setdefault(row["application"], set()).add(
-                            row["mesh_id"]
-                        )
-        merged = letters.combine(
-            letters_report.rows, label_texts, app_indications, term_index
         )
         repository = TsvRepository(args.out)
         repository.save(
             "letter_indications",
             ("application", "submission_type", "submission_no", "approval_date",
              "letter_url", "url_guessed", "shared_letter", "status", "sentence",
-             "indication_mesh", "indication_terms", "indication_bearing"),
+             "indication_bearing"),
             letters_report.rows,
         )
+        print(letters.render(letters_report))
+        print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "indication-normalize":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the step needs the bulk data tree")
+            return 1
+        vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
+        if not vocabulary.exists:
+            print(f"{vocabulary.descriptors} not found — pass --mesh")
+            return 1
+        connection = BiokdeConnection(credentials=Path(args.creds))
+        if not connection.has_credentials:
+            print(f"{connection.credentials} not found — pass --creds")
+            return 1
+        out_dir = Path(args.out)
+        in_scope = [
+            row for row in approval_events.build(data).rows if row.trial_relevant == "true"
+        ]
+        keys = [(r.application, r.submission_type, r.submission_no) for r in in_scope]
+
+        def _tsv(name: str) -> list[dict[str, str]]:
+            path = out_dir / name
+            if not path.is_file():
+                return []
+            with path.open(encoding="utf-8") as handle:
+                return list(csv.DictReader(handle, delimiter="\t"))
+
+        def _key(row: dict[str, str]) -> str:
+            return f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+
+        letter_text = {
+            _key(r): r["sentence"] for r in _tsv("letter_indications.tsv")
+            if r.get("indication_bearing") == "true" and r.get("sentence")
+        }
+        label_text = {_key(r): r.get("text") or "" for r in _tsv("submission_indication_text.tsv")}
+        headings: dict[str, list[str]] = {}
+        for r in _tsv("label_trials.tsv"):
+            heading = (r.get("heading") or "").strip()
+            if heading and heading not in headings.setdefault(_key(r), []):
+                headings[_key(r)].append(heading)
+        openfda: dict[str, set[str]] = {}
+        for r in _tsv("indications.tsv"):
+            if r.get("mesh_id"):
+                openfda.setdefault(r["application"], set()).add(r["mesh_id"])
+        condition_rows = _tsv("trial_condition_map.tsv")
+        exact = {r["source_name"].casefold(): r["mesh_id"] for r in condition_rows}
+        known = {r["mesh_id"]: r["biokdeid"] for r in condition_rows if r.get("biokdeid")}
+        import pymongo
+
+        in_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
+            connection_uri(connection),
+            serverSelectionTimeoutMS=connection.timeout_ms,
+        )
+        try:
+            in_report = indication_normalize.build(
+                keys,
+                letters=letter_text,
+                label_section_1=label_text,
+                headings=headings,
+                openfda=openfda,
+                exact=exact,
+                known_biokdeids=known,
+                index=indications.build_index(vocabulary),
+                internal_ids=BiokdeRepository(in_client, connection).internal_ids,
+            )
+        finally:
+            in_client.close()
+        repository = TsvRepository(args.out)
         repository.save(
             "submission_indications",
             ("application", "submission_type", "submission_no", "source",
-             "indication_mesh", "indication_terms", "text"),
-            merged,
+             "source_key", "text", "mesh_id", "biokdeid", "term", "chosen"),
+            in_report.rows,
         )
-        print(letters.render(letters_report, merged))
+        print(indication_normalize.render(in_report, len(keys)))
         print(f"\nwritten to {repository.out_dir}/")
         return 0
 

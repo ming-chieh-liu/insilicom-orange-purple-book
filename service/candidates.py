@@ -46,8 +46,8 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from config.settings import MeshVocabulary, RawData, TrialArchive
-from service import approval_events, indications, normalize
+from config.settings import RawData, TrialArchive
+from service import approval_events, normalize
 from source import trial_studies
 from utility.logging import get_logger
 
@@ -271,23 +271,51 @@ def graph_supported(out_dir: Path) -> dict[str, frozenset[str]]:
     return {app: frozenset(ncts) for app, ncts in out.items()}
 
 
-def code_heading(
-    heading: str, exact: dict[str, str], index: indications.TermIndex
-) -> str:
-    """The MeSH descriptor a section-14 heading names, or ``""``.
+def pick_indication(heading_ids: list[str], chosen_ids: list[str]) -> str:
+    """The one disease a trial description is ranked on, or ``""`` (D30).
 
-    Two stages, because neither alone is enough. An exact lookup against the
-    graph's disease synonyms is precise but only answers clean headings — 19%
-    of the 1,397 distinct ones, because most carry qualifiers
-    (``ALK-Positive Metastatic NSCLC Previously Treated with...``). The entry
-    term sweep reaches 65% but is coarser, returning a parent where the exact
-    lookup would have returned the disease. Exact first, sweep as fallback.
+    Its own §14 heading first, when that names exactly one disease; two
+    diseases in one heading are evidence for neither. When the heading names
+    none ("14.1 Study 1", a trial name), the submission's chosen indication —
+    its letter or its label's section 1 — stands in, again only if it is one.
+
+    >>> pick_indication(["MESH:D002289"], ["MESH:D008545"])
+    'MESH:D002289'
+    >>> pick_indication(["MESH:D008545", "MESH:D008175"], ["MESH:D002289"])
+    ''
+    >>> pick_indication([], ["MESH:D002289"])
+    'MESH:D002289'
+    >>> pick_indication([], ["MESH:D002289", "MESH:D008545"])
+    ''
     """
-    direct = exact.get(heading.casefold())
-    if direct:
-        return direct
-    coded = indications.code(heading, index)
-    return sorted(coded)[0] if len(coded) == 1 else ""
+    if heading_ids:
+        return heading_ids[0] if len(heading_ids) == 1 else ""
+    return chosen_ids[0] if len(chosen_ids) == 1 else ""
+
+
+def read_indications(
+    out_dir: Path,
+) -> tuple[dict[tuple[str, str], list[str]], dict[str, list[str]]]:
+    """``submission_indications.tsv`` as P3 needs it (D30).
+
+    Returns ``(heading ids by (submission key, heading), chosen ids by
+    submission key)``. The table is the only place indications are coded; P3
+    no longer codes a heading itself.
+    """
+    headings: dict[tuple[str, str], list[str]] = {}
+    chosen: dict[str, list[str]] = {}
+    for row in _read_tsv(out_dir / "submission_indications.tsv"):
+        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        mesh_id = row.get("mesh_id") or ""
+        if row.get("source") == "label_14_heading":
+            ids = headings.setdefault((key, row.get("source_key") or ""), [])
+            if mesh_id and mesh_id not in ids:
+                ids.append(mesh_id)
+        elif row.get("chosen") == "true" and mesh_id:
+            chosen.setdefault(key, [])
+            if mesh_id not in chosen[key]:
+                chosen[key].append(mesh_id)
+    return headings, chosen
 
 
 def _read_tsv(path: Path) -> Iterator[dict[str, str]]:
@@ -629,7 +657,8 @@ __all__ = [
     "build",
     "BIOSIMILAR_TRIAL",
     "MIN_NAME_LENGTH",
-    "code_heading",
+    "pick_indication",
+    "read_indications",
     "collapse",
     "graph_supported",
     "looks_biosimilar",
@@ -643,7 +672,6 @@ __all__ = [
 def build(
     data: RawData,
     archive: TrialArchive,
-    vocabulary: MeshVocabulary,
     out_dir: Path,
 ) -> CandidatesReport:
     """Collapse the descriptions, index the registry, and shortlist each unit."""
@@ -659,10 +687,6 @@ def build(
         for row in _read_tsv(out_dir / "trial_drug_map.tsv")
     }
     condition_of = {
-        row["source_name"].casefold(): row["mesh_id"]
-        for row in _read_tsv(out_dir / "trial_condition_map.tsv")
-    }
-    exact_condition = {
         row["source_name"].casefold(): row["mesh_id"]
         for row in _read_tsv(out_dir / "trial_condition_map.tsv")
     }
@@ -690,7 +714,10 @@ def build(
             row.application for row in spine.rows if row.trial_relevant == "true"
         ),
     )
-    term_index = indications.build_index(vocabulary)
+    heading_ids, chosen_ids = read_indications(out_dir)
+    if not heading_ids and not chosen_ids:
+        _log.warning("submission_indications.tsv is empty or missing — run "
+                     "--mode indication-normalize first; units get no indication")
     studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of)
 
     units: list[Unit] = []
@@ -703,10 +730,10 @@ def build(
             fda_drug[name] for name in application_names if name in fda_drug
         }
         stem_sourced = any(name in via_stem for name in application_names)
-        heading = row.get("heading", "")
-        indication_mesh = code_heading(heading, exact_condition, term_index)
-        if indication_mesh and not indication_mesh.startswith("MESH:"):
-            indication_mesh = f"MESH:{indication_mesh}"
+        heading = (row.get("heading") or "").strip()
+        indication_mesh = pick_indication(
+            heading_ids.get((key, heading), []), chosen_ids.get(key, [])
+        )
         if not drug_mesh:
             no_drug += 1
             shortlisted: tuple[Candidate, ...] = ()

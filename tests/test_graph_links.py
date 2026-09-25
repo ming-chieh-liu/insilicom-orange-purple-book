@@ -448,3 +448,28 @@ def test_a_mixed_file_takes_only_the_exhausted() -> None:
         _unlinked("later_appearance_of_the_same_trial", "4"),
     ]
     assert graph_links.exhausted_only(rows) == {"NDA1|ORIG|1", "NDA1|ORIG|3"}
+
+
+def test_the_submissions_own_chosen_indication_replaces_todays_label(
+    workspace: Path,
+) -> None:
+    """D30: when submission_indications.tsv exists, tier C walks the disease
+    this approval was for, not every indication the drug holds today."""
+    (workspace / "submission_indications.tsv").write_text(
+        "application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext"
+        "\tmesh_id\tbiokdeid\tterm\tchosen\n"
+        "NDA019640\tSUPPL\t58\tletter\t\tx\tMESH:D014424\t55633\tTurner Syndrome\ttrue\n",
+        encoding="utf-8",
+    )
+    repo = _graph(
+        [{"node_one_id": "6308113", "node_two_id": "55633",
+          "locations": [["1.55633.6308113", 0.9]]}],
+        [{"pmid": "1", "abstract": "Trial NCT00000123 in Turner syndrome.",
+          "articleTitle": "t", "publicationType": ["randomized controlled trial"]}],
+    )
+    report = graph_links.build(
+        workspace, repo, {"NCT00000123": ("2001-01-01", "540", "PHASE3")},
+        {"NDA019640|SUPPL|58", "NDA000002|ORIG|1"},
+        {"NDA019640": frozenset({"SOMATROPIN"})},
+    )
+    assert [u.indication_term for u in report.units] == ["Turner Syndrome"]

@@ -192,3 +192,25 @@ def test_the_report_renders(tmp_path: Path) -> None:
     text = graph_trials.render(graph_trials.GraphTrialsReport((), 100, 95, 60, 55, 25))
     assert "YIELDING TRIALS" in text
     assert "25.0%" in text
+
+
+def test_chosen_submission_indications_replace_todays_label(tmp_path: Path) -> None:
+    """D30: an application is walked with the union of its submissions' chosen
+    indications, which already carry biokdeids."""
+    out = _workspace(tmp_path, indications="")
+    (out / "submission_indications.tsv").write_text(
+        "application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext"
+        "\tmesh_id\tbiokdeid\tterm\tchosen\n"
+        "BLA1\tSUPPL\t35\tletter\t\tx\tMESH:D002289\tbk-dis\tLung Neoplasms\ttrue\n"
+        "BLA1\tSUPPL\t35\tlabel_14_heading\tNSCLC\tNSCLC\tMESH:D0\tbk-other\tx\tfalse\n",
+        encoding="utf-8",
+    )
+    graph = _FakeGraph(
+        {("bk-drug", "bk-dis"): ["111"]},
+        {"111": [_mention("NCT02578680", "111")]},
+    )
+    report = graph_trials.build(
+        out, cast(GraphEvidenceRepository, graph), frozenset({"BLA1"}),
+        {"BLA1": frozenset({"PEMBROLIZUMAB"})},
+    )
+    assert [r.nct_id for r in report.rows] == ["NCT02578680"]
