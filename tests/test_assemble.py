@@ -854,3 +854,68 @@ def test_a_label_role_rejecting_what_the_review_links_is_role_disagrees(
     [link] = assemble.build(out, adj).links
     assert (link.sources, link.conflict, link.evidence_tier) == (
         "review_protocol", "role_disagrees", "B")
+
+
+# ---------------------------------------------------------------------------
+# Tier C joins P5 (D14, D31) — never above, never moving, a stronger link
+# ---------------------------------------------------------------------------
+
+
+def _graph_picks(adj: Path, rows: list[tuple[str, str, int]]) -> None:
+    (adj / "graph_verdicts.jsonl").write_text("\n".join(
+        json.dumps({"unit_id": f"{key}|graph", "final": nct, "prompt_version": v})
+        for key, nct, v in rows) + "\n", encoding="utf-8")
+
+
+def test_a_graph_pick_on_an_unlinked_submission_is_a_tier_c_link(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT07777777", 2)])
+    link = next(l for l in assemble.build(out, adj).links if l.nct_id == "NCT07777777")
+    assert (link.evidence_tier, link.evidence_source, link.sources) == (
+        "C", "kg_abstract", "kg_abstract")
+    assert link.submission_no == "45"
+
+
+def test_a_graph_pick_agreeing_with_a_label_link_only_adds_a_source(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _graph_picks(adj, [("BLA125514|SUPPL|35", "NCT02578680", 2)])
+    [link] = assemble.build(out, adj).links
+    assert link.evidence_tier == "A" and link.sources == "label_nct;kg_abstract"
+
+
+def test_a_graph_pick_never_moves_a_trial_another_route_attributes(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT02578680", 2)])
+    links = assemble.build(out, adj).links
+    assert [(l.submission_no, l.evidence_tier) for l in links] == [("35", "A")]
+
+
+def test_among_graph_picks_the_earliest_submission_keeps_the_trial(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT07777777", 2),
+                       ("BLA125514|SUPPL|35", "NCT07777777", 2),
+                       ("BLA999999|ORIG|1", "NCT07777778", 2),      # not in the spine
+                       ("BLA125514|SUPPL|45", "NCT07777779", 1)])   # old prompt version
+    graph = [l for l in assemble.build(out, adj).links if l.evidence_tier == "C"]
+    assert [(l.nct_id, l.submission_no) for l in graph] == [("NCT07777777", "35")]
+
+
+def test_a_later_none_verdict_withdraws_a_graph_pick(workspace: tuple[Path, Path]) -> None:
+    """Append-only: the last verdict for a unit wins, so a re-judged NONE removes it."""
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT07777777", 2),
+                       ("BLA125514|SUPPL|45", "NONE", 2)])
+    assert all(l.evidence_tier != "C" for l in assemble.build(out, adj).links)

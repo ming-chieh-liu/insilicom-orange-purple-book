@@ -110,17 +110,28 @@ Output one line per case, nothing else:
 
 ## Step 3 — combine, tiebreak, record
 
-Identical machinery to P4 — `service/identification.py` is reused, pointed at
-the tier-C directories:
-
 ```bash
-$PY main.py --mode identify-combine --adjudication adjudication/graph
-$PY main.py --mode identify-record --from adjudication/graph/identify_judged.jsonl \
-            --adjudication adjudication/graph
+$PY main.py --mode graph-prepare [--limit N]
+#   → adjudication/graph_batches/v2/graph-batch-NNN.ids (20 ids each)
+#   judges A and B save answers as adjudication/graph_raw/v2/graph-batch-NNN-{A,B}.txt
+$PY main.py --mode graph-combine
+#   → appends decided units to adjudication/graph_verdicts.jsonl (prompt_version 2);
+#     writes graph-tiebreak-batch-NNN.ids; save the third judge's answers as
+#     graph_raw/v2/graph-tiebreak-batch-NNN-C.txt and re-run until "nothing pending"
 ```
 
-Answers are validated against that unit's own candidate ids and refused
-otherwise.
+`service/graph_judging.py` validates every answer against **that unit's own**
+candidate ids and refuses anything else. *(Before 2026-09-25 this step borrowed
+P4's `identify-record`, which reads a `candidate_ids` field graph units do not
+carry — it would have refused every named trial — and stamped P4's prompt
+version.)*
+
+P5 (`--mode assemble`) then turns each pick into a **tier C** link,
+`evidence_source = kg_abstract`, only where no other route links that trial for
+the application; where the label or review route already links it for the same
+submission, `kg_abstract` is added to that row's `sources` instead. A tier-C
+pick never moves or replaces a stronger link; among tier-C picks, the earliest
+submission keeps the trial (D16).
 
 ## Step 4 — report
 

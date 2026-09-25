@@ -56,6 +56,7 @@ from service import (
     letters,
     review_role,
     review_trials,
+    graph_judging,
     graph_links,
     graph_trials,
     normalize,
@@ -96,6 +97,10 @@ MODES: dict[str, str] = {
     "verdict (see docs/runbooks/label-trial-role.md)",
     "label-role-combine": "pair the label-role judges' answers, batch tiebreaks, "
     "record decided units",
+    "graph-prepare": "batch the tier-C units without a current-prompt verdict "
+    "(see docs/runbooks/select-graph-trial.md)",
+    "graph-combine": "pair the tier-C judges' answers, batch tiebreaks, record "
+    "decided units in adjudication/graph_verdicts.jsonl",
     "precision-prepare": "sample withheld-answer P4 units per evidence group into "
     "adjudication/precision_p4_v1/ (--limit = units per group, default 40)",
     "precision-combine": "pair the precision experiment's judge answers, batch "
@@ -766,6 +771,23 @@ def main(argv: list[str] | None = None) -> int:
                 lr_verdicts, decided_on=date.today().isoformat(),
             )
         print(label_role.render(lr_role_report))
+        return 0
+
+    if args.mode in ("graph-prepare", "graph-combine"):
+        adjudication_dir = Path(args.adjudication)
+        gj_version = f"v{graph_judging.PROMPT_VERSION}"
+        gj_units = adjudication_dir / "graph_units.jsonl"
+        gj_batches = adjudication_dir / "graph_batches" / gj_version
+        gj_verdicts = adjudication_dir / "graph_verdicts.jsonl"
+        if args.mode == "graph-prepare":
+            gj_report = graph_judging.prepare(gj_units, gj_batches, gj_verdicts,
+                                              limit=args.limit)
+        else:
+            gj_report = graph_judging.combine(
+                gj_units, adjudication_dir / "graph_raw" / gj_version, gj_batches,
+                gj_verdicts, decided_on=date.today().isoformat(),
+            )
+        print(graph_judging.render(gj_report))
         return 0
 
     if args.mode in ("precision-prepare", "precision-combine"):

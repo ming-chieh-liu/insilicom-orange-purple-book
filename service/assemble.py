@@ -40,7 +40,7 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from service import identification, judging, label_role, review_role
+from service import graph_judging, identification, judging, label_role, review_role
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -766,6 +766,43 @@ def build(out_dir: Path, adjudication_dir: Path, *,
         ))
         position[(nct, key)] = len(links) - 1
         linked_submissions.add(key)
+    # Tier C (D14, D31): a graph pick the judges agreed on. It never moves or
+    # replaces a stronger link: where another route already links the trial for
+    # this submission it only adds ``kg_abstract`` to that row's sources (the D19
+    # cross-check); where another route attributes the trial to another
+    # submission of the application, it adds nothing. Among tier-C picks
+    # themselves D16 still holds -- the earliest submission keeps it.
+    linked_trials = {(link.application, link.nct_id) for link in links}
+    graph_first: dict[tuple[str, str], tuple[str, tuple[int, str], str]] = {}
+    for key, nct in graph_judging.read_picks(adjudication_dir / "graph_verdicts.jsonl"):
+        if key not in spine:
+            continue
+        application, _, submission_no = key.split("|")
+        if (nct, key) in position:
+            held = links[position[(nct, key)]]
+            links[position[(nct, key)]] = held._replace(sources=";".join(
+                dict.fromkeys([*held.sources.split(";"), graph_judging.EVIDENCE_SOURCE])))
+            continue
+        if (application, nct) in linked_trials:
+            continue
+        rank_key = (spine[key].get("approval_date", ""), _submission_sort(submission_no))
+        held_first = graph_first.get((application, nct))
+        if held_first is None or rank_key < (held_first[0], held_first[1]):
+            graph_first[(application, nct)] = (rank_key[0], rank_key[1], key)
+    for (application, nct), (when, _, key) in sorted(graph_first.items()):
+        _, submission_type, submission_no = key.split("|")
+        links.append(Link(
+            nct_id=nct, application=application, submission_type=submission_type,
+            submission_no=submission_no, approval_date=when,
+            action_type=spine[key].get("action_type", ""),
+            indication_mesh=chosen.get(key, ("", ""))[0],
+            indication_term=chosen.get(key, ("", ""))[1],
+            drug_mesh="", trial_name="", label_enrollment="", registry_enrollment="",
+            evidence_tier=TIER_GRAPH, evidence_source=graph_judging.EVIDENCE_SOURCE,
+            count_check="no_count", sources=graph_judging.EVIDENCE_SOURCE,
+        ))
+        linked_submissions.add(key)
+
     context_rows: list[ReviewContext] = []
     for key, nct, role, protocol in judged_reviews:
         if role in review_role.LINKING:

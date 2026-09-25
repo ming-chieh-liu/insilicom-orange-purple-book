@@ -168,6 +168,11 @@ code says `not yet implemented` until it lands.
   first up to the 400-abstract budget → PMIDs → NCT ids → start ≤ approval **and** primary
   completion ≤ approval → the same P4c judges (prompt v2), tier C. Units carry
   `basis = drug_only` and each candidate the disease(s) it was found under.
+  **Tier C joins P5 as of 2026-09-25** (it never did before — `TIER_GRAPH` was unused): judging via
+  `graph-prepare`/`graph-combine` (`service/graph_judging.py`, prompt v2, answers checked against
+  the unit's own candidates), then a pick becomes a tier-C `kg_abstract` link only where no other
+  route links that trial for the application; where one does for the same submission, it only adds
+  `kg_abstract` to `sources`.
 
 ## Hard constraints
 
