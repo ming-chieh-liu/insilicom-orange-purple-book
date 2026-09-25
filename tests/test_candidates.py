@@ -363,6 +363,38 @@ def test_an_unusable_phase_is_excluded(patched_archive: None) -> None:
 def test_the_pass_shortlists_and_counts(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    report = _run_pass(tmp_path, monkeypatch)
+    assert report.descriptions == 2
+    assert report.collapsed == 2
+    assert report.already_identified == 1
+    assert report.to_judge == 1
+    judged = next(u for u in report.units if u.needs_judgement)
+    assert judged.acronym == "KEYNOTE-189"
+    assert judged.enrollment == "616"
+    assert judged.drug_mesh == "MESH:C582435"
+    assert [c.nct_id for c in judged.candidates] == ["NCT02578680"]
+
+
+def test_a_name_the_submissions_review_resolved_skips_the_shortlist(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D29: the review named KEYNOTE-189's trial by protocol id and its registry
+    acronym is the label's name, so no judge is asked."""
+    report = _run_pass(tmp_path, monkeypatch, mentions=(
+        "application\tsubmission_type\tsubmission_no\tapproval_date\tdocument\theading"
+        "\tprotocol_id\tnct_id\toutcome\tacronym\n"
+        "BLA125514\tSUPPL\t35\t2018-08-20\tSumR\th\tMK-3475-189\tNCT02578680"
+        "\taccepted\tKEYNOTE-189\n"
+    ))
+    assert report.to_judge == 0 and report.review_identified == 1
+    unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
+    assert (unit.review_nct, unit.candidates) == ("NCT02578680", ())
+    assert "identified by the submission's review" in candidates.render(report)
+
+
+def _run_pass(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mentions: str = ""
+) -> "candidates.CandidatesReport":
     out = tmp_path / "output"
     out.mkdir()
     (out / "label_trials.tsv").write_text(
@@ -412,18 +444,29 @@ def test_the_pass_shortlists_and_counts(
         "ingredients_of",
         lambda data, apps: {"BLA125514": frozenset({"PEMBROLIZUMAB"})},
     )
-    report = candidates.build(
+    if mentions:
+        (out / "review_trial_mentions.tsv").write_text(mentions, encoding="utf-8")
+    return candidates.build(
         object(), object(), out  # type: ignore[arg-type]
     )
-    assert report.descriptions == 2
-    assert report.collapsed == 2
-    assert report.already_identified == 1
-    assert report.to_judge == 1
-    judged = next(u for u in report.units if u.needs_judgement)
-    assert judged.acronym == "KEYNOTE-189"
-    assert judged.enrollment == "616"
-    assert judged.drug_mesh == "MESH:C582435"
-    assert [c.nct_id for c in judged.candidates] == ["NCT02578680"]
+
+
+_MENTIONS_HEAD = ("application\tsubmission_type\tsubmission_no\tprotocol_id\tnct_id"
+                  "\toutcome\tacronym\n")
+
+
+def test_review_names_keep_only_unambiguous_accepted_names(tmp_path: Path) -> None:
+    (tmp_path / "review_trial_mentions.tsv").write_text(_MENTIONS_HEAD + "".join([
+        "A\tORIG\t1\tMCP-103-302\tNCT1\taccepted\tTRIUMPH\n",
+        "A\tORIG\t1\tXYZ-001-A\tNCT2\taccepted\t\n",
+        "A\tORIG\t1\tXYZ-001-A\tNCT3\taccepted\t\n",       # one name, two trials
+        "A\tORIG\t1\tABC-9999\tNCT4\tstart_after_approval\t\n",
+        "A\tORIG\t1\tSTUDY 12\tNCT5\taccepted\t\n",        # a numbering
+        "A\tORIG\t1\tAB1\tNCT6\taccepted\t\n",             # too short
+    ]), encoding="utf-8")
+    assert candidates.review_names(tmp_path) == {
+        "A|ORIG|1": {"mcp103302": "NCT1", "triumph": "NCT1"}}
+    assert candidates.review_names(tmp_path / "absent") == {}
 
 
 def test_a_missing_input_file_yields_no_rows(tmp_path: Path) -> None:

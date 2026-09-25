@@ -138,13 +138,15 @@ code says `not yet implemented` until it lands.
   identification never asks about support. New P4b step, before assembly, on the linked
   submission's own §14 text, same six roles as D26; replaces `adjudication/verdicts.jsonl`. Only
   `PIVOTAL`/`SUPPORTING` link.
-- **D29 — how the sources combine** (2026-09-24, **not yet implemented**). Direct sources first
+- **D29 — how the sources combine** (2026-09-24, **implemented in code 2026-09-25; `output/` not yet rebuilt**). Direct sources first
   (label-stated NCT, review protocol id). A §14 description whose trial name matches a protocol id or
   acronym the same submission's review matched skips the shortlist. The shortlist serves only
   descriptions no FDA document identifies; the graph route (tier C) serves what has no usable
   document. Rows carry `sources` and `conflict` (`role_disagrees`, `attribution_moved`,
   `judged_contradicts_direct`, `indication_mismatch`). Different trials from different routes for one
-  approval is normal, not a conflict. Detail: `docs/DESIGN.md` §3c, which also records the open
+  approval is normal, not a conflict. As built: a description resolved by name gets `evidence_source =
+  review_name_match`, tier A; a `role_disagrees` row is held at tier B; the label side of a role
+  disagreement is the old polarity verdict until D28 lands. Detail: `docs/DESIGN.md` §3c, which also records the open
   question on D17 tier A for judged links.
 - **D30 — indications: read once, normalise once, one table** (2026-09-24, **implemented in
   code 2026-09-24; `output/` not yet rebuilt**). Readers emit raw text (label §1 + §14 headings, letter sentence, reviews later);
@@ -195,8 +197,8 @@ index |      |  letter > letter_located > label §1 >   |          |            
       | no                                             |  2 judges + 3rd,      |
 P3  CT.gov (600,762) by drug + start < approval,       |  six roles; PIVOTAL|  |
     ranked by condition + stated count -> <=40         |  SUPPORTING link      |
-    [D29 not yet implemented: skip the shortlist when  |  -> TIER A            |
-     the same submission's review matched the name]    |  (review_protocol,D27)|
+    D29: a name the same submission's review matched   |  -> TIER A            |
+     skips this -> TIER A (review_name_match)          |  (review_protocol,D27)|
       |                                                |          |       P3c pubmedRelations
 P4  "which candidate is this description?"             |          |       -> PMIDs -> NCT
     two judges, third on disagreement                  |          |       P4c "plausibly
@@ -207,8 +209,8 @@ P4b [D28 not yet implemented: role of every label      |          |       -> TIE
       +------------------------------------------------+----------+------------+
                               |
 P5 assemble   D16 earliest-wins across label AND review -> trial_submission_map.tsv
-              columns sources, conflict (attribution_moved built; role_disagrees,
-              judged_contradicts_direct, indication_mismatch not yet implemented);
+              columns sources, conflict (D29: attribution_moved · role_disagrees
+              -> tier B · judged_contradicts_direct · indication_mismatch);
               review-only links take the submission's chosen indication (D30)
               + review_trial_context.tsv (non-linking roles) + unlinked_submissions.tsv
                               |

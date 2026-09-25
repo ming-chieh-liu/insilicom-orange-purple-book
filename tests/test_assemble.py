@@ -666,3 +666,129 @@ def test_non_linking_roles_are_context_and_v1_is_ignored(workspace: tuple[Path, 
     report = assemble.build(out, adj)
     assert [(c.nct_id, c.role) for c in report.review_context] == [("NCT00000777", "PK_CLINPHARM")]
     assert {l.nct_id for l in report.links} == {"NCT02578680"}
+
+
+# ---------------------------------------------------------------------------
+# D29 — direct identification and the conflict column
+# ---------------------------------------------------------------------------
+
+
+def _identify(adj: Path, unit_id: str, final: str) -> None:
+    (adj / "identify_verdicts.jsonl").write_text(json.dumps({
+        "unit_id": unit_id, "judge_a": final, "judge_b": final, "tiebreak": None,
+        "final": final, "prompt_version": 1,
+    }) + "\n", encoding="utf-8")
+
+
+def test_a_review_identified_description_is_tier_a_whatever_the_counts(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit(stated_nct="", review_nct="NCT02578680", enrollment="9")])
+    [link] = assemble.build(out, adj).links
+    assert (link.evidence_source, link.evidence_tier) == ("review_name_match", "A")
+    assert link.sources == "label_description;review_protocol" and link.conflict == ""
+
+
+def test_a_judge_contradicting_the_review_is_overruled_and_recorded(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit(stated_nct="", review_nct="NCT02578680")])
+    _identify(adj, "BLA125514|SUPPL|35|KEYNOTE-189", "NCT01111111")
+    report = assemble.build(out, adj)
+    [link] = report.links
+    assert link.nct_id == "NCT02578680"
+    assert link.conflict == "judged_contradicts_direct"
+    assert ("judged_contradicts_direct", 1) in report.by_conflict
+
+
+def test_a_judge_agreeing_with_the_review_is_no_conflict(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit(stated_nct="", review_nct="NCT02578680")])
+    _identify(adj, "BLA125514|SUPPL|35|KEYNOTE-189", "NCT02578680")
+    assert assemble.build(out, adj).links[0].conflict == ""
+
+
+def test_a_review_calling_a_label_link_not_evidence_holds_it_at_tier_b(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED", 2)])
+    report = assemble.build(out, adj)
+    [link] = report.links
+    assert (link.conflict, link.evidence_tier) == ("role_disagrees", "B")
+    assert [c.role for c in report.review_context] == ["FAILED"]
+
+
+def test_a_review_linking_what_polarity_refuted_is_a_role_disagreement(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
+                     "final": "NOT_SUPPORTING"}])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL", 2)])
+    [link] = assemble.build(out, adj).links
+    assert (link.evidence_source, link.conflict, link.evidence_tier) == (
+        "review_protocol", "role_disagrees", "B")
+
+
+_INDICATIONS_HEAD = ("application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext\t"
+                     "mesh_id\tbiokdeid\tterm\tchosen\n")
+
+
+def _indications(out: Path, rows: list[tuple[str, str]]) -> None:
+    (out / "submission_indications.tsv").write_text(_INDICATIONS_HEAD + "".join(
+        f"BLA125514\tSUPPL\t35\t{source}\tk\tt\t{mesh}\t1\tx\tfalse\n" for source, mesh in rows
+    ), encoding="utf-8")
+
+
+def test_a_letter_indication_outside_label_section_1_is_flagged(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _indications(out, [("letter", "MESH:D008545"), ("label_section_1", "MESH:D002289")])
+    [link] = assemble.build(out, adj).links
+    assert (link.conflict, link.evidence_tier) == ("indication_mismatch", "A")
+
+
+def test_a_letter_indication_inside_a_cumulative_section_1_is_fine(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _indications(out, [("letter_located", "MESH:D002289"), ("", ""),
+                       ("label_section_1", "MESH:D002289"), ("label_section_1", "MESH:D008545")])
+    assert assemble.build(out, adj).links[0].conflict == ""
+
+
+def test_without_a_label_section_1_the_letter_is_not_tested(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _indications(out, [("letter", "MESH:D008545")])
+    assert assemble.build(out, adj).links[0].conflict == ""
+
+
+def test_the_report_lists_conflicts(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED", 2)])
+    text = assemble.render(assemble.build(out, adj))
+    assert "conflicts (D29" in text and "role_disagrees" in text
+
+
+def test_a_review_identified_unit_does_not_take_part_in_guard_grouping() -> None:
+    units: list[dict[str, object]] = [
+        {"unit_id": "A|SUPPL|1|X", "application": "A", "submission_type": "SUPPL",
+         "submission_no": "1", "approval_date": "2020", "review_nct": "NCT1"},
+        {"unit_id": "A|SUPPL|2|X", "application": "A", "submission_type": "SUPPL",
+         "submission_no": "2", "approval_date": "2021"},
+    ]
+    assert assemble._guard_led_units(units, {"A|SUPPL|1"}) == set()

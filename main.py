@@ -682,7 +682,7 @@ def main(argv: list[str] | None = None) -> int:
         repository.save(
             "review_trial_mentions",
             ("application", "submission_type", "submission_no", "approval_date",
-             "document", "heading", "protocol_id", "nct_id", "outcome"),
+             "document", "heading", "protocol_id", "nct_id", "outcome", "acronym"),
             rv_report.mentions,
         )
         units_path = Path(args.adjudication) / "review_role_units.jsonl"

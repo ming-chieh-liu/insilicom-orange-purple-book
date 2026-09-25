@@ -86,6 +86,8 @@ class ProtocolStudy(NamedTuple):
     start_date: str
     title: str
     interventions: str
+    #: The registry's acronym, so P3 can match a label's trial name to it (D29).
+    acronym: str = ""
 
 
 class ReviewText(NamedTuple):
@@ -107,6 +109,8 @@ class ReviewMention(NamedTuple):
     protocol_id: str
     nct_id: str
     outcome: str
+    #: Registry acronym of the matched study; P3 matches label names to it.
+    acronym: str = ""
 
 
 class ReviewReport(NamedTuple):
@@ -160,7 +164,8 @@ def build_index(facts: Iterable[StudyFacts]) -> dict[str, list[ProtocolStudy]]:
     index: dict[str, list[ProtocolStudy]] = defaultdict(list)
     for study in facts:
         record = ProtocolStudy(study.nct_id, study.lead_sponsor, study.start_date,
-                               study.brief_title, " | ".join(study.interventions))
+                               study.brief_title, " | ".join(study.interventions),
+                               study.acronym)
         for identifier in {study.org_study_id, *study.secondary_ids}:
             key = normalise_id(identifier)
             if len(key) >= 4:
@@ -336,7 +341,8 @@ def build(
                 heading = heading_before(review.text, position)
                 mentions.append(ReviewMention(application, submission_type, submission_no,
                                               approval_date, review.label, heading, token,
-                                              study.nct_id if study else "", outcome))
+                                              study.nct_id if study else "", outcome,
+                                              study.acronym if study else ""))
                 if outcome == ACCEPTED and study is not None:
                     snippet = " ".join(review.text[max(0, position - WINDOW):position + WINDOW].split())
                     accepted[(key, study.nct_id)].append((token, review.label, heading, snippet))

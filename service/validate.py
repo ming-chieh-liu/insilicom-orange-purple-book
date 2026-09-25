@@ -229,7 +229,8 @@ def route_agreement(map_path: Path) -> tuple[tuple[tuple[str, int], ...], int]:
     >>> import tempfile
     >>> path = Path(tempfile.mkdtemp()) / "m.tsv"
     >>> _ = path.write_text("sources\tconflict\nlabel_nct\t\nlabel_nct;review_protocol\t\n"
-    ...                     "review_protocol\tattribution_moved\n", encoding="utf-8")
+    ...                     "review_protocol\tattribution_moved;role_disagrees\n",
+    ...                     encoding="utf-8")
     >>> route_agreement(path)
     ((('label_nct', 1), ('label_nct;review_protocol', 1), ('review_protocol', 1)), 1)
     >>> route_agreement(path.parent / "absent.tsv")
@@ -242,7 +243,8 @@ def route_agreement(map_path: Path) -> tuple[tuple[tuple[str, int], ...], int]:
     with map_path.open(encoding="utf-8") as handle:
         rows = list(csv.DictReader(handle, delimiter="\t"))
     counts = Counter(row.get("sources") or row.get("evidence_source") or "" for row in rows)
-    moved = sum(1 for row in rows if row.get("conflict") == "attribution_moved")
+    moved = sum(1 for row in rows
+                if "attribution_moved" in (row.get("conflict") or "").split(";"))
     return tuple(sorted(counts.items())), moved
 
 

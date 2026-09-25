@@ -58,6 +58,19 @@ TIER_CORROBORATED: str = "A"
 TIER_JUDGED: str = "B"
 TIER_GRAPH: str = "C"
 
+#: Label-route evidence sources that identify a trial without the shortlist.
+DIRECT_SOURCES: frozenset[str] = frozenset({"label_nct", "review_name_match"})
+
+#: D29 conflict values. A row can carry several, ``;``-joined.
+ATTRIBUTION_MOVED = "attribution_moved"
+ROLE_DISAGREES = "role_disagrees"
+JUDGED_CONTRADICTS_DIRECT = "judged_contradicts_direct"
+INDICATION_MISMATCH = "indication_mismatch"
+
+#: Letter-derived indication sources, and the label source they must sit inside.
+LETTER_SOURCES: frozenset[str] = frozenset({"letter", "letter_located"})
+LABEL_INDICATION_SOURCE = "label_section_1"
+
 
 class Link(NamedTuple):
     """One trial → submission claim, as ``trial_submission_map.tsv`` holds it."""
@@ -78,7 +91,9 @@ class Link(NamedTuple):
     registry_enrollment: str
     evidence_tier: str
     #: ``label_nct`` when the label named the trial itself, ``label_description``
-    #: when two judges identified it from prose.
+    #: when two judges identified it from prose, ``review_name_match`` when the
+    #: label's trial name is a protocol id or acronym the same submission's
+    #: review resolved (D29), ``review_protocol`` for a review-only link.
     evidence_source: str
     #: ``counts_agree`` \\| ``counts_diverge`` \\| ``no_count``.
     count_check: str
@@ -95,8 +110,12 @@ class Link(NamedTuple):
     #: Every route that named this trial for this submission (D29):
     #: ``label_nct`` · ``label_description`` · ``review_protocol``.
     sources: str = ""
-    #: ``attribution_moved`` when the label and review routes' earliest
-    #: submissions for this trial differ; D16 across both routes decided.
+    #: D29, ``;``-joined: ``attribution_moved`` (the routes' earliest
+    #: submissions differ; D16 across both decided) · ``role_disagrees`` (label
+    #: and review disagree on whether the trial supports this approval; held
+    #: at tier B) · ``judged_contradicts_direct`` (a judge picked another trial
+    #: for a description an FDA document identified; the direct one kept) ·
+    #: ``indication_mismatch`` (the letter's indication is not inside label §1).
     conflict: str = ""
 
 
@@ -185,8 +204,15 @@ def tier_for(
 
     >>> tier_for("label_description", "counts_agree", "", True)
     'B'
+
+    **A description a same-submission review identified is direct too** (D29):
+    the FDA named the trial by its protocol id and the label names it the same
+    way, so the drug filter was never involved.
+
+    >>> tier_for("review_name_match", "counts_diverge", "stem")
+    'A'
     """
-    if evidence_source == "label_nct":
+    if evidence_source in DIRECT_SOURCES:
         return TIER_STATED
     if drug_basis == "stem" or injected:
         return TIER_JUDGED
@@ -262,7 +288,7 @@ def _identified(
     unit: dict[str, object], verdicts: dict[str, identification.Verdict]
 ) -> str:
     """The trial this unit resolves to, by either route, or ``""``."""
-    stated = str(unit.get("stated_nct") or "")
+    stated = str(unit.get("stated_nct") or unit.get("review_nct") or "")
     if stated:
         return stated
     verdict = verdicts.get(str(unit.get("unit_id") or ""))
@@ -301,7 +327,9 @@ __all__ = [
     "counts_agree",
     "read_jsonl",
     "ReviewContext",
+    "add_conflict",
     "chosen_indications",
+    "indication_mismatches",
     "refuted_pairs",
     "review_judgements",
     "tier_for",
@@ -320,6 +348,7 @@ class AssembleReport(NamedTuple):
     submissions_total: int
     review_context: tuple[ReviewContext, ...] = ()
     attribution_moved: int = 0
+    by_conflict: tuple[tuple[str, int], ...] = ()
 
     @property
     def coverage(self) -> float:
@@ -331,6 +360,42 @@ class AssembleReport(NamedTuple):
         0.0
         """
         return self.submissions_linked / self.submissions_total if self.submissions_total else 0.0
+
+
+def add_conflict(held: str, new: str) -> str:
+    """``held`` with ``new`` appended once.
+
+    >>> add_conflict("", "role_disagrees")
+    'role_disagrees'
+    >>> add_conflict("attribution_moved", "role_disagrees")
+    'attribution_moved;role_disagrees'
+    >>> add_conflict("role_disagrees", "role_disagrees")
+    'role_disagrees'
+    >>> add_conflict("role_disagrees", "")
+    'role_disagrees'
+    """
+    return ";".join(dict.fromkeys(p for p in (*held.split(";"), new) if p))
+
+
+def indication_mismatches(out_dir: Path) -> set[str]:
+    """Submissions whose letter indication is not contained in label §1 (D29).
+
+    Label §1 is cumulative, so it legitimately lists more than this approval
+    added; the test is containment of the letter's MeSH ids, not equality.
+    Only submissions carrying both sources are tested.
+    """
+    letter: dict[str, set[str]] = {}
+    label: dict[str, set[str]] = {}
+    for row in _read_tsv(out_dir / "submission_indications.tsv"):
+        mesh = row.get("mesh_id") or ""
+        if not mesh:
+            continue
+        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        if row.get("source") in LETTER_SOURCES:
+            letter.setdefault(key, set()).add(mesh)
+        elif row.get("source") == LABEL_INDICATION_SOURCE:
+            label.setdefault(key, set()).add(mesh)
+    return {key for key, ids in letter.items() if key in label and not ids <= label[key]}
 
 
 def _read_tsv(path: Path) -> Iterator[dict[str, str]]:
@@ -426,6 +491,9 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     #: Carcinoma" -- which is two units and would otherwise be two identical
     #: rows.
     emitted: set[tuple[str, str]] = set()
+    #: ``(trial, submission)`` the old polarity verdicts dropped, so a review
+    #: judging the same pair as evidence is recorded as a disagreement.
+    refuted_at: set[tuple[str, str]] = set()
     units = list(read_jsonl(out_dir / "candidates.jsonl"))
     guard_led = _guard_led_units(units, guard)
 
@@ -508,8 +576,16 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         registry = _registry_counts(unit)
         label_count = str(unit.get("enrollment") or "")
 
+        direct = str(unit.get("review_nct") or "")
+        contradicted = False
         if stated:
             nct, source = stated, "label_nct"
+        elif direct:
+            # D29: the review identified this description; a judge's pick from
+            # before the skip existed is kept only as a recorded disagreement.
+            nct, source = direct, "review_name_match"
+            earlier = verdicts.get(str(unit.get("unit_id") or ""))
+            contradicted = bool(earlier and earlier.identified and earlier.final != direct)
         else:
             verdict = verdicts.get(str(unit.get("unit_id") or ""))
             if verdict is None:
@@ -579,6 +655,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         )
 
         if (nct, str(unit["application"])) in refuted:
+            refuted_at.add((nct, key))
             unlinked.append(
                 Unlinked(
                     str(unit["application"]),
@@ -621,9 +698,12 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                 count_check=check,
                 drug_basis=basis,
                 injected="true" if was_injected else "",
-                sources=source,
-                conflict="attribution_moved"
-                if (str(unit["application"]), nct) in moved else "",
+                sources="label_description;review_protocol"
+                if source == "review_name_match" else source,
+                conflict=add_conflict(
+                    ATTRIBUTION_MOVED if (str(unit["application"]), nct) in moved else "",
+                    JUDGED_CONTRADICTS_DIRECT if contradicted else "",
+                ),
             )
         )
         linked_submissions.add(key)
@@ -638,13 +718,15 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         when = spine[key].get("approval_date", "")
         if earliest.get((application, nct)) != when:
             continue
-        conflict = "attribution_moved" if (application, nct) in moved else ""
+        conflict = ATTRIBUTION_MOVED if (application, nct) in moved else ""
+        if (nct, key) in refuted_at:
+            conflict = add_conflict(conflict, ROLE_DISAGREES)
         if (nct, key) in position:
             held = links[position[(nct, key)]]
             links[position[(nct, key)]] = held._replace(
                 sources=";".join(dict.fromkeys([*held.sources.split(";"), "review_protocol"])),
                 evidence_tier=TIER_STATED,
-                conflict=held.conflict or conflict,
+                conflict=add_conflict(held.conflict, conflict),
             )
             continue
         _, submission_type, submission_no = key.split("|")
@@ -669,6 +751,26 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         context_rows.append(ReviewContext(nct, application, submission_type, submission_no,
                                           protocol, role))
     context = tuple(sorted(context_rows))
+
+    # D29 role_disagrees: the label route links a trial the same submission's
+    # review judged as *not* evidence for it (FAILED, NOT_FOR_THIS_APPROVAL…),
+    # or the review links one the label's polarity verdict refuted. Either way
+    # the row stays, but not at tier A until someone resolves it.
+    non_linking = {(key, nct) for key, nct, role, _ in judged_reviews
+                   if role not in review_role.LINKING}
+    mismatched = indication_mismatches(out_dir)
+    for i, link in enumerate(links):
+        key = f"{link.application}|{link.submission_type}|{link.submission_no}"
+        conflict = link.conflict
+        if (key, link.nct_id) in non_linking or (
+            (link.nct_id, key) in refuted_at and "review_protocol" in link.sources
+        ):
+            conflict = add_conflict(conflict, ROLE_DISAGREES)
+        if key in mismatched:
+            conflict = add_conflict(conflict, INDICATION_MISMATCH)
+        tier = TIER_JUDGED if ROLE_DISAGREES in conflict.split(";") else link.evidence_tier
+        if (conflict, tier) != (link.conflict, link.evidence_tier):
+            links[i] = link._replace(conflict=conflict, evidence_tier=tier)
 
     # Only submissions that produced **no unit at all** get a catch-all row.
     # A submission whose units each failed for a stated reason is already
@@ -708,7 +810,12 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         submissions_linked=len(linked_submissions),
         submissions_total=len(spine),
         review_context=context,
-        attribution_moved=sum(1 for link in links if link.conflict == "attribution_moved"),
+        attribution_moved=sum(
+            1 for link in links if ATTRIBUTION_MOVED in link.conflict.split(";")
+        ),
+        by_conflict=tuple(Counter(
+            part for link in links for part in link.conflict.split(";") if part
+        ).most_common()),
     )
 
 
@@ -741,7 +848,7 @@ def _guard_led_units(
     first: dict[tuple[str, str], dict[str, object]] = {}
     members: dict[tuple[str, str], list[str]] = {}
     for unit in units:
-        if unit.get("stated_nct"):
+        if unit.get("stated_nct") or unit.get("review_nct"):
             continue
         unit_id = str(unit.get("unit_id") or "")
         group = (str(unit.get("application") or ""), unit_id.rsplit("|", 1)[-1])
@@ -781,6 +888,10 @@ def render(report: AssembleReport) -> str:
     ]
     for tier, count in report.by_tier:
         lines.append(f"    {tier:<38}{count:>9,}")
+    if report.by_conflict:
+        lines += ["", "  conflicts (D29; a link can carry several):"]
+        for name, count in report.by_conflict:
+            lines.append(f"    {name:<38}{count:>9,}")
     lines += ["", "  by evidence source:"]
     for source, count in report.by_source:
         lines.append(f"    {source:<38}{count:>9,}")

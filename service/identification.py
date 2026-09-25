@@ -142,7 +142,7 @@ def read_units(
     by_trial: dict[tuple[str, str], dict[str, object]] = {}
     seen = skipped = 0
     for row in iter_json_lines(path):
-        if row.get("stated_nct"):
+        if row.get("stated_nct") or row.get("review_nct"):
             continue
         candidates = row.get("candidates")
         if not isinstance(candidates, list) or not candidates:

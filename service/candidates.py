@@ -134,15 +134,21 @@ class Unit(NamedTuple):
     #: Digest of the label PDF this description came from, so P5 can tell one
     #: label counted several times from several labels sharing a date.
     label_sha: str = ""
+    #: The trial the same submission's FDA review identified by protocol id,
+    #: when the label's trial name matches that id or the registry acronym
+    #: (D29). Set only where :attr:`stated_nct` is empty.
+    review_nct: str = ""
 
     @property
     def needs_judgement(self) -> bool:
         """Whether P4 has to decide this one.
 
         A description that states its own NCT id is already identified; sending
-        it to a judge would spend two calls to confirm what the label said.
+        it to a judge would spend two calls to confirm what the label said. One
+        whose name an FDA review of the same submission already resolved is
+        identified too (D29).
         """
-        return not self.stated_nct
+        return not (self.stated_nct or self.review_nct)
 
 
 class CandidatesReport(NamedTuple):
@@ -156,6 +162,8 @@ class CandidatesReport(NamedTuple):
     no_candidates: int
     over_cap: int
     median_candidates: int
+    #: Descriptions resolved by a same-submission review's protocol id (D29).
+    review_identified: int = 0
 
     @property
     def to_judge(self) -> int:
@@ -235,6 +243,53 @@ def names_match(label_name: str, candidate: "Candidate") -> bool:
     return squashed in _squash(
         f"{candidate.acronym} {candidate.org_study_id} {candidate.brief_title}"
     )
+
+
+#: Label "names" that are a numbering, not a name: ``STUDY 1``, ``TRIAL 2``.
+#: Squashed they pass :data:`MIN_NAME_LENGTH`, and a sponsor could register
+#: exactly such an id, so they never resolve a description on their own.
+GENERIC_NAME = re.compile(r"(?i)^(study|trial|protocol|part|table|cohort)\W*\w{0,3}$")
+
+
+def review_names(out_dir: Path) -> dict[str, dict[str, str]]:
+    """``application|type|number`` → squashed name → NCT, for every trial the
+    submission's FDA reviews identified (D26 ``accepted`` mentions).
+
+    Both the protocol id as the review wrote it and the matched study's
+    registry acronym count as names. A name that points at two trials within
+    one submission is ambiguous and dropped — an exact match or nothing.
+
+    Every accepted mention counts, not only the review route's earliest one:
+    this is identity, and D16 is applied later, in P5, over all routes.
+    """
+    found: dict[str, dict[str, set[str]]] = {}
+    for row in _read_tsv(out_dir / "review_trial_mentions.tsv"):
+        if row.get("outcome") != "accepted" or not row.get("nct_id"):
+            continue
+        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        for name in (row.get("protocol_id") or "", row.get("acronym") or ""):
+            squashed = _squash(name)
+            if len(squashed) >= MIN_NAME_LENGTH and not GENERIC_NAME.match(name.strip()):
+                found.setdefault(key, {}).setdefault(squashed, set()).add(row["nct_id"])
+    return {
+        key: {name: next(iter(ncts)) for name, ncts in names.items() if len(ncts) == 1}
+        for key, names in found.items()
+    }
+
+
+def review_match(label_name: str, names: dict[str, str]) -> str:
+    """The NCT a review resolved for this label trial name, or ``""``.
+
+    >>> review_match("MCP-103-302", {"mcp103302": "NCT1"})
+    'NCT1'
+    >>> review_match("STUDY 1", {"study1": "NCT2"})
+    ''
+    >>> review_match("KEYNOTE", {"keynote189": "NCT3"})
+    ''
+    """
+    if not label_name or GENERIC_NAME.match(label_name.strip()):
+        return ""
+    return names.get(_squash(label_name), "")
 
 
 def _years_before(start: str, approval: str) -> int:
@@ -663,6 +718,8 @@ __all__ = [
     "graph_supported",
     "looks_biosimilar",
     "names_match",
+    "review_match",
+    "review_names",
     "index_studies",
     "render",
     "shortlist",
@@ -719,9 +776,10 @@ def build(
         _log.warning("submission_indications.tsv is empty or missing — run "
                      "--mode indication-normalize first; units get no indication")
     studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of)
+    reviewed = review_names(out_dir)
 
     units: list[Unit] = []
-    no_drug = no_candidates = over_cap = already = 0
+    no_drug = no_candidates = over_cap = already = from_review = 0
     sizes: list[int] = []
     for row in collapsed:
         key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
@@ -734,9 +792,15 @@ def build(
         indication_mesh = pick_indication(
             heading_ids.get((key, heading), []), chosen_ids.get(key, [])
         )
-        if not drug_mesh:
-            no_drug += 1
+        stated = row.get("nct_id", "")
+        # D29: a direct FDA identification skips the shortlist entirely.
+        resolved = "" if stated else review_match(row.get("acronym", ""),
+                                                   reviewed.get(key, {}))
+        if stated or resolved:
             shortlisted: tuple[Candidate, ...] = ()
+        elif not drug_mesh:
+            no_drug += 1
+            shortlisted = ()
         else:
             shortlisted = shortlist(
                 drug_mesh,
@@ -757,9 +821,10 @@ def build(
                 label_name=row.get("acronym", ""),
                 from_graph=from_graph_by_app.get(row["application"], frozenset()),
             )
-        stated = row.get("nct_id", "")
         if stated:
             already += 1
+        elif resolved:
+            from_review += 1
         elif not shortlisted:
             no_candidates += 1
         else:
@@ -783,6 +848,7 @@ def build(
                 excerpt=row.get("excerpt", ""),
                 candidates=shortlisted,
                 label_sha=row.get("label_sha", ""),
+                review_nct=resolved,
             )
         )
     sizes.sort()
@@ -792,6 +858,7 @@ def build(
         descriptions=len(descriptions),
         collapsed=len(collapsed),
         already_identified=already,
+        review_identified=from_review,
         no_drug=no_drug,
         no_candidates=no_candidates,
         over_cap=over_cap,
@@ -810,6 +877,8 @@ def render(report: CandidatesReport) -> str:
             "",
             f"  already identified (label states an NCT) "
             f"{report.already_identified:>9,}",
+            f"  identified by the submission's review    "
+            f"{report.review_identified:>9,}",
             f"  NEEDING JUDGEMENT                        {report.to_judge:>9,}",
             "",
             f"    no drug resolved for the application   {report.no_drug:>9,}",
