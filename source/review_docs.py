@@ -15,6 +15,7 @@ them would be a study that could not yet have supported anything.
 
 from __future__ import annotations
 
+import html as html_lib
 import re
 from collections.abc import Iterator
 from typing import NamedTuple
@@ -119,6 +120,13 @@ def toc_components(html: str) -> list[tuple[str, str]]:
     [('SumR', '761116Orig1s000SumR.pdf'), ('StatR', '761116Orig1s000StatR.pdf')]
     >>> toc_components("<html>no map here</html>")
     []
+
+    File names are HTML-unescaped: the page is HTML, so ``Prempro &amp;
+    Premphase`` names a file whose real name has a bare ``&`` — fetched as
+    written, all three of its components returned 404.
+
+    >>> toc_components('var pdfFilenames = {medr: "20-527S017_Prempro%20&amp;%20Premphase_Medr.pdf"};')
+    [('MedR', '20-527S017_Prempro%20&%20Premphase_Medr.pdf')]
     """
     listed = _FILENAMES.search(html)
     if listed:
@@ -126,13 +134,15 @@ def toc_components(html: str) -> list[tuple[str, str]]:
         for key, value in _ENTRY.findall(listed.group(1)):
             component = _MAP_KEYS.get(key.lower())
             if component:
-                out.extend((component, name) for name in re.findall(r"\"([^\"]+)\"", value))
+                out.extend((component, html_lib.unescape(name))
+                           for name in re.findall(r"\"([^\"]+)\"", value))
         return out
     base, flags = _BASE.search(html), _FLAGS.search(html)
     if not (base and flags):
         return []
     present = {key.lower(): value for key, value in re.findall(r"(\w+)\s*:\s*(\d)", flags.group(1))}
-    return [(c, f"{base.group(1)}{c}.pdf") for c in COMPONENTS if present.get(c.lower()) == "1"]
+    return [(c, f"{html_lib.unescape(base.group(1))}{c}.pdf")
+            for c in COMPONENTS if present.get(c.lower()) == "1"]
 
 
 def component_url(toc_url: str, filename: str) -> str:
