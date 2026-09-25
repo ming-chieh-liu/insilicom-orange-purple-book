@@ -51,7 +51,7 @@ START = re.compile(
     r"|an?\s+(?:new\s+)?indications?\b)"
     r"|\b(?:application|supplement|sNDA|sBLA|NDA|BLA)\s+"
     r"(?:provides|proposes|adds|updates|revises|expands|extends|includes|requests|seeks)\b"
-    r"|\b(?:is|are)\s+(?:now\s+)?indicated\s+(?:for|as|in|to)\s+"
+    r"|\b(?:is|are)\s+(?:now\s+)?indicated\s+(?:for|as|in|to|with)\b[:\s]*"
     r"|\byour\s+request\s+to\s+supplement\b",
     re.IGNORECASE,
 )
@@ -195,6 +195,12 @@ def indication_sentence(text: str) -> str:
     ...     "license application for adalimumab to expand the indication to include "
     ...     "psoriatic arthritis has been approved. Sincerely")
     'Your request to supplement your biologics license application for adalimumab to expand the indication to include psoriatic arthritis has been approved'
+    >>> indication_sentence("Erelzi is indicated for: \u2022 Rheumatoid Arthritis (RA) "
+    ...     "\u2022 Psoriatic Arthritis (PsA) APPROVAL & LABELING We have")
+    'is indicated for: \u2022 Rheumatoid Arthritis (RA) \u2022 Psoriatic Arthritis (PsA)'
+    >>> indication_sentence("Anktiva is indicated with BCG for the treatment of adult "
+    ...     "patients with BCG-unresponsive bladder cancer. APPROVAL & LABELING")
+    'is indicated with BCG for the treatment of adult patients with BCG-unresponsive bladder cancer'
     >>> indication_sentence("Please refer to your application.")
     ''
     """
