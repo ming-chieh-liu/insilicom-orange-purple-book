@@ -301,6 +301,7 @@ __all__ = [
     "counts_agree",
     "read_jsonl",
     "ReviewContext",
+    "chosen_indications",
     "refuted_pairs",
     "review_judgements",
     "tier_for",
@@ -330,6 +331,34 @@ class AssembleReport(NamedTuple):
         0.0
         """
         return self.submissions_linked / self.submissions_total if self.submissions_total else 0.0
+
+
+def _read_tsv(path: Path) -> Iterator[dict[str, str]]:
+    """Rows of a TSV, nothing if the file is absent."""
+    if not path.exists():
+        return
+    with path.open(encoding="utf-8", newline="") as handle:
+        yield from csv.DictReader(handle, delimiter="\t")
+
+
+def chosen_indications(out_dir: Path) -> dict[str, tuple[str, str]]:
+    """``application|type|number`` → ``(mesh ids, terms)`` of the submission's
+    chosen indication, each ``;``-joined (D30).
+
+    A link built from a label description carries its own trial's disease from
+    the §14 heading; a review-only link has no heading, so it takes the
+    approval's chosen indication instead.
+    """
+    ids: dict[str, list[str]] = {}
+    terms: dict[str, list[str]] = {}
+    for row in _read_tsv(out_dir / "submission_indications.tsv"):
+        if row.get("chosen") != "true" or not row.get("mesh_id"):
+            continue
+        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        if row["mesh_id"] not in ids.setdefault(key, []):
+            ids[key].append(row["mesh_id"])
+            terms.setdefault(key, []).append(row.get("term") or "")
+    return {key: (";".join(v), ";".join(terms[key])) for key, v in ids.items()}
 
 
 def review_judgements(adjudication_dir: Path) -> list[tuple[str, str, str, str]]:
@@ -603,6 +632,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     # already names the same trial for the same submission.
     position = {(link.nct_id, f"{link.application}|{link.submission_type}|{link.submission_no}"): i
                 for i, link in enumerate(links)}
+    chosen = chosen_indications(out_dir)
     for key, nct, protocol in review_links:
         application = key.split("|", 1)[0]
         when = spine[key].get("approval_date", "")
@@ -621,8 +651,10 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         links.append(Link(
             nct_id=nct, application=application, submission_type=submission_type,
             submission_no=submission_no, approval_date=when,
-            action_type=spine[key].get("action_type", ""), indication_mesh="",
-            indication_term="", drug_mesh="", trial_name=protocol, label_enrollment="",
+            action_type=spine[key].get("action_type", ""),
+            indication_mesh=chosen.get(key, ("", ""))[0],
+            indication_term=chosen.get(key, ("", ""))[1],
+            drug_mesh="", trial_name=protocol, label_enrollment="",
             registry_enrollment="", evidence_tier=TIER_STATED,
             evidence_source="review_protocol", count_check="no_count",
             sources="review_protocol", conflict=conflict,

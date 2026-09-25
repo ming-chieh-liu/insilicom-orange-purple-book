@@ -596,6 +596,38 @@ def test_a_review_only_link_is_tier_a(workspace: tuple[Path, Path]) -> None:
     assert link.trial_name == "P-999" and link.submission_no == "45"
 
 
+def test_a_review_only_link_takes_the_submissions_chosen_indication(
+    workspace: tuple[Path, Path],
+) -> None:
+    """A review names no disease heading, so the link carries the approval's
+    chosen indication from submission_indications.tsv (D30)."""
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    (out / "submission_indications.tsv").write_text(
+        "application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext\t"
+        "mesh_id\tbiokdeid\tterm\tchosen\n"
+        "BLA125514\tSUPPL\t45\tletter\tk\tt\tMESH:D008545\t11\tMelanoma\ttrue\n"
+        "BLA125514\tSUPPL\t45\tletter\tk\tt\tMESH:D008545\t11\tMelanoma\ttrue\n"
+        "BLA125514\tSUPPL\t45\tletter\tk\tt\tMESH:D002289\t12\tLung\ttrue\n"
+        "BLA125514\tSUPPL\t45\topenfda_current\tk\tt\tMESH:D000001\t13\tX\tfalse\n"
+        "BLA125514\tSUPPL\t45\tletter\tk\tt\t\t\t\tfalse\n",
+        encoding="utf-8")
+    _reviews(adj, [("BLA125514|SUPPL|45|NCT09999999", "PIVOTAL", 2)])
+    link = next(l for l in assemble.build(out, adj).links if l.nct_id == "NCT09999999")
+    assert link.indication_mesh == "MESH:D008545;MESH:D002289"
+    assert link.indication_term == "Melanoma;Lung"
+
+
+def test_without_the_indication_table_a_review_link_has_a_blank_indication(
+    workspace: tuple[Path, Path],
+) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit()])
+    _reviews(adj, [("BLA125514|SUPPL|45|NCT09999999", "PIVOTAL", 2)])
+    link = next(l for l in assemble.build(out, adj).links if l.nct_id == "NCT09999999")
+    assert (link.indication_mesh, link.indication_term) == ("", "")
+
+
 def test_both_routes_on_one_submission_merge_into_one_row(workspace: tuple[Path, Path]) -> None:
     out, adj = workspace
     _write_units(out, [_unit()])

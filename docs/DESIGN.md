@@ -366,33 +366,59 @@ name ↔ acronym/protocol-id match, or agreement with the review route).
 
 ---
 
-## 4. Pipeline — six phases
+## 4. Pipeline — six phases, four sources
+
+*Diagram redrawn 2026-09-25 for the letter, review and indication steps (D25–D30). The
+original one-route diagram is in git history before this date.*
 
 ```
-P0 spine        Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
-                trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921   (D4, as built)
-                D23, built 2026-09-24:        5,766 ORIG + 4,009 SUPPL
-                                             + 1,520 D24 guard SUPPL = 11,295
-
-P1 normalize    biokde pubmedEntitiesFlat as synonym dictionary -> MeSH descriptor
-                  FDA drug -> MeSH          FDA indication -> MeSH
-                  trial intervention -> MeSH   trial condition -> MeSH
-
-P2 labels       ApplicationDocs type 2 -> per-submission label PDF (~4,305 available)
-                anchor ^14 CLINICAL STUDIES; split on 14.N; per description extract
-                acronym, NCT if present, ENROLLMENT COUNT, phase, design, population
-
-P3 candidates   CT.gov archive (600,762) filtered by
-                drug-MeSH + condition-MeSH + phase + start < approval_date
-                -> 10-40 candidates   (measured: 16 / 11 / 33 / 14 / 10)
-
-P4 agents       4a identify: which candidate is this description? or NONE   [AGENT]
-                4b polarity: supporting vs failed / safety / PK   [ALREADY BUILT]
-
-P5 assemble     tier A/B/C -> trial_submission_map.tsv
-                + unlinked_submissions.tsv, a reason for every unlinked event
-
-P6 validate     against the 2,209 label-cited NCT links; KG cross-check for conflicts
+P0 spine      Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
+              -> D23: 5,766 ORIG + 4,009 SUPPL + 1,520 D24-guard SUPPL = 11,295 trial-relevant
+              (was D4: 5,879 ORIG + 2,042 core SUPPL = 7,921)
+                              |
+P1 normalize  FDA side  : ingredient -> MeSH via biokde synonyms (+ moiety fold)
+              TRIAL side: derivedSection.*BrowseModule.meshes (NLM's curation)
+              both carry the biokdeid the graph route needs
+                              |
+      +-----------------------+-----------------------+-----------------------+
+      | LABEL ROUTE           | LETTERS (D25)         | REVIEW ROUTE (D26)    | GRAPH ROUTE (D14)
+      |                       | indications only,     | trials by protocol id | no document needed
+P2    | ApplicationDocs 2     | ApplicationDocs 1     | ApplicationDocs 21, 3 |
+read  | -> label PDF, §14     | -> "provides for …"   |  (TOC), pediatric     |
+      | NCT|acronym|COUNT     | keyword sentence, or  | -> Study/Trial/Proto- |
+      | + §1, §14 headings    | agent locate+verify   |    col <id>           |
+      |                       | (letter-indication)   | -> exactly 1 registry |
+      |                       |          |            |    orgStudyId|second. |
+      |                       |          v            | -> guards: date,      |
+P2i   |      +------> INDICATION TABLE (D30) <-----+  |    sponsor|drug, pkg  |
+index |      |  letter > letter_located > label §1 >   |          |            |
+      |      |  openfda_current, coded once to MeSH    |          |            |
+      |      |  + biokdeid: submission_indications.tsv |          |            |
+      |      |        (read by P3, P3c, P5)            |          |            |
+      v                                                |          v            |
+  label states NCT? --yes--> TIER A (label_nct)        |  P4r role judge:      |
+      | no                                             |  2 judges + 3rd,      |
+P3  CT.gov (600,762) by drug + start < approval,       |  six roles; PIVOTAL|  |
+    ranked by condition + stated count -> <=40         |  SUPPORTING link      |
+    [D29 not yet implemented: skip the shortlist when  |  -> TIER A            |
+     the same submission's review matched the name]    |  (review_protocol,D27)|
+      |                                                |          |       P3c pubmedRelations
+P4  "which candidate is this description?"             |          |       -> PMIDs -> NCT
+    two judges, third on disagreement                  |          |       P4c "plausibly
+    counts agree -> TIER A · diverge -> TIER B         |          |       evidence?" 2 judges
+P4b [D28 not yet implemented: role of every label      |          |       -> TIER C, never
+     link at submission grain; old application-grain   |          |          promoted
+     polarity verdicts still applied]                  |          |            |
+      +------------------------------------------------+----------+------------+
+                              |
+P5 assemble   D16 earliest-wins across label AND review -> trial_submission_map.tsv
+              columns sources, conflict (attribution_moved built; role_disagrees,
+              judged_contradicts_direct, indication_mismatch not yet implemented);
+              review-only links take the submission's chosen indication (D30)
+              + review_trial_context.tsv (non-linking roles) + unlinked_submissions.tsv
+                              |
+P6 validate   shortlist recall · judge precision · route agreement by `sources`
+              · graph cross-check
 ```
 
 **Why this works.** §14 rarely names an NCT id but always describes the trial — design, population,
@@ -425,6 +451,29 @@ descriptor need a fallback key (semaglutide → PubChem only); code names are se
 naming plus ≥49k bytes/page and skip them. Anchor on `^14 CLINICAL STUDIES` to the next top-level
 section — a naive regex over flat text matches table data and TOC entries and must not be used.
 → `label_trials.tsv`. **Gate:** ≥90% of non-scanned labels yield a §14 region.
+
+**P2 letters — indications (D25, D30).** *`source/approval_letter.py`, `service/letters.py`,
+`service/letter_locate.py`.* `--mode letters` fetches type-1 letters of in-scope submissions
+(1998+) through `source/polite_fetch.py` and takes the indication sentence by keyword;
+`letter-locate-prepare` / `letter-indication-combine` send the rest to agents that point at the
+sentence, which code extracts and a second agent pair verifies
+(`docs/runbooks/letter-indication.md`; pilot hand-checked 2026-09-25). **Built; full run pending
+the fetch.**
+
+**P2i — one indication table (D30).** *`service/indication_normalize.py`.*
+`--mode indication-normalize` codes every indication text once — letter, agent-located letter,
+label §1, §14 headings, current openFDA label — to `MESH:D…` + `biokdeid`, and marks one source
+per submission `chosen` by that precedence. → `submission_indications.tsv`, read by P3, P3c,
+the graph links and P5 (review-only links carry the chosen indication). **Built; not yet run on
+the full letter set.**
+
+**P2 reviews → P4r — trials by protocol id (D26, D27).** *`source/review_docs.py`,
+`service/review_trials.py`, `service/review_role.py`.* `--mode reviews` fetches types 21, 3 (via
+the table-of-contents page) and pediatric reviews, skips files with no text layer, matches
+protocol ids exactly to one registry study, applies the three guards and D16, and writes one unit
+per (submission, trial). `review-role-prepare` / `review-role-combine` run the role judges
+(`docs/runbooks/review-trial-role.md`, prompt v2). PIVOTAL/SUPPORTING → tier A,
+`evidence_source = review_protocol`. **Built; fetch running 2026-09-25; v2 not yet judged.**
 
 **P3 — candidate generation.** *New: `service/candidates.py`.* Index the CT.gov archive once
 (600,762 rows; the prototype took ~2 minutes across 25 shards).

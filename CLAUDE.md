@@ -164,53 +164,65 @@ code says `not yet implemented` until it lands.
 - Combination regimens are legitimately many-to-many: KEYNOTE-189 approved pembrolizumab *with*
   chemo owned by other applications.
 
-## Pipeline — six phases
+## Pipeline — six phases, four sources
 
 ```
-                     THE LABEL ROUTE                    THE GRAPH ROUTE
-                                                        (independent source)
-
-P0 spine      Submissions + Applications + ActionTypes
-              -> 87,055 approved NDA|BLA events
-              -> trial-relevant = 5,879 ORIG + 2,042 core SUPPL = 7,921  (D4, as built)
-              -> D23, built 2026-09-24: 5,766 ORIG + 4,009 SUPPL
-                                     + 1,520 D24-guard SUPPL = 11,295
+P0 spine      Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
+              -> D23: 5,766 ORIG + 4,009 SUPPL + 1,520 D24-guard SUPPL = 11,295 trial-relevant
+              (was D4: 5,879 ORIG + 2,042 core SUPPL = 7,921)
                               |
 P1 normalize  FDA side  : ingredient -> MeSH via biokde synonyms (+ moiety fold)
-              TRIAL side: derivedSection.*BrowseModule.meshes -- NLM's own
-                          curation, NOT the biokde synonym index
+              TRIAL side: derivedSection.*BrowseModule.meshes (NLM's curation)
               both carry the biokdeid the graph route needs
                               |
-              +---------------+-------------------------------+
-              |                                               |
-P2 labels     ApplicationDocs type 2 -> label PDF          P3c graph candidates
-              anchor ^14 CLINICAL STUDIES                  pubmedRelations edge
-              extract NCT | acronym | ENROLLMENT           -> .locations -> PMIDs
-                              |                            -> pubmedDocs abstracts
-              label states an NCT? ---> yes -> TIER A      -> regex NCT
-                              | no                         -> drop trials starting
-P3 candidates CT.gov (600,762) filtered by                    after the approval
-              drug-MeSH + start < approval_date                        |
-              ranked by condition + stated count           P4c judge   |
-              -> 40 candidates                             "is any of these
-                              |                             plausibly evidence?"
-P4 judge      "which candidate is this description?"        two judges, NONE
-              two judges, third on disagreement             expected to dominate
-                              |                                        |
-              counts agree -> TIER A                                   |
-              counts diverge -> TIER B                            TIER C, never
-                              |                                    promoted
-              +---------------+-------------------------------+
+      +-----------------------+-----------------------+-----------------------+
+      | LABEL ROUTE           | LETTERS (D25)         | REVIEW ROUTE (D26)    | GRAPH ROUTE (D14)
+      |                       | indications only,     | trials by protocol id | no document needed
+P2    | ApplicationDocs 2     | ApplicationDocs 1     | ApplicationDocs 21, 3 |
+read  | -> label PDF, §14     | -> "provides for …"   |  (TOC), pediatric     |
+      | NCT|acronym|COUNT     | keyword sentence, or  | -> Study/Trial/Proto- |
+      | + §1, §14 headings    | agent locate+verify   |    col <id>           |
+      |                       | (letter-indication)   | -> exactly 1 registry |
+      |                       |          |            |    orgStudyId|second. |
+      |                       |          v            | -> guards: date,      |
+P2i   |      +------> INDICATION TABLE (D30) <-----+  |    sponsor|drug, pkg  |
+index |      |  letter > letter_located > label §1 >   |          |            |
+      |      |  openfda_current, coded once to MeSH    |          |            |
+      |      |  + biokdeid: submission_indications.tsv |          |            |
+      |      |        (read by P3, P3c, P5)            |          |            |
+      v                                                |          v            |
+  label states NCT? --yes--> TIER A (label_nct)        |  P4r role judge:      |
+      | no                                             |  2 judges + 3rd,      |
+P3  CT.gov (600,762) by drug + start < approval,       |  six roles; PIVOTAL|  |
+    ranked by condition + stated count -> <=40         |  SUPPORTING link      |
+    [D29 not yet implemented: skip the shortlist when  |  -> TIER A            |
+     the same submission's review matched the name]    |  (review_protocol,D27)|
+      |                                                |          |       P3c pubmedRelations
+P4  "which candidate is this description?"             |          |       -> PMIDs -> NCT
+    two judges, third on disagreement                  |          |       P4c "plausibly
+    counts agree -> TIER A · diverge -> TIER B         |          |       evidence?" 2 judges
+P4b [D28 not yet implemented: role of every label      |          |       -> TIER C, never
+     link at submission grain; old application-grain   |          |          promoted
+     polarity verdicts still applied]                  |          |            |
+      +------------------------------------------------+----------+------------+
                               |
-P5 assemble   both routes -> trial_submission_map.tsv
-              + unlinked_submissions.tsv, a reason for every unlinked event
+P5 assemble   D16 earliest-wins across label AND review -> trial_submission_map.tsv
+              columns sources, conflict (attribution_moved built; role_disagrees,
+              judged_contradicts_direct, indication_mismatch not yet implemented);
+              review-only links take the submission's chosen indication (D30)
+              + review_trial_context.tsv (non-linking roles) + unlinked_submissions.tsv
                               |
-P6 validate   shortlist recall (free, from labels that state their own id)
-              judge precision (withheld answers)
-              graph cross-check -> the `conflict` column
+P6 validate   shortlist recall · judge precision · route agreement by `sources`
+              · graph cross-check
 ```
 
-**The two routes are parallel and independent, not sequential.** The graph route
+**Letters give indications, never trials; reviews give trials by the sponsor's own protocol id**
+(D25, D26). Both are fetched at 1 request/s with a breaker after 5 consecutive 403s — FDA banned
+this host's IP after an unthrottled run. A review link and a label link to the same trial meet in
+P5's D16; a later mention moves nothing, an earlier one moves the link and sets
+`conflict = attribution_moved`.
+
+**The label and graph routes are parallel and independent, not sequential.** The graph route
 branches at P1 and skips P2/P3 entirely, because the approvals it serves have no
 readable section 14 — that is the whole reason it exists. It does two jobs:
 
