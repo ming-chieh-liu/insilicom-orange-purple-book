@@ -167,7 +167,8 @@ code says `not yet implemented` until it lands.
   disease) from the drug to a `Disease` node, direction drug → disease or unrecorded, best-scored
   first up to the 400-abstract budget → PMIDs → NCT ids → start ≤ approval **and** primary
   completion ≤ approval → the same P4c judges (prompt v2), tier C. Units carry
-  `basis = drug_only` and each candidate the disease(s) it was found under.
+  `basis = drug_only` and each candidate the disease(s) it was found under. Measured on 150 such
+  submissions: 21 (14%) reach candidates, median 2; a trial with no registry record is dropped here.
   **Tier C joins P5 as of 2026-09-25** (it never did before — `TIER_GRAPH` was unused): judging via
   `graph-prepare`/`graph-combine` (`service/graph_judging.py`, prompt v2, answers checked against
   the unit's own candidates), then a pick becomes a tier-C `kg_abstract` link only where no other

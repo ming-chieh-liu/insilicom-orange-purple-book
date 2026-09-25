@@ -605,3 +605,16 @@ def test_abstracts_are_found_whether_pmid_is_stored_as_text_or_number() -> None:
     ])
     assert [(m.pmid, m.nct_id) for m in repo.mentions_in(["2", "1", "2", "x9"])] == [
         ("2", "NCT00000002"), ("1", "NCT00000001")]
+
+
+def test_a_drug_only_candidate_with_no_registry_record_is_dropped(workspace: Path) -> None:
+    """Without a record there are no dates to check, and a drug-wide search
+    reaches trials registered decades after the approval."""
+    repo = _graph([_treats("d1", "COVID-19", ["1", "2"])],
+                  [_paper("1", "NCT06096863"), _paper("2", "NCT00000101")])
+    report = graph_links.build(
+        workspace, repo, {"NCT00000101": ("2001-01-01", "10", "PHASE3", "2003-01-01")},
+        {"NDA000002|ORIG|1"}, {"NDA000002": frozenset({"SOMATROPIN"})},
+    )
+    [unit] = report.units
+    assert [c.nct_id for c in unit.candidates] == ["NCT00000101"]

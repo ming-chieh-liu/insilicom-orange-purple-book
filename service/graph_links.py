@@ -480,9 +480,14 @@ def _drug_only_unit(
         for name in diseases_of.get(mention.pmid, []):
             if name not in found_under[mention.nct_id]:
                 found_under[mention.nct_id].append(name)
+    # A drug-wide search reaches any trial an abstract names, including ones
+    # registered decades after the approval; one with no registry record has no
+    # dates to check, so here it cannot pass the date bounds (a 1996 approval
+    # was offered NCT06096863, a COVID-19 trial). The indication path keeps
+    # its original leniency.
     candidates = [
         _with_registry(c, studies)._replace(diseases="; ".join(found_under[c.nct_id][:5]))
-        for c in rank(mentions)
+        for c in rank(mentions) if c.nct_id in studies
     ]
     candidates = completed_by(within_date(candidates, row["approval_date"]),
                               row["approval_date"])
