@@ -37,7 +37,7 @@ from config.settings import (
 from dao.biokde import BiokdeRepository, connection_uri
 from dao.graph_evidence import GraphEvidenceRepository
 from dao.tsv_repository import TsvRepository
-from source import label_pdf, mesh_descriptors, moiety, trial_studies
+from source import label_pdf, mesh_descriptors, moiety, review_docs, trial_studies
 from source.raw_table import read_rows
 from service import (
     adjudication,
@@ -52,6 +52,7 @@ from service import (
     indications,
     letter_locate,
     letters,
+    review_trials,
     graph_links,
     graph_trials,
     normalize,
@@ -80,6 +81,8 @@ MODES: dict[str, str] = {
     "MeSH descriptors via the Insilicom graph",
     "letters": "fetch each trial-relevant submission's approval letter, code the "
     "indication it states, and choose one indication source per submission (D25)",
+    "reviews": "fetch each trial-relevant submission's FDA reviews, match the "
+    "protocol ids they cite to registry trials, and write role units (D26)",
     "letter-locate-prepare": "write locate units and batches for letters the "
     "keyword rule missed (see docs/runbooks/letter-indication.md)",
     "letter-indication-combine": "pair locator/verifier answers, extract agreed "
@@ -169,6 +172,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--letter-cache",
         default="fda_raw/letter_pdf",
         help="where approval-letter PDFs are cached (gitignored, rebuildable)",
+    )
+    parser.add_argument(
+        "--review-cache",
+        default="fda_raw/review_pdf",
+        help="where FDA review documents are cached (gitignored, rebuildable)",
     )
     parser.add_argument(
         "--offline",
@@ -599,6 +607,73 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(letters.render(letters_report))
         print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode == "reviews":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the reviews need the bulk data tree")
+            return 1
+        archive = TrialArchive(root=Path(args.trial_archive))
+        if not archive.study_shards:
+            print(f"{archive.root} has no {archive.study_glob}")
+            return 1
+        in_scope = [
+            row for row in approval_events.build(data).rows if row.trial_relevant == "true"
+        ]
+        rv_wanted = {
+            f"{r.application[-6:]}|{r.submission_type}|{r.submission_no}" for r in in_scope
+        }
+        documents = [
+            d for d in review_docs.read_review_documents(data)
+            if f"{d.application.zfill(6)}|{d.submission_type}|{d.submission_no}" in rv_wanted
+        ]
+        review_texts, fetch_stats = review_trials.collect_texts(
+            documents, Path(args.review_cache), offline=args.offline, parsers=args.parsers
+        )
+        applicants = {
+            (r.get("ApplNo") or "").strip().zfill(6): (r.get("SponsorName") or "").strip()
+            for r in read_rows(data.applications)
+        }
+        drug_names: dict[str, set[str]] = {}
+        brand_names: dict[str, set[str]] = {}
+        for product in read_rows(data.products):
+            digits = (product.get("ApplNo") or "").strip().zfill(6)
+            brand_names.setdefault(digits, set()).add((product.get("DrugName") or "").strip())
+            for part in [product.get("DrugName") or "", *(product.get("ActiveIngredient") or "").split(";")]:
+                word = part.strip().upper().split(" ")[0] if part.strip() else ""
+                if len(word) >= 5:
+                    drug_names.setdefault(digits, set()).add(word)
+        sentences: dict[str, str] = {}
+        letters_tsv = Path(args.out) / "letter_indications.tsv"
+        if letters_tsv.is_file():
+            with letters_tsv.open(encoding="utf-8") as handle:
+                for row in csv.DictReader(handle, delimiter="\t"):
+                    if row.get("sentence"):
+                        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+                        sentences[key] = row["sentence"]
+        rv_report = review_trials.build(
+            [(r.application, r.submission_type, r.submission_no, r.approval_date) for r in in_scope],
+            review_texts,
+            review_trials.build_index(trial_studies.read_study_facts(archive)),
+            applicants=applicants,
+            drug_names=drug_names,
+            brands=brand_names,
+            approval_sentences=sentences,
+        )
+        repository = TsvRepository(args.out)
+        repository.save(
+            "review_trial_mentions",
+            ("application", "submission_type", "submission_no", "approval_date",
+             "document", "heading", "protocol_id", "nct_id", "outcome"),
+            rv_report.mentions,
+        )
+        units_path = Path(args.adjudication) / "review_role_units.jsonl"
+        with units_path.open("w", encoding="utf-8") as handle:
+            for rv_unit in rv_report.units:
+                handle.write(json.dumps(rv_unit) + "\n")
+        print(review_trials.render(rv_report, fetch_stats))
+        print(f"\nwritten to {repository.out_dir}/ and {units_path}")
         return 0
 
     if args.mode == "letter-locate-prepare":

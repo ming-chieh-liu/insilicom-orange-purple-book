@@ -87,6 +87,12 @@ class StudyFacts(NamedTuple):
     #: drug to everything sharing a benzene ring. See D22.
     derived_drug_mesh: tuple[str, ...] = ()
     derived_condition_mesh: tuple[str, ...] = ()
+    #: Every other id the study is registered under — a cooperative group's
+    #: number (``GOG-0240``), NCI's CTRP id, the sponsor's own when another
+    #: organisation registered it. FDA reviews cite trials by these (D26).
+    secondary_ids: tuple[str, ...] = ()
+    #: The registering sponsor's name, for the review route's sponsor guard.
+    lead_sponsor: str = ""
 
 
 def _facts_of(document: dict[str, object]) -> StudyFacts | None:
@@ -126,6 +132,8 @@ def _facts_of(document: dict[str, object]) -> StudyFacts | None:
     status = section("statusModule").get("startDateStruct")
     derived = document.get("derivedSection")
     derived = derived if isinstance(derived, dict) else {}
+    secondary = identification.get("secondaryIdInfos")
+    lead = section("sponsorCollaboratorsModule").get("leadSponsor")
     return StudyFacts(
         nct_id=nct,
         brief_title=str(identification.get("briefTitle") or ""),
@@ -138,6 +146,12 @@ def _facts_of(document: dict[str, object]) -> StudyFacts | None:
         conditions=conditions,
         derived_drug_mesh=_browse_meshes(derived, "interventionBrowseModule"),
         derived_condition_mesh=_browse_meshes(derived, "conditionBrowseModule"),
+        secondary_ids=tuple(
+            str(item.get("id") or "")
+            for item in (secondary if isinstance(secondary, list) else [])
+            if isinstance(item, dict) and item.get("id")
+        ),
+        lead_sponsor=str(lead.get("name") or "") if isinstance(lead, dict) else "",
     )
 
 

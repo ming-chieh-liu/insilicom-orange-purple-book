@@ -126,7 +126,9 @@ def _rich(nct: str) -> dict[str, object]:
                 "briefTitle": "Pembrolizumab in NSCLC",
                 "acronym": "KEYNOTE-189",
                 "orgStudyIdInfo": {"id": "3475-189"},
+                "secondaryIdInfos": [{"id": "KEYNOTE-189"}, {"id": ""}, "junk"],
             },
+            "sponsorCollaboratorsModule": {"leadSponsor": {"name": "Merck Sharp & Dohme LLC"}},
             "statusModule": {"startDateStruct": {"date": "2016-02-26"}},
             "designModule": {
                 "phases": ["PHASE3"],
@@ -177,6 +179,10 @@ def test_the_matchable_facts_are_read(rich_archive: TrialArchive) -> None:
     assert one.phases == ("PHASE3",)
     assert one.start_date == "2016-02-26"
     assert one.conditions == ("Carcinoma, Non-Small-Cell Lung",)
+    # The review route (D26) matches protocol ids against these two as well.
+    assert one.secondary_ids == ("KEYNOTE-189",)
+    assert one.lead_sponsor == "Merck Sharp & Dohme LLC"
+    assert facts["NCT00000009"].secondary_ids == () and facts["NCT00000009"].lead_sponsor == ""
 
 
 def test_the_enrollment_count_is_kept_as_text(rich_archive: TrialArchive) -> None:

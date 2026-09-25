@@ -31,7 +31,7 @@ from typing import NamedTuple
 
 from config.settings import RawData
 from service import approval_events
-from source import approval_letter, label_pdf
+from source import approval_letter, label_pdf, polite_fetch
 from utility import application_number as appno
 from utility.logging import get_logger
 
@@ -115,11 +115,11 @@ NOT_FETCHED = "not_fetched"
 
 #: Seconds between requests to FDA. The first unthrottled run was banned after
 #: about 1,500 letters at ~12 requests a second.
-REQUEST_INTERVAL: float = 1.0
+REQUEST_INTERVAL: float = polite_fetch.REQUEST_INTERVAL
 
 #: Refusals (HTTP 403) in a row that stop the run. Once the server bans an
 #: address, every further request is wasted and can lengthen the ban.
-BREAKER: int = 5
+BREAKER: int = polite_fetch.BREAKER
 
 
 
@@ -316,39 +316,12 @@ def build(
         url for urls in plan.values() for url, guessed in urls if not guessed
     )
     _log.info("%d in-scope submissions, %d distinct letter addresses", len(spine), len(distinct))
-    cached: dict[str, Path] = {}
-    failure: dict[str, str] = {}
-    refused = 0
-    tripped = False
-    asked = False
-    for url in distinct:
-        if label_pdf.is_cached(url, cache_root):
-            path: Path | None = label_pdf.cache_path(url, cache_root)
-        elif offline or tripped:
-            continue  # left unfetched: blocked or not_fetched below
-        else:
-            if asked:
-                _sleep(interval)
-            asked = True
-            path, reason = label_pdf.fetch_status(url, cache_root)
-            if reason == label_pdf.FORBIDDEN:
-                refused += 1
-                if refused >= BREAKER:
-                    tripped = True
-                    _log.warning(
-                        "%d refusals in a row: the server is refusing this address; "
-                        "stopping, the rest stays blocked for a later run", refused
-                    )
-                continue
-            refused = 0
-            if path is None:
-                failure[url] = reason
-                continue
-        if path is not None and approval_letter.is_pdf(path):
-            cached[url] = path
-        elif path is not None:
-            path.unlink(missing_ok=True)  # an HTML answer is not a letter
-            failure[url] = label_pdf.NOT_FOUND
+    fetched = polite_fetch.fetch_all(
+        distinct, cache_root, offline=offline, interval=interval, breaker=BREAKER,
+        sleep=lambda seconds: _sleep(seconds),
+    )
+    cached = fetched.cached
+    failure = fetched.failed
     texts: dict[str, str] = {}
     unreadable: set[str] = set()
     if parsers <= 1:
