@@ -51,16 +51,17 @@ def batched_ids(batch_dir: Path, step: str) -> set[str]:
     return out
 
 
-def write_batches(batch_dir: Path, step: str, unit_ids: list[str]) -> list[Path]:
+def write_batches(batch_dir: Path, step: str, unit_ids: list[str],
+                  size: int = BATCH_SIZE) -> list[Path]:
     """Chunk ``unit_ids`` into new batch files, numbered after the existing ones."""
     batch_dir.mkdir(parents=True, exist_ok=True)
     taken = [int(m.group(1)) for p in batch_dir.glob(f"{step}-batch-*.ids")
              if (m := re.search(r"batch-(\d+)", p.name))]
     start = max(taken, default=0) + 1
     written: list[Path] = []
-    for offset in range(0, len(unit_ids), BATCH_SIZE):
-        path = batch_dir / f"{step}-batch-{start + offset // BATCH_SIZE:03d}.ids"
-        path.write_text("\n".join(unit_ids[offset:offset + BATCH_SIZE]) + "\n", encoding="utf-8")
+    for offset in range(0, len(unit_ids), size):
+        path = batch_dir / f"{step}-batch-{start + offset // size:03d}.ids"
+        path.write_text("\n".join(unit_ids[offset:offset + size]) + "\n", encoding="utf-8")
         written.append(path)
     return written
 

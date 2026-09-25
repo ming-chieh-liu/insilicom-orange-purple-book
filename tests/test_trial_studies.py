@@ -129,7 +129,8 @@ def _rich(nct: str) -> dict[str, object]:
                 "secondaryIdInfos": [{"id": "KEYNOTE-189"}, {"id": ""}, "junk"],
             },
             "sponsorCollaboratorsModule": {"leadSponsor": {"name": "Merck Sharp & Dohme LLC"}},
-            "statusModule": {"startDateStruct": {"date": "2016-02-26"}},
+            "statusModule": {"startDateStruct": {"date": "2016-02-26"},
+                             "primaryCompletionDateStruct": {"date": "2018-03-08"}},
             "designModule": {
                 "phases": ["PHASE3"],
                 "enrollmentInfo": {"count": 616, "type": "ACTUAL"},
@@ -183,6 +184,9 @@ def test_the_matchable_facts_are_read(rich_archive: TrialArchive) -> None:
     assert one.secondary_ids == ("KEYNOTE-189",)
     assert one.lead_sponsor == "Merck Sharp & Dohme LLC"
     assert facts["NCT00000009"].secondary_ids == () and facts["NCT00000009"].lead_sponsor == ""
+    # D31's completion filter reads this; absent means "unknown", never a date.
+    assert one.primary_completion == "2018-03-08"
+    assert facts["NCT00000009"].primary_completion == ""
 
 
 def test_the_enrollment_count_is_kept_as_text(rich_archive: TrialArchive) -> None:

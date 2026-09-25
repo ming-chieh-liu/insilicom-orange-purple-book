@@ -48,6 +48,59 @@ PMID_IN_LOCATION = re.compile(r"^(\d+)\.")
 ABSTRACT_BUDGET: int = 400
 
 
+#: ``pubmedRelations.relationship_type`` for **negative correlation** — the
+#: drug lowers, treats or cures the disease (D31). The graph stores the type as
+#: a bare code; read off pembrolizumab's 2,888 disease edges: ``3`` carries the
+#: treatment literature (NSCLC, melanoma, urothelial carcinoma), ``2`` is
+#: positive correlation (immune-related adverse events, pneumonitis), ``1`` is
+#: association. **``correlation_type`` is a different field with different
+#: codes** (its ``0`` coincides with this ``3``); reading it instead is the
+#: mistake this constant exists to prevent.
+NEGATIVE_CORRELATION: str = "3"
+
+#: ``direction`` codes: ``12`` points node one → node two. An edge whose
+#: direction is unrecorded counts as undirected and is kept.
+FORWARD: str = "12"
+BACKWARD: str = "21"
+UNDIRECTED: frozenset[str] = frozenset({"", "0", "NA"})
+
+#: The node type a treatment edge must end on.
+DISEASE_TYPE: str = "Disease"
+
+
+class TreatmentEdge(NamedTuple):
+    """One drug → disease negative-correlation edge and the PMIDs behind it."""
+
+    disease_biokdeid: str
+    disease_name: str
+    score: float
+    pmids: tuple[str, ...]
+
+
+def points_from(drug_is_node_one: bool, direction: str) -> bool:
+    """Whether an edge runs from the drug to the disease, or has no direction.
+
+    >>> points_from(True, "12"), points_from(False, "21"), points_from(True, "NA")
+    (True, True, True)
+    >>> points_from(True, "21"), points_from(False, "12")
+    (False, False)
+    """
+    if direction in UNDIRECTED:
+        return True
+    return direction == (FORWARD if drug_is_node_one else BACKWARD)
+
+
+def _pmids(edge: dict[str, Any]) -> tuple[str, ...]:
+    found: dict[str, None] = {}
+    for location in edge.get("locations") or []:
+        if not location:
+            continue
+        match = PMID_IN_LOCATION.match(str(location[0]))
+        if match:
+            found[match.group(1)] = None
+    return tuple(found)
+
+
 class Mention(NamedTuple):
     """One registry id an abstract mentioned, and where."""
 
@@ -96,13 +149,42 @@ class GraphEvidenceRepository:
             ]
         }
         for edge in self._relations.find(query):
-            for location in edge.get("locations") or []:
-                if not location:
-                    continue
-                match = PMID_IN_LOCATION.match(str(location[0]))
-                if match:
-                    found.add(match.group(1))
+            found.update(_pmids(edge))
         return sorted(found)
+
+    def treatment_edges(self, drug: str) -> list[TreatmentEdge]:
+        """Every disease the literature says this drug negatively correlates
+        with, best-scored first (D31).
+
+        For approvals with **no indication**: instead of one drug-disease edge,
+        every edge of type :data:`NEGATIVE_CORRELATION` from the drug to a
+        ``Disease`` node, in either storage orientation, whose direction runs
+        drug → disease or is unrecorded.
+        """
+        query = {
+            "relationship_type": NEGATIVE_CORRELATION,
+            "$or": [
+                {"node_one_id": drug, "node_two_type": DISEASE_TYPE},
+                {"node_two_id": drug, "node_one_type": DISEASE_TYPE},
+            ],
+        }
+        out: list[TreatmentEdge] = []
+        for edge in self._relations.find(query, {"context": 0, "contList": 0}):
+            first = str(edge.get("node_one_id")) == drug
+            if not points_from(first, str(edge.get("direction") or "")):
+                continue
+            side = "two" if first else "one"
+            try:
+                score = float(edge.get("score") or 0)
+            except (TypeError, ValueError):
+                score = 0.0
+            out.append(TreatmentEdge(
+                str(edge.get(f"node_{side}_id") or ""),
+                str(edge.get(f"node_{side}_name") or ""),
+                score,
+                _pmids(edge),
+            ))
+        return sorted(out, key=lambda e: (-e.score, e.disease_biokdeid))
 
     def mentions_in(self, pmids: Iterable[str]) -> list[Mention]:
         """Registry ids printed in these abstracts.
@@ -149,8 +231,12 @@ class GraphEvidenceRepository:
 
 __all__ = [
     "ABSTRACT_BUDGET",
+    "DISEASE_TYPE",
     "NCT",
+    "NEGATIVE_CORRELATION",
     "PMID_IN_LOCATION",
     "GraphEvidenceRepository",
     "Mention",
+    "TreatmentEdge",
+    "points_from",
 ]

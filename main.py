@@ -52,6 +52,7 @@ from service import (
     indications,
     label_role,
     letter_locate,
+    precision_check,
     letters,
     review_role,
     review_trials,
@@ -95,6 +96,10 @@ MODES: dict[str, str] = {
     "verdict (see docs/runbooks/label-trial-role.md)",
     "label-role-combine": "pair the label-role judges' answers, batch tiebreaks, "
     "record decided units",
+    "precision-prepare": "sample withheld-answer P4 units per evidence group into "
+    "adjudication/precision_p4_v1/ (--limit = units per group, default 40)",
+    "precision-combine": "pair the precision experiment's judge answers, batch "
+    "tiebreaks, and print precision per evidence group",
     "letter-locate-prepare": "write locate units and batches for letters the "
     "keyword rule missed (see docs/runbooks/letter-indication.md)",
     "letter-indication-combine": "pair locator/verifier answers, extract agreed "
@@ -374,7 +379,8 @@ def main(argv: list[str] | None = None) -> int:
             )
         archive = TrialArchive(root=Path(args.trial_archive))
         studies = {
-            facts.nct_id: (facts.start_date, facts.enrollment, ";".join(facts.phases))
+            facts.nct_id: (facts.start_date, facts.enrollment, ";".join(facts.phases),
+                           facts.primary_completion)
             for facts in trial_studies.read_study_facts(archive)
         }
         spine_rows = approval_events.build(data)
@@ -760,6 +766,23 @@ def main(argv: list[str] | None = None) -> int:
                 lr_verdicts, decided_on=date.today().isoformat(),
             )
         print(label_role.render(lr_role_report))
+        return 0
+
+    if args.mode in ("precision-prepare", "precision-combine"):
+        pc_folder = Path(args.adjudication) / "precision_p4_v1"
+        pc_units = Path(args.out) / "candidates.jsonl"
+        if args.mode == "precision-prepare":
+            pc_count, pc_batches = precision_check.prepare(pc_units, pc_folder, args.limit or 40)
+            print(f"{pc_count} units, {len(pc_batches)} batches in {pc_folder}/batches; "
+                  f"answers go to {pc_folder}/raw/prec-batch-NNN-{{A,B}}.txt")
+        else:
+            pc_new, pc_pending, pc_missing = precision_check.combine(
+                pc_folder, date.today().isoformat())
+            print(f"newly recorded {pc_new}; awaiting a tiebreak {len(pc_pending)}; "
+                  f"answered by one judge only {len(pc_missing)}")
+        print(precision_check.render(precision_check.score(pc_folder)
+                                     if (pc_folder / "truth.json").exists() else (),
+                                     precision_check.eligible_counts(pc_units)))
         return 0
 
     if args.mode == "letter-locate-prepare":

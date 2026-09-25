@@ -1,10 +1,24 @@
 # Prompt — is any of these literature trials the evidence for this approval?
 
-**Version:** 1 · **Created:** 2026-09-16
+**Version:** 2 · **Created:** 2026-09-16 · **v2:** 2026-09-25
+
+*v1 → v2 (2026-09-25, D31): units now come in two bases. `indication` units are
+unchanged in meaning. `drug_only` units exist for approvals with no indication
+at all; their candidates come from every disease the drug is reported to treat
+(negative-correlation edges), each candidate shows the disease(s) it was found
+under, and every candidate already completed its primary endpoint before the
+approval. v2 adds the `{{indication}}` wording for that case, the "found under"
+field and one rule. No v1 verdicts were recorded, so none are invalidated.*
 
 The tier-C judge prompt. One judgement = one `(submission, graph edge)` unit
 from `adjudication/graph_units.jsonl`. Substitute `{{drug}}`, `{{indication}}`,
 `{{approval_date}}` and `{{candidates}}`; send nothing else.
+
+| Field | `basis = indication` | `basis = drug_only` |
+|---|---|---|
+| `{{drug}}` | the unit's `drug` | the unit's `drug` |
+| `{{indication}}` | the unit's `indication_term` | `not recorded — candidates come from the literature on every disease this drug is reported to treat` |
+| `{{candidates}}` | one line per candidate: NCT id, enrollment, phases, start date, mentions, trial report yes/no, example title | the same, plus `found under: <diseases>` and the primary completion date |
 
 Changing this file changes what the stored verdicts mean, so **bump the version
 and record it in each verdict** rather than editing in place.
@@ -51,6 +65,11 @@ Rules:
 - If two or more candidates fit equally well, answer NONE. A regulatory
   approval usually rests on one or two named trials, and if you cannot tell
   which, you do not know.
+- If "Approved for" says not recorded, the approval could be for any disease a
+  candidate was found under. Choose a candidate only if it is an
+  interventional efficacy study of this drug that could have supported a first
+  approval before the date; if candidates in different diseases fit equally,
+  answer NONE.
 - NONE is the expected answer for most units and is never a failure. A wrong
   match invents a link between a trial and a drug approval that does not exist.
   Nothing downstream can tell a fabricated link from a real one.

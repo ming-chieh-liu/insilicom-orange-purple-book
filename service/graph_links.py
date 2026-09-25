@@ -28,10 +28,16 @@ from __future__ import annotations
 
 import csv
 from collections import Counter, defaultdict
+from collections.abc import Mapping
 from pathlib import Path
 from typing import NamedTuple
 
-from dao.graph_evidence import ABSTRACT_BUDGET, GraphEvidenceRepository, Mention
+from dao.graph_evidence import (
+    ABSTRACT_BUDGET,
+    GraphEvidenceRepository,
+    Mention,
+    TreatmentEdge,
+)
 from service import indication_normalize
 from utility.logging import get_logger
 
@@ -95,6 +101,20 @@ class GraphCandidate(NamedTuple):
     start_date: str
     enrollment: str
     phases: str
+    #: Drug-only units (D31): the diseases whose treatment edges' papers
+    #: mentioned this trial, best-scored first, so the judge sees what the
+    #: trial is about when the approval's own indication is unknown.
+    diseases: str = ""
+    primary_completion: str = ""
+
+
+#: How a unit's candidates were gathered.
+BASIS_INDICATION = "indication"
+BASIS_DRUG_ONLY = "drug_only"
+
+#: Treatment edges a drug-only unit walks, best-scored first. Pembrolizumab
+#: alone has 1,390; the abstract budget, not this, is what usually binds.
+MAX_TREATMENT_EDGES: int = 50
 
 
 class GraphUnit(NamedTuple):
@@ -110,6 +130,11 @@ class GraphUnit(NamedTuple):
     indication_term: str
     pmids_examined: int
     candidates: tuple[GraphCandidate, ...]
+    #: :data:`BASIS_INDICATION` — the drug and this approval's indication — or
+    #: :data:`BASIS_DRUG_ONLY` when no indication is known (D31).
+    basis: str = BASIS_INDICATION
+    #: The approved ingredient names, for the prompt's ``{{drug}}``.
+    drug: str = ""
 
 
 class GraphReport(NamedTuple):
@@ -122,6 +147,9 @@ class GraphReport(NamedTuple):
     with_edge: int
     with_candidates: int
     by_candidate_count: tuple[tuple[int, int], ...]
+    #: D31: approvals with a drug but no indication, searched on the drug alone.
+    drug_only_considered: int = 0
+    drug_only_with_candidates: int = 0
 
     @property
     def yield_rate(self) -> float:
@@ -186,6 +214,58 @@ def within_date(
     ]
 
 
+def completed_by(
+    candidates: list[GraphCandidate], approval_date: str
+) -> list[GraphCandidate]:
+    """Drop trials whose primary completion postdates the approval (D31).
+
+    Applied to drug-only units, whose candidates are the drug's whole treatment
+    literature and so mostly post-approval studies. A trial still collecting
+    its primary endpoint cannot have been the evidence. An unrecorded date is
+    kept, as in :func:`within_date`.
+
+    >>> c = GraphCandidate("N1", 1, True, "1", "t", "2001", "", "", "", "2004-06")
+    >>> [x.nct_id for x in completed_by([c], "2005-01-01")], completed_by([c], "2003-01-01")
+    (['N1'], [])
+    """
+    if not approval_date:
+        return candidates
+    return [
+        candidate
+        for candidate in candidates
+        if not candidate.primary_completion or candidate.primary_completion <= approval_date
+    ]
+
+
+def treatment_pmids(
+    edges: list[TreatmentEdge], budget: int
+) -> tuple[list[str], dict[str, list[str]]]:
+    """PMIDs to read for a drug-only unit, and the diseases each came from.
+
+    Edges are taken best-scored first and their PMIDs in order until the
+    abstract budget is spent, so a drug with a thousand edges reads its
+    strongest treatment literature rather than an arbitrary slice.
+
+    >>> e = [TreatmentEdge("d1", "Melanoma", 9.0, ("1", "2")),
+    ...      TreatmentEdge("d2", "NSCLC", 5.0, ("2", "3"))]
+    >>> treatment_pmids(e, 3)
+    (['1', '2', '3'], {'1': ['Melanoma'], '2': ['Melanoma', 'NSCLC'], '3': ['NSCLC']})
+    >>> treatment_pmids(e, 1)[0]
+    ['1']
+    """
+    order: list[str] = []
+    diseases: dict[str, list[str]] = defaultdict(list)
+    for edge in edges[:MAX_TREATMENT_EDGES]:
+        for pmid in edge.pmids:
+            if pmid not in diseases and len(order) >= budget:
+                continue
+            if pmid not in diseases:
+                order.append(pmid)
+            if edge.disease_name not in diseases[pmid]:
+                diseases[pmid].append(edge.disease_name)
+    return order, dict(diseases)
+
+
 def _read_tsv(path: Path) -> list[dict[str, str]]:
     if not path.is_file():
         return []
@@ -199,10 +279,14 @@ __all__ = [
     "GraphCandidate",
     "GraphReport",
     "GraphUnit",
+    "BASIS_DRUG_ONLY",
+    "BASIS_INDICATION",
     "build",
+    "completed_by",
     "exhausted_only",
     "rank",
     "render",
+    "treatment_pmids",
     "within_date",
 ]
 
@@ -210,7 +294,7 @@ __all__ = [
 def build(
     out_dir: Path,
     repository: GraphEvidenceRepository,
-    studies: dict[str, tuple[str, str, str]],
+    studies: Mapping[str, tuple[str, ...]],
     unserved: set[str],
     ingredients: dict[str, frozenset[str]],
     limit: int | None = None,
@@ -222,7 +306,15 @@ def build(
     ``unlinked_submissions.tsv`` rather than recomputed, so tier C works on
     exactly what tiers A and B left behind and cannot quietly disagree with
     them. ``studies`` maps an NCT id to its start date, enrollment and phases,
-    for the date bound and for the judge to compare against.
+    for the date bound and for the judge to compare against, plus its primary
+    completion date as a fourth field where known.
+
+    **Drug-only fallback (D31).** An approval whose drug resolves but which has
+    no indication at all is not skipped: every negative-correlation (treats)
+    edge from the drug to a disease is walked instead, the papers behind the
+    best-scored ones read, and their registry ids offered with the disease each
+    came from. Such a unit is marked :data:`BASIS_DRUG_ONLY` and is also held to
+    the primary-completion bound. The indication path is unchanged.
     """
     spine = {
         f"{r['application']}|{r['submission_type']}|{r['submission_no']}": r
@@ -251,6 +343,7 @@ def build(
                 by_application[row["application"]].add(found)
     units: list[GraphUnit] = []
     considered = with_drug = with_disease = with_edge = with_candidates = 0
+    drug_only = drug_only_found = 0
     sizes: Counter[int] = Counter()
 
     for key in sorted(unserved):
@@ -270,7 +363,22 @@ def build(
             with_drug += 1
         if diseases:
             with_disease += 1
-        if not (drugs and diseases):
+        if not drugs:
+            continue
+        if not diseases:
+            drug_only += 1
+            unit = _drug_only_unit(key, row, drugs, repository, studies, budget)
+            if unit is not None:
+                unit = unit._replace(
+                    drug=_names(ingredients.get(row["application"], frozenset())))
+            if unit is not None:
+                with_edge += 1
+                with_candidates += 1
+                drug_only_found += 1
+                sizes[len(unit.candidates)] += 1
+                units.append(unit)
+            if limit is not None and considered >= limit:
+                break
             continue
 
         pmids: list[str] = []
@@ -290,14 +398,7 @@ def build(
 
         mentions = repository.mentions_in(pmids[:budget])
         candidates = within_date(rank(mentions), row["approval_date"])
-        candidates = [
-            candidate._replace(
-                start_date=studies.get(candidate.nct_id, ("", "", ""))[0],
-                enrollment=studies.get(candidate.nct_id, ("", "", ""))[1],
-                phases=studies.get(candidate.nct_id, ("", "", ""))[2],
-            )
-            for candidate in candidates
-        ]
+        candidates = [_with_registry(candidate, studies) for candidate in candidates]
         candidates = within_date(candidates, row["approval_date"])
         if not candidates:
             continue
@@ -315,6 +416,7 @@ def build(
                 indication_term=term,
                 pmids_examined=min(len(pmids), budget),
                 candidates=tuple(candidates),
+                drug=_names(ingredients.get(row["application"], frozenset())),
             )
         )
         if limit is not None and considered >= limit:
@@ -334,6 +436,70 @@ def build(
         with_edge=with_edge,
         with_candidates=with_candidates,
         by_candidate_count=tuple(sorted(sizes.items())),
+        drug_only_considered=drug_only,
+        drug_only_with_candidates=drug_only_found,
+    )
+
+
+def _names(ingredients: frozenset[str]) -> str:
+    """``"A; B"`` — the approved ingredient names, sorted.
+
+    >>> _names(frozenset({"SOMATROPIN"}))
+    'SOMATROPIN'
+    """
+    return "; ".join(sorted(ingredients))
+
+
+def _with_registry(
+    candidate: GraphCandidate, studies: Mapping[str, tuple[str, ...]]
+) -> GraphCandidate:
+    facts = tuple(studies.get(candidate.nct_id, ())) + ("", "", "", "")
+    return candidate._replace(start_date=facts[0], enrollment=facts[1], phases=facts[2],
+                              primary_completion=facts[3])
+
+
+def _drug_only_unit(
+    key: str,
+    row: dict[str, str],
+    drugs: set[str],
+    repository: GraphEvidenceRepository,
+    studies: Mapping[str, tuple[str, ...]],
+    budget: int,
+) -> GraphUnit | None:
+    """The D31 unit for an approval with a drug and no indication, or None."""
+    edges: list[TreatmentEdge] = []
+    for drug in sorted(drugs)[:3]:
+        edges.extend(repository.treatment_edges(drug))
+    edges.sort(key=lambda e: (-e.score, e.disease_biokdeid))
+    pmids, diseases_of = treatment_pmids(edges, budget)
+    if not pmids:
+        return None
+    mentions = repository.mentions_in(pmids)
+    found_under: dict[str, list[str]] = defaultdict(list)
+    for mention in mentions:
+        for name in diseases_of.get(mention.pmid, []):
+            if name not in found_under[mention.nct_id]:
+                found_under[mention.nct_id].append(name)
+    candidates = [
+        _with_registry(c, studies)._replace(diseases="; ".join(found_under[c.nct_id][:5]))
+        for c in rank(mentions)
+    ]
+    candidates = completed_by(within_date(candidates, row["approval_date"]),
+                              row["approval_date"])
+    if not candidates:
+        return None
+    return GraphUnit(
+        unit_id=f"{key}|graph",
+        application=row["application"],
+        submission_type=row["submission_type"],
+        submission_no=row["submission_no"],
+        approval_date=row["approval_date"],
+        drug_biokdeid=sorted(drugs)[0],
+        disease_biokdeid="",
+        indication_term="",
+        pmids_examined=len(pmids),
+        candidates=tuple(candidates),
+        basis=BASIS_DRUG_ONLY,
     )
 
 
@@ -348,6 +514,8 @@ def render(report: GraphReport) -> str:
         f"    with a drug<->disease edge             {report.with_edge:>9,}",
         f"    YIELDING CANDIDATES                    {report.with_candidates:>9,}"
         f"  ({100 * report.yield_rate:.1f}%)",
+        f"  no indication: drug-only search (D31)    {report.drug_only_considered:>9,}",
+        f"    yielding candidates                    {report.drug_only_with_candidates:>9,}",
         "",
         "  candidates per unit:",
     ]

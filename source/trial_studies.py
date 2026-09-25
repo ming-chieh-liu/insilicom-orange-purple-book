@@ -93,6 +93,10 @@ class StudyFacts(NamedTuple):
     secondary_ids: tuple[str, ...] = ()
     #: The registering sponsor's name, for the review route's sponsor guard.
     lead_sponsor: str = ""
+    #: ``primaryCompletionDateStruct``, as written (may be year-month). A trial
+    #: whose primary completion postdates an approval cannot have been its
+    #: evidence; the drug-only graph fallback uses it as a hard filter (D31).
+    primary_completion: str = ""
 
 
 def _facts_of(document: dict[str, object]) -> StudyFacts | None:
@@ -134,6 +138,7 @@ def _facts_of(document: dict[str, object]) -> StudyFacts | None:
     derived = derived if isinstance(derived, dict) else {}
     secondary = identification.get("secondaryIdInfos")
     lead = section("sponsorCollaboratorsModule").get("leadSponsor")
+    completion = section("statusModule").get("primaryCompletionDateStruct")
     return StudyFacts(
         nct_id=nct,
         brief_title=str(identification.get("briefTitle") or ""),
@@ -152,6 +157,8 @@ def _facts_of(document: dict[str, object]) -> StudyFacts | None:
             if isinstance(item, dict) and item.get("id")
         ),
         lead_sponsor=str(lead.get("name") or "") if isinstance(lead, dict) else "",
+        primary_completion=str(completion.get("date") or "")
+        if isinstance(completion, dict) else "",
     )
 
 

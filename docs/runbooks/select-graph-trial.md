@@ -1,6 +1,6 @@
 # Runbook — tier C: judge the graph's literature candidates
 
-**For:** the main agent · **Prompt:** `docs/prompts/graph-trial-selection.md` (v1)
+**For:** the main agent · **Prompt:** `docs/prompts/graph-trial-selection.md` (v2)
 **Written:** 2026-09-16
 
 ## What this does and why
@@ -57,6 +57,16 @@ least one candidate:
                  "trial_report": false, "enrollment": "21249", ...}]}
 ```
 
+**Two bases (D31, 2026-09-25).** A unit is `basis: "indication"` when the
+submission has an indication — the drug↔indication edge, unchanged — or
+`basis: "drug_only"` when it has none: every `relationship_type = 3`
+(negative correlation) edge from the drug to a `Disease` node, direction drug →
+disease or unrecorded, best-scored first up to the 400-abstract budget; each
+candidate carries `diseases` (found under) and `primary_completion`, and
+drug-only candidates must have completed their primary endpoint on or before
+the approval date. The prompt's field table says how each basis fills
+`{{indication}}` and `{{candidates}}`.
+
 **The unserved set is read from `unlinked_submissions.tsv`, not recomputed**, so
 tier C works on exactly what tiers A and B left behind and cannot quietly
 disagree with them. Run `--mode assemble` first or it will work from a stale
@@ -96,7 +106,7 @@ Output one line per case, nothing else:
 ```
 
 **Do not paraphrase the prompt.** Copy it verbatim. Verdicts record
-`prompt_version: 1`; changing the wording means bumping the version.
+`prompt_version: 2`; changing the wording means bumping the version.
 
 ## Step 3 — combine, tiebreak, record
 

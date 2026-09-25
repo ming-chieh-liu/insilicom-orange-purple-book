@@ -1,0 +1,634 @@
+{
+ "BLA103000|SUPPL|5325|NCT01153815": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA103000|SUPPL|5325|NCT03261167": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA125084|SUPPL|277|CA225-025": {
+  "group": "count_exact_unique",
+  "truth": "NCT00079066"
+ },
+ "BLA125085|SUPPL|332|NCT00565851": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA125118|SUPPL|240|GVHD-1": {
+  "group": "count_approximate",
+  "truth": "NCT01743131"
+ },
+ "BLA125377|SUPPL|115|CHECKMATE-743": {
+  "group": "name_unique",
+  "truth": "NCT02899299"
+ },
+ "BLA125377|SUPPL|94|CHECKMATE-214": {
+  "group": "name_unique",
+  "truth": "NCT02231749"
+ },
+ "BLA125388|SUPPL|106|NCT01100502": {
+  "group": "weak",
+  "truth": "NCT01100502"
+ },
+ "BLA125388|SUPPL|97|ECHELON-1": {
+  "group": "weak",
+  "truth": "NCT01712490"
+ },
+ "BLA125388|SUPPL|99|ECHELON-2": {
+  "group": "name_unique",
+  "truth": "NCT01777152"
+ },
+ "BLA125477|SUPPL|34|REACH-2": {
+  "group": "name_unique",
+  "truth": "NCT02435433"
+ },
+ "BLA125514|SUPPL|105|NCT02625961": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA125514|SUPPL|144|KEYNOTE-966": {
+  "group": "count_approximate",
+  "truth": "NCT04003636"
+ },
+ "BLA125514|SUPPL|148|KEYNOTE-204": {
+  "group": "name_unique",
+  "truth": "NCT02684292"
+ },
+ "BLA125514|SUPPL|188|NCT03924895": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA125514|SUPPL|192|NCT04634877": {
+  "group": "count_approximate",
+  "truth": "NCT04634877"
+ },
+ "BLA125514|SUPPL|40|KEYNOTE-002": {
+  "group": "name_unique",
+  "truth": "NCT02362594"
+ },
+ "BLA125514|SUPPL|41|NCT02775435": {
+  "group": "weak",
+  "truth": "NCT02775435"
+ },
+ "BLA125514|SUPPL|42|KEYNOTE-189": {
+  "group": "weak",
+  "truth": "NCT02578680"
+ },
+ "BLA125514|SUPPL|55|KEYNOTE-181": {
+  "group": "count_exact_unique",
+  "truth": "NCT02564263"
+ },
+ "BLA125514|SUPPL|96|KEYNOTE-590": {
+  "group": "count_exact_unique",
+  "truth": "NCT03189719"
+ },
+ "BLA125522|SUPPL|13|NCT01763918": {
+  "group": "count_approximate",
+  "truth": "NCT01763918"
+ },
+ "BLA125554|SUPPL|106|CHECKMATE-039": {
+  "group": "weak",
+  "truth": "NCT01592370"
+ },
+ "BLA125554|SUPPL|127|CHECKMATE-77T": {
+  "group": "count_exact_unique",
+  "truth": "NCT04025879"
+ },
+ "BLA125554|SUPPL|34|CHECKMATE-025": {
+  "group": "name_unique",
+  "truth": "NCT01668784"
+ },
+ "BLA125554|SUPPL|34|CHECKMATE-275": {
+  "group": "count_exact_unique",
+  "truth": "NCT02387996"
+ },
+ "BLA125554|SUPPL|42|CHECKMATE-032": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA125554|SUPPL|81|ATTRACTION-3": {
+  "group": "weak",
+  "truth": "NCT02569242"
+ },
+ "BLA125554|SUPPL|91|CHECKMATE-649": {
+  "group": "name_unique",
+  "truth": "NCT02872116"
+ },
+ "BLA125557|SUPPL|13|MT103-205": {
+  "group": "name_unique",
+  "truth": "NCT01471782"
+ },
+ "BLA125559|SUPPL|29|NCT01644175": {
+  "group": "count_approximate",
+  "truth": "NCT01644175"
+ },
+ "BLA125559|SUPPL|47|NCT01617655": {
+  "group": "count_approximate",
+  "truth": "NCT01617655"
+ },
+ "BLA761034|SUPPL|25|NCT02807636": {
+  "group": "weak",
+  "truth": "NCT02807636"
+ },
+ "BLA761034|SUPPL|58|NCT05091567": {
+  "group": "weak",
+  "truth": "NCT05091567"
+ },
+ "BLA761055|SUPPL|40|SINUS-52": {
+  "group": "name_unique",
+  "truth": "NCT02898454"
+ },
+ "BLA761069|SUPPL|35|TOPAZ-1": {
+  "group": "name_unique",
+  "truth": "NCT03875235"
+ },
+ "BLA761069|SUPPL|45|NCT03164616": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761115|ORIG|1|IMMU-132": {
+  "group": "count_approximate",
+  "truth": "NCT01631552"
+ },
+ "BLA761137|SUPPL|32|NCT03288545": {
+  "group": "weak",
+  "truth": "NCT03288545"
+ },
+ "BLA761139|SUPPL|41|NCT04622319": {
+  "group": "count_approximate",
+  "truth": "NCT04622319"
+ },
+ "BLA761175|ORIG|1|NCT00565851": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761180|ORIG|1|ECZTRA 2": {
+  "group": "name_unique",
+  "truth": "NCT03160885"
+ },
+ "BLA761180|ORIG|1|ECZTRA 3": {
+  "group": "name_unique",
+  "truth": "NCT03363854"
+ },
+ "BLA761232|ORIG|1|RATIONALE-302": {
+  "group": "count_exact_unique",
+  "truth": "NCT03430843"
+ },
+ "BLA761232|SUPPL|18|RATIONALE-305": {
+  "group": "count_approximate",
+  "truth": "NCT03777657"
+ },
+ "BLA761232|SUPPL|18|RATIONALE-306": {
+  "group": "weak",
+  "truth": "NCT03783442"
+ },
+ "BLA761234|ORIG|1|RELATIVITY-047": {
+  "group": "name_unique",
+  "truth": "NCT03470922"
+ },
+ "BLA761240|ORIG|1|JUPITER-02": {
+  "group": "count_exact_unique",
+  "truth": "NCT03581786"
+ },
+ "BLA761240|ORIG|1|POLARIS-02": {
+  "group": "weak",
+  "truth": "NCT02915432"
+ },
+ "BLA761258|ORIG|1|AK105-202": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761258|ORIG|1|AK105-304": {
+  "group": "name_unique",
+  "truth": "NCT04974398"
+ },
+ "BLA761268|ORIG|1|NCT00565851": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761334|SUPPL|5|NCT03597295": {
+  "group": "name_unique",
+  "truth": "NCT03597295"
+ },
+ "BLA761381|ORIG|1|ATTRACTION-3": {
+  "group": "weak",
+  "truth": "NCT02569242"
+ },
+ "BLA761381|ORIG|1|CHECKMATE-274": {
+  "group": "name_unique",
+  "truth": "NCT02632409"
+ },
+ "BLA761381|ORIG|1|CHECKMATE-275": {
+  "group": "count_approximate",
+  "truth": "NCT02387996"
+ },
+ "BLA761381|ORIG|1|CHECKMATE-77T": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761381|ORIG|1|CHECKMATE-816": {
+  "group": "name_unique",
+  "truth": "NCT02998528"
+ },
+ "BLA761390|ORIG|1|OLYMPIA 1": {
+  "group": "count_approximate",
+  "truth": "NCT04501666"
+ },
+ "BLA761391|ORIG|1|ARCADIA 1": {
+  "group": "count_approximate",
+  "truth": "NCT03985943"
+ },
+ "BLA761417|ORIG|1|RATIONALE-302": {
+  "group": "count_exact_unique",
+  "truth": "NCT03430843"
+ },
+ "BLA761417|ORIG|1|RATIONALE-305": {
+  "group": "weak",
+  "truth": "NCT03777657"
+ },
+ "BLA761429|ORIG|1|ATTRACTION-3": {
+  "group": "weak",
+  "truth": "NCT02569242"
+ },
+ "BLA761429|ORIG|1|CHECKMATE-057": {
+  "group": "name_unique",
+  "truth": "NCT01673867"
+ },
+ "BLA761429|ORIG|1|CHECKMATE-275": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761429|ORIG|1|CHECKMATE-577": {
+  "group": "name_unique",
+  "truth": "NCT02743494"
+ },
+ "BLA761429|ORIG|1|CHECKMATE-77T": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761440|ORIG|1|DREAMM-7": {
+  "group": "weak",
+  "truth": "NCT04246047"
+ },
+ "BLA761467|ORIG|1|KEYNOTE-017": {
+  "group": "weak",
+  "truth": "NCT02267603"
+ },
+ "BLA761467|ORIG|1|KEYNOTE-590": {
+  "group": "count_exact_unique",
+  "truth": "NCT03189719"
+ },
+ "BLA761467|ORIG|1|KEYNOTE-868": {
+  "group": "count_approximate",
+  "truth": "NCT03914612"
+ },
+ "BLA761467|ORIG|1|NCT02819518": {
+  "group": "name_unique",
+  "truth": "NCT02819518"
+ },
+ "BLA761467|ORIG|1|NCT03635567": {
+  "group": "count_exact_unique",
+  "truth": "NCT03635567"
+ },
+ "BLA761467|SUPPL|9|NCT03425643": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761467|SUPPL|9|NCT03924895": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "BLA761467|SUPPL|9|NCT04634877": {
+  "group": "count_approximate",
+  "truth": "NCT04634877"
+ },
+ "BLA761467|SUPPL|9|NCT05239728": {
+  "group": "name_unique",
+  "truth": "NCT05239728"
+ },
+ "NDA020896|SUPPL|44|IRIN 983": {
+  "group": "weak",
+  "truth": "NCT00069121"
+ },
+ "NDA021462|SUPPL|51|KEYNOTE-021": {
+  "group": "name_unique",
+  "truth": "NCT02039674"
+ },
+ "NDA021845|SUPPL|25|PACES-1": {
+  "group": "count_exact_unique",
+  "truth": "NCT00159861"
+ },
+ "NDA021845|SUPPL|25|SUPER-1": {
+  "group": "count_approximate",
+  "truth": "NCT00644605"
+ },
+ "NDA202439|SUPPL|25|RECORD 1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA202714|SUPPL|33|NCT01998971": {
+  "group": "weak",
+  "truth": "NCT01998971"
+ },
+ "NDA202806|SUPPL|6|BREAK-3": {
+  "group": "weak",
+  "truth": "NCT01227889"
+ },
+ "NDA203985|SUPPL|13|EXIST-2": {
+  "group": "name_unique",
+  "truth": "NCT00790400"
+ },
+ "NDA203985|SUPPL|13|EXIST-3": {
+  "group": "weak",
+  "truth": "NCT01713946"
+ },
+ "NDA203985|SUPPL|13|RADIANT-4": {
+  "group": "name_unique",
+  "truth": "NCT01524783"
+ },
+ "NDA204790|SUPPL|14|SPRING-2": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA205437|SUPPL|11|PSOR-4": {
+  "group": "weak",
+  "truth": "NCT03721172"
+ },
+ "NDA205437|SUPPL|13|PSOR-5": {
+  "group": "count_exact_unique",
+  "truth": "NCT03777436"
+ },
+ "NDA205437|SUPPL|8|PSOR-3": {
+  "group": "count_exact_unique",
+  "truth": "NCT03123471"
+ },
+ "NDA205649|SUPPL|23|NCT00660907": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA205755|SUPPL|9|ASCEND-1": {
+  "group": "weak",
+  "truth": "NCT01283516"
+ },
+ "NDA205755|SUPPL|9|ASCEND-4": {
+  "group": "weak",
+  "truth": "NCT01828099"
+ },
+ "NDA207103|SUPPL|24|FUL347 321": {
+  "group": "weak",
+  "truth": "NCT04191499"
+ },
+ "NDA207793|SUPPL|16|NAPOLI 3": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA207793|SUPPL|16|NAPOLI-1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA208558|SUPPL|13|SOLO-1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA208692|SUPPL|12|COSMIC-311": {
+  "group": "weak",
+  "truth": "NCT03690388"
+ },
+ "NDA208692|SUPPL|12|NCT01835158": {
+  "group": "weak",
+  "truth": "NCT01835158"
+ },
+ "NDA208716|SUPPL|6|MONARCH 2": {
+  "group": "name_unique",
+  "truth": "NCT02102490"
+ },
+ "NDA209092|SUPPL|18|MONALEESA-7": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA209394|SUPPL|19|ENDURANCE-1": {
+  "group": "count_approximate",
+  "truth": "NCT02604017"
+ },
+ "NDA209394|SUPPL|19|EXPEDITION-1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA209394|SUPPL|19|SURVEYOR-2": {
+  "group": "weak",
+  "truth": "NCT02966795"
+ },
+ "NDA209472|SUPPL|5|KEYNOTE-189": {
+  "group": "weak",
+  "truth": "NCT02578680"
+ },
+ "NDA209500|SUPPL|16|NCT04985942": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA209500|SUPPL|16|NCT05061706": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA209637|SUPPL|3|SUSTAIN 6": {
+  "group": "name_unique",
+  "truth": "NCT01720446"
+ },
+ "NDA209935|SUPPL|2|NCT02278120": {
+  "group": "name_unique",
+  "truth": "NCT02278120"
+ },
+ "NDA210192|ORIG|1|SWORD-1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA210238|ORIG|1|ADAPT-1": {
+  "group": "count_exact_unique",
+  "truth": "NCT01972529"
+ },
+ "NDA210238|ORIG|1|ADAPT-2": {
+  "group": "count_exact_unique",
+  "truth": "NCT01976104"
+ },
+ "NDA210326|ORIG|1|MONARCH 2": {
+  "group": "name_unique",
+  "truth": "NCT02107703"
+ },
+ "NDA210745|ORIG|1|PSOR-3": {
+  "group": "count_exact_unique",
+  "truth": "NCT03123471"
+ },
+ "NDA210745|ORIG|1|PSOR-5": {
+  "group": "count_exact_unique",
+  "truth": "NCT03777436"
+ },
+ "NDA210745|ORIG|1|PSOR-6": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA211225|ORIG|1|ASCEND-1": {
+  "group": "weak",
+  "truth": "NCT01283516"
+ },
+ "NDA211225|ORIG|1|ASCEND-4": {
+  "group": "weak",
+  "truth": "NCT01828099"
+ },
+ "NDA211651|SUPPL|10|TALAPRO-2": {
+  "group": "name_unique",
+  "truth": "NCT03395197"
+ },
+ "NDA211994|ORIG|1|GEMINI-1": {
+  "group": "name_unique",
+  "truth": "NCT02831673"
+ },
+ "NDA212320|ORIG|1|AEGIS 1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA212576|ORIG|1|ASTX727-01": {
+  "group": "name_unique",
+  "truth": "NCT02103478"
+ },
+ "NDA212576|ORIG|1|ASTX727-02": {
+  "group": "name_unique",
+  "truth": "NCT03306264"
+ },
+ "NDA212782|ORIG|1|NCT00048230": {
+  "group": "count_approximate",
+  "truth": "NCT00048230"
+ },
+ "NDA212860|ORIG|1|CRUISE 1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA212904|ORIG|1|TIVO-3": {
+  "group": "weak",
+  "truth": "NCT02627963"
+ },
+ "NDA212937|ORIG|1|SIOPEL 6": {
+  "group": "name_unique",
+  "truth": "NCT00652132"
+ },
+ "NDA213400|ORIG|1|G000-101": {
+  "group": "name_unique",
+  "truth": "NCT01897571"
+ },
+ "NDA213983|ORIG|1|SPRING-2": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA214028|ORIG|1|GEMINI 1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA214028|ORIG|1|GEMINI 2": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA214783|ORIG|1|KD025-213": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA214952|ORIG|1|PACES-1": {
+  "group": "count_exact_unique",
+  "truth": "NCT00159861"
+ },
+ "NDA215014|SUPPL|11|APL2-308": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA215110|ORIG|1|ENDURANCE-1": {
+  "group": "count_approximate",
+  "truth": "NCT02604017"
+ },
+ "NDA215110|ORIG|1|EXPEDITION-1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA215110|ORIG|1|SURVEYOR-2": {
+  "group": "weak",
+  "truth": "NCT02966795"
+ },
+ "NDA215192|ORIG|1|VATE-1": {
+  "group": "count_approximate",
+  "truth": "NCT02865850"
+ },
+ "NDA215272|ORIG|1|PSOARING 1": {
+  "group": "weak",
+  "truth": "NCT03956355"
+ },
+ "NDA215383|SUPPL|6|LITESPARK-005": {
+  "group": "count_approximate",
+  "truth": "NCT04195750"
+ },
+ "NDA215499|ORIG|1|HPTN 083": {
+  "group": "weak",
+  "truth": "NCT02720094"
+ },
+ "NDA215499|ORIG|1|HPTN 084": {
+  "group": "weak",
+  "truth": "NCT03164564"
+ },
+ "NDA215985|SUPPL|7|INTEGUMENT-1": {
+  "group": "weak",
+  "truth": "NCT04773587"
+ },
+ "NDA216340|ORIG|1|KRYSTAL-1": {
+  "group": "weak",
+  "truth": "NCT03785249"
+ },
+ "NDA217188|ORIG|1|COVID-19": {
+  "group": "weak",
+  "truth": "NCT04960202"
+ },
+ "NDA217347|ORIG|1|CARDIGAN 1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA217389|ORIG|1|ENHANCE-1": {
+  "group": "count_exact_unique",
+  "truth": "NCT04535986"
+ },
+ "NDA217389|ORIG|1|ENHANCE-2": {
+  "group": "count_exact_unique",
+  "truth": "NCT04542057"
+ },
+ "NDA217439|ORIG|1|TALAPRO-2": {
+  "group": "name_unique",
+  "truth": "NCT03395197"
+ },
+ "NDA218160|SUPPL|2|LIBRETTO-531": {
+  "group": "name_unique",
+  "truth": "NCT04211337"
+ },
+ "NDA218436|ORIG|1|REMIX-1": {
+  "group": "name_unique",
+  "truth": "NCT05030311"
+ },
+ "NDA218436|ORIG|1|REMIX-2": {
+  "group": "name_unique",
+  "truth": "NCT05032157"
+ },
+ "NDA219015|ORIG|1|MVOR-1": {
+  "group": "name_unique",
+  "truth": "NCT05296629"
+ },
+ "NDA219469|ORIG|1|OASIS 1": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ },
+ "NDA219696|ORIG|1|ADAPT-1": {
+  "group": "count_exact_unique",
+  "truth": "NCT01972529"
+ },
+ "NDA219696|ORIG|1|ADAPT-2": {
+  "group": "count_exact_unique",
+  "truth": "NCT01976104"
+ },
+ "NDA220442|ORIG|1|COVID-19": {
+  "group": "answer_absent",
+  "truth": "NONE"
+ }
+}

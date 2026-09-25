@@ -159,6 +159,15 @@ code says `not yet implemented` until it lands.
   P3 reads per-trial heading indications from it; the graph route reads chosen submission
   indications instead of application-level `indications.tsv`. Replaces three separate coding paths;
   `submission_indication_text.tsv` had no reader.
+- **D31 — no indication: search the drug's treatment edges** (2026-09-25, **implemented in
+  code 2026-09-25; not yet run**). The graph route (D14, tier C) keeps walking drug ↔ *this
+  submission's indication*, unchanged, and that stays one of P3/P4's candidate sources. Only where a
+  submission has **no indication at all** does it fall back to the drug alone: every
+  `pubmedRelations` edge with `relationship_type = 3` (negative correlation: the drug treats the
+  disease) from the drug to a `Disease` node, direction drug → disease or unrecorded, best-scored
+  first up to the 400-abstract budget → PMIDs → NCT ids → start ≤ approval **and** primary
+  completion ≤ approval → the same P4c judges (prompt v2), tier C. Units carry
+  `basis = drug_only` and each candidate the disease(s) it was found under.
 
 ## Hard constraints
 
@@ -275,6 +284,11 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 
 - **`biokdeIDTest` is a different id space** from `pubmedRelations` — always resolve through
   `pubmedEntitiesFlat`.
+- **`pubmedRelations` stores relation types as bare codes, in two look-alike fields.** Filter on
+  `relationship_type`: `3` = negative correlation (treats — NSCLC for pembrolizumab, score 3,007),
+  `2` = positive correlation (adverse events), `1` = association. `correlation_type` is a
+  different field whose `0` happens to coincide with `relationship_type = 3`; reading it once
+  produced the opposite conclusion. `direction` `12` = node one → node two. See D31.
 - **Keep the `biokdeid`.** The prefixed `id` (`MESH:C582435`) is the *external* vocabulary id and
   does not appear in `pubmedRelations` at all; edges are keyed on the internal `biokdeid`
   (`6308113`). P1 carries it on every mapping row so P5 can walk drug → disease edges without

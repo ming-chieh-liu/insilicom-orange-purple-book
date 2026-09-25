@@ -31,16 +31,16 @@ class _Collection:
         self, query: dict[str, Any], _projection: dict[str, int] | None = None
     ) -> list[dict[str, Any]]:
         self.queries.append(query)
-        if "$or" in query:
-            wanted = {
-                (c["node_one_id"], c["node_two_id"]) for c in query["$or"]
-            }
-            return [
-                r
-                for r in self.rows
-                if (r["node_one_id"], r["node_two_id"]) in wanted
-            ]
-        return list(self.rows)
+
+        def matches(row: dict[str, Any], clause: dict[str, Any]) -> bool:
+            return all(row.get(k) == v for k, v in clause.items())
+
+        plain = {k: v for k, v in query.items() if k != "$or"}
+        return [
+            r for r in self.rows
+            if matches(r, plain)
+            and ("$or" not in query or any(matches(r, c) for c in query["$or"]))
+        ]
 
     def find_one(
         self, query: dict[str, Any], _projection: dict[str, int]
@@ -348,6 +348,10 @@ def test_an_approval_with_no_disease_id_is_counted_not_judged(workspace: Path) -
     assert report.with_drug == 1
     assert report.with_disease == 0
     assert report.with_candidates == 0
+    # D31: no indication is no longer the end — it is searched on the drug
+    # alone, and here the graph has no treatment edge for it either.
+    assert report.drug_only_considered == 1
+    assert report.drug_only_with_candidates == 0
 
 
 def test_a_candidate_starting_after_the_approval_never_reaches_a_judge(
@@ -473,3 +477,118 @@ def test_the_submissions_own_chosen_indication_replaces_todays_label(
         {"NDA019640": frozenset({"SOMATROPIN"})},
     )
     assert [u.indication_term for u in report.units] == ["Turner Syndrome"]
+
+
+# ---------------------------------------------------------------------------
+# D31 — no indication: search the drug's negative-correlation (treats) edges
+# ---------------------------------------------------------------------------
+
+
+def _treats(disease: str, name: str, pmids: list[str], *, score: str = "5",
+            rel: str = "3", direction: str = "12", drug_first: bool = True,
+            other_type: str = "Disease") -> dict[str, Any]:
+    drug, other = "6308113", disease
+    row: dict[str, Any] = {
+        "relationship_type": rel, "direction": direction, "score": score,
+        "locations": [[f"{p}.x.y", 0.9] for p in pmids],
+    }
+    if drug_first:
+        row.update(node_one_id=drug, node_two_id=other, node_one_type="Chemical",
+                   node_two_type=other_type, node_two_name=name)
+    else:
+        row.update(node_one_id=other, node_two_id=drug, node_one_type=other_type,
+                   node_two_type="Chemical", node_one_name=name)
+    return row
+
+
+def _paper(pmid: str, nct: str) -> dict[str, Any]:
+    return {"pmid": pmid, "abstract": f"Trial {nct}.", "articleTitle": f"Paper {pmid}",
+            "publicationType": ["randomized controlled trial"]}
+
+
+def test_only_drug_to_disease_negative_correlation_edges_are_walked() -> None:
+    repo = _repository([
+        _treats("d1", "Dwarfism", ["1"], score="9"),
+        _treats("d2", "Turner Syndrome", ["2"], drug_first=False, direction="21"),
+        _treats("d3", "Obesity", ["3"], direction="NA"),
+        _treats("d4", "Headache", ["4"], rel="2"),                 # positive: adverse
+        _treats("d5", "Short Stature", ["5"], direction="21"),     # disease -> drug
+        _treats("g1", "GH1", ["6"], other_type="Gene"),
+    ], [])
+    edges = repo.treatment_edges("6308113")
+    assert [e.disease_name for e in edges] == ["Dwarfism", "Turner Syndrome", "Obesity"]  # ties by id
+    assert edges[0].pmids == ("1",)
+
+
+def test_a_bad_score_sorts_last_rather_than_failing() -> None:
+    repo = _repository([_treats("d1", "A", ["1"], score="n/a"),
+                        _treats("d2", "B", ["2"], score="1")], [])
+    assert [e.disease_name for e in repo.treatment_edges("6308113")] == ["B", "A"]
+
+
+def test_an_approval_with_no_indication_is_searched_on_the_drug_alone(
+    workspace: Path,
+) -> None:
+    repo = _graph(
+        [_treats("d1", "Growth Hormone Deficiency", ["1", "2"], score="9"),
+         _treats("d2", "Turner Syndrome", ["2", "3"], score="4")],
+        [_paper("1", "NCT00000101"), _paper("2", "NCT00000102"), _paper("3", "NCT00000103")],
+    )
+    report = graph_links.build(
+        workspace, repo,
+        {"NCT00000101": ("2001-01-01", "200", "PHASE3", "2003-01-01"),
+         "NCT00000102": ("2002-01-01", "90", "PHASE3", "2006-05-01"),   # finished after
+         "NCT00000103": ("2001-06-01", "50", "PHASE2", "")},            # unknown: kept
+        {"NDA000002|ORIG|1"},
+        {"NDA000002": frozenset({"SOMATROPIN"})},
+    )
+    [unit] = report.units
+    assert unit.basis == graph_links.BASIS_DRUG_ONLY and unit.indication_term == ""
+    assert unit.drug == "SOMATROPIN"
+    by = {c.nct_id: c for c in unit.candidates}
+    assert set(by) == {"NCT00000101", "NCT00000103"}
+    assert by["NCT00000101"].diseases == "Growth Hormone Deficiency"
+    assert by["NCT00000103"].diseases == "Turner Syndrome"
+    assert report.drug_only_with_candidates == 1
+    assert "drug-only search (D31)" in graph_links.render(report)
+
+
+def test_an_approval_with_an_indication_keeps_the_indication_path(workspace: Path) -> None:
+    """D31 is a fallback: where the indication is known nothing changes, and a
+    treatment edge to another disease is not walked."""
+    repo = _graph(
+        [{"node_one_id": "6308113", "node_two_id": "55633",
+          "locations": [["1.55633.6308113", 0.9]]},
+         _treats("d9", "Obesity", ["9"])],
+        [_paper("1", "NCT00000123"), _paper("9", "NCT00000999")],
+    )
+    report = graph_links.build(
+        workspace, repo, {"NCT00000123": ("2001-01-01", "540", "PHASE3", "2009-01-01")},
+        {"NDA019640|SUPPL|58"}, {"NDA019640": frozenset({"SOMATROPIN"})},
+    )
+    [unit] = report.units
+    assert unit.basis == graph_links.BASIS_INDICATION and unit.drug == "SOMATROPIN"
+    # the completion bound is D31's, not applied to the indication path
+    assert [c.nct_id for c in unit.candidates] == ["NCT00000123"]
+    assert report.drug_only_considered == 0
+
+
+def test_a_drug_only_search_with_nothing_surviving_the_dates_yields_no_unit(
+    workspace: Path,
+) -> None:
+    repo = _graph([_treats("d1", "X", ["1"])], [_paper("1", "NCT00000101")])
+    report = graph_links.build(
+        workspace, repo, {"NCT00000101": ("2010-01-01", "10", "PHASE3", "2012-01-01")},
+        {"NDA000002|ORIG|1"}, {"NDA000002": frozenset({"SOMATROPIN"})},
+    )
+    assert report.units == () and report.drug_only_considered == 1
+
+
+def test_the_drug_only_limit_stops_the_pass(workspace: Path) -> None:
+    repo = _graph([_treats("d1", "X", ["1"])], [_paper("1", "NCT00000101")])
+    report = graph_links.build(
+        workspace, repo, {}, {"NDA000002|ORIG|1", "NDA019640|SUPPL|58"},
+        {"NDA000002": frozenset({"SOMATROPIN"}), "NDA019640": frozenset({"SOMATROPIN"})},
+        limit=1,
+    )
+    assert report.events_considered == 1
