@@ -47,6 +47,7 @@ from service import (
     identity_census,
     identification,
     indications,
+    letters,
     graph_links,
     graph_trials,
     normalize,
@@ -73,6 +74,8 @@ MODES: dict[str, str] = {
     "and report what still needs a tiebreak",
     "normalize": "map FDA drugs and indications, and the trial side, onto "
     "MeSH descriptors via the Insilicom graph",
+    "letters": "fetch each trial-relevant submission's approval letter, code the "
+    "indication it states, and choose one indication source per submission (D25)",
     "labels": "fetch each trial-relevant submission's archived label and read "
     "its section 14 into trial descriptions",
     "candidates": "narrow the trial registry to a judgeable shortlist per "
@@ -151,6 +154,16 @@ def build_parser() -> argparse.ArgumentParser:
         "--label-cache",
         default="fda_raw/label_pdf",
         help="where archived label PDFs are cached (gitignored, rebuildable)",
+    )
+    parser.add_argument(
+        "--letter-cache",
+        default="fda_raw/letter_pdf",
+        help="where approval-letter PDFs are cached (gitignored, rebuildable)",
+    )
+    parser.add_argument(
+        "--offline",
+        action="store_true",
+        help="letters: read only cached files; send no request to FDA",
     )
     parser.add_argument(
         "--workers",
@@ -557,6 +570,61 @@ def main(argv: list[str] | None = None) -> int:
                 )
         print(candidates.render(candidates_report))
         print(f"\nwritten to {units_path}")
+        return 0
+
+    if args.mode == "letters":
+        data = RawData(root=Path(args.fda_raw))
+        if not data.exists:
+            print(f"{data.root} not found — the letters need the bulk data tree")
+            return 1
+        vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
+        if not vocabulary.exists:
+            print(f"{vocabulary.descriptors} not found — pass --mesh")
+            return 1
+        term_index = indications.build_index(vocabulary)
+        letters_report = letters.build(
+            data,
+            Path(args.letter_cache),
+            term_index,
+            parsers=args.parsers,
+            offline=args.offline,
+        )
+        out_dir = Path(args.out)
+        label_texts: dict[str, str] = {}
+        label_tsv = out_dir / "submission_indication_text.tsv"
+        if label_tsv.is_file():
+            with label_tsv.open(encoding="utf-8") as handle:
+                for row in csv.DictReader(handle, delimiter="\t"):
+                    key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+                    label_texts[key] = row.get("text") or ""
+        app_indications: dict[str, set[str]] = {}
+        openfda_tsv = out_dir / "indications.tsv"
+        if openfda_tsv.is_file():
+            with openfda_tsv.open(encoding="utf-8") as handle:
+                for row in csv.DictReader(handle, delimiter="\t"):
+                    if row.get("mesh_id"):
+                        app_indications.setdefault(row["application"], set()).add(
+                            row["mesh_id"]
+                        )
+        merged = letters.combine(
+            letters_report.rows, label_texts, app_indications, term_index
+        )
+        repository = TsvRepository(args.out)
+        repository.save(
+            "letter_indications",
+            ("application", "submission_type", "submission_no", "approval_date",
+             "letter_url", "url_guessed", "shared_letter", "status", "sentence",
+             "indication_mesh", "indication_terms", "indication_bearing"),
+            letters_report.rows,
+        )
+        repository.save(
+            "submission_indications",
+            ("application", "submission_type", "submission_no", "source",
+             "indication_mesh", "indication_terms", "text"),
+            merged,
+        )
+        print(letters.render(letters_report, merged))
+        print(f"\nwritten to {repository.out_dir}/")
         return 0
 
     if args.mode == "labels":

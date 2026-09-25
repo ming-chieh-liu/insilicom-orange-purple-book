@@ -66,6 +66,26 @@ FROM_LABEL: str = "label_section_1"
 #: ("hepatitis b"), and everything else is a separator.
 WORD = re.compile(r"[a-z0-9]+")
 
+#: A possessive ``'s`` (straight or curly apostrophe). MeSH writes "Alzheimer
+#: Disease" where a label or letter writes "Alzheimer's disease"; split on
+#: punctuation, the ``s`` survives as a word of its own and the match fails, so
+#: the text coded only the generic "Disease". Dropped from both sides.
+POSSESSIVE = re.compile(r"['\u2019]s\b")
+
+
+def normalise(text: str) -> str:
+    """The form both entry terms and text are matched in.
+
+    >>> normalise("Alzheimer's Disease")
+    'alzheimer disease'
+    >>> normalise("Alzheimer\u2019s disease")
+    'alzheimer disease'
+    >>> normalise("Carcinoma, Non-Small-Cell Lung")
+    'carcinoma non small cell lung'
+    """
+    return " ".join(WORD.findall(POSSESSIVE.sub("", text.lower())))
+
+
 #: Words that invert the disease named after them. ``[a-z0-9]+`` splits
 #: ``Non-Small Cell Lung Cancer`` into ``non small cell lung cancer``, so a
 #: sweep that matches the four-word span ``small cell lung cancer`` returns
@@ -151,8 +171,14 @@ def build_index(vocabulary: MeshVocabulary) -> TermIndex:
     collisions = 0
     for descriptor in diseases(vocabulary):
         names[descriptor.ui] = descriptor.name
-        for term in descriptor.terms:
-            if term in by_term:
+        for raw in descriptor.terms:
+            # Normalised exactly as the text is, or a term carrying punctuation
+            # ("alzheimer's diseases", "alzheimer-type dementia (atd)") could
+            # never be matched by the word sweep at all.
+            term = normalise(raw)
+            if not term:
+                continue
+            if by_term.get(term, descriptor.ui) != descriptor.ui:
                 collisions += 1
                 continue
             by_term[term] = descriptor.ui
@@ -196,6 +222,13 @@ def code(text: str, index: TermIndex) -> set[str]:
     >>> code("", index)
     set()
 
+    **A possessive does not break a match** — see :data:`POSSESSIVE`.
+
+    >>> ad = TermIndex({"alzheimer disease": "D000544", "disease": "D004194"},
+    ...                {"D000544": "Alzheimer Disease", "D004194": "Disease"}, 2, 0)
+    >>> sorted(code("for the treatment of Alzheimer's disease", ad))
+    ['D000544']
+
     **A span negated by the word before it is dropped.** See :data:`NEGATORS`.
 
     >>> negated = TermIndex({"small cell lung cancer": "D055752"},
@@ -205,7 +238,7 @@ def code(text: str, index: TermIndex) -> set[str]:
     >>> code("non-small cell lung cancer", negated)
     set()
     """
-    words = WORD.findall(text.lower())
+    words = normalise(text).split()
     spans: list[tuple[int, int, str]] = []
     for start in range(len(words)):
         if start and words[start - 1] in NEGATORS:
@@ -380,6 +413,8 @@ def render(report: IndicationReport) -> str:
 
 
 __all__ = [
+    "POSSESSIVE",
+    "normalise",
     "NEGATORS",
     "FROM_LABEL",
     "TEXT_LIMIT",

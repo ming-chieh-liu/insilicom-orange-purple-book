@@ -140,16 +140,31 @@ def cache_path(url: str, root: Path) -> Path:
     return root / digest[:2] / f"{digest}.pdf"
 
 
-def fetch(url: str, root: Path) -> Path | None:
-    """The cached PDF for ``url``, downloading it once. ``None`` if it fails.
+#: Why a fetch returned no file. ``forbidden`` is the server refusing *us*
+#: (HTTP 403 — a rate-limit ban), which is not evidence the file is absent;
+#: ``not_found`` (HTTP 404) is.
+FORBIDDEN: str = "forbidden"
+NOT_FOUND: str = "not_found"
+ERROR: str = "error"
+EMPTY: str = "empty"
+
+
+def is_cached(url: str, root: Path) -> bool:
+    """Whether ``url`` is already in the cache, without touching the network."""
+    path = cache_path(url, root)
+    return path.is_file() and path.stat().st_size > 0
+
+
+def fetch_status(url: str, root: Path) -> tuple[Path | None, str]:
+    """``(cached path, "")`` or ``(None, reason)``, downloading at most once.
 
     Never refetches: a present, non-empty file is taken as good. The archive is
     static — a label approved in 2009 does not change — so revalidation would
-    cost 4,169 round trips for nothing.
+    cost thousands of round trips for nothing.
     """
     destination = cache_path(url, root)
     if destination.is_file() and destination.stat().st_size > 0:
-        return destination
+        return destination, ""
     destination.parent.mkdir(parents=True, exist_ok=True)
     request = urllib.request.Request(
         as_https(url), headers={"User-Agent": USER_AGENT}
@@ -157,22 +172,33 @@ def fetch(url: str, root: Path) -> Path | None:
     try:
         with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
             payload = response.read()
-    except Exception as error:
-        # Deliberately broad. A single malformed row must not end a 4,169-file
-        # run, and the archive produces more than URLError and OSError:
-        # InvalidURL for an unencoded space, and decoding errors on a few
-        # redirect chains. Every failure is counted and reported.
+    except urllib.error.HTTPError as error:
         _log.warning("%s: %s", url, error)
-        return None
+        if error.code == 403:
+            return None, FORBIDDEN
+        if error.code == 404:
+            return None, NOT_FOUND
+        return None, ERROR
+    except Exception as error:
+        # Deliberately broad. A single malformed row must not end a run, and the
+        # archive produces more than URLError and OSError: InvalidURL for an
+        # unencoded space, and decoding errors on a few redirect chains.
+        _log.warning("%s: %s", url, error)
+        return None, ERROR
     if not payload:
         _log.warning("%s: empty response", url)
-        return None
+        return None, EMPTY
     # Written via a temporary name so an interrupted run cannot leave a
     # half-file that the next run would trust.
     partial = destination.with_suffix(".part")
     partial.write_bytes(payload)
     partial.replace(destination)
-    return destination
+    return destination, ""
+
+
+def fetch(url: str, root: Path) -> Path | None:
+    """The cached file for ``url``, downloading it once. ``None`` if it fails."""
+    return fetch_status(url, root)[0]
 
 
 def extract_text(path: Path) -> tuple[str, int, int] | None:
@@ -212,8 +238,12 @@ def read_pdf(path: Path, url: str = "") -> FetchedLabel | None:
 
 
 __all__ = [
+    "EMPTY",
+    "ERROR",
+    "FORBIDDEN",
     "LABEL_DOC_TYPE",
     "MIN_TEXT_CHARS",
+    "NOT_FOUND",
     "TIMEOUT",
     "USER_AGENT",
     "FetchedLabel",
@@ -222,6 +252,8 @@ __all__ = [
     "cache_path",
     "extract_text",
     "fetch",
+    "fetch_status",
+    "is_cached",
     "read_label_documents",
     "read_pdf",
 ]

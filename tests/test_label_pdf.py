@@ -200,3 +200,22 @@ def test_a_pdf_with_no_text_is_a_scan(text: str, expected: bool) -> None:
 
 def test_bytes_per_page_survives_a_zero_page_pdf() -> None:
     assert label_pdf.FetchedLabel("u", Path("p"), 0, 100, "").bytes_per_page == 100
+
+
+# ---------------------------------------------------------------------------
+# Why a fetch failed: a refusal is not an absence
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("code", "reason"), [(403, "forbidden"), (404, "not_found"), (500, "error")])
+def test_an_http_error_is_classified(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, code: int, reason: str
+) -> None:
+    import urllib.error
+
+    def refuse(request: object, timeout: int) -> object:
+        raise urllib.error.HTTPError("https://x/a.pdf", code, "no", {}, None)  # type: ignore[arg-type]
+
+    monkeypatch.setattr(label_pdf.urllib.request, "urlopen", refuse)
+    assert label_pdf.fetch_status("http://x/a.pdf", tmp_path) == (None, reason)
+    assert not label_pdf.is_cached("http://x/a.pdf", tmp_path)

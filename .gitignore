@@ -48,3 +48,5 @@ examine/
 # Review-trial-role judging units: rebuilt by the pilot builder, not curated
 adjudication/review_role_units.jsonl
 adjudication/review_role_tiebreak_needed.txt
+adjudication/letter_locate_units.jsonl
+adjudication/letter_verify_units.jsonl

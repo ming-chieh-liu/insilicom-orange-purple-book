@@ -115,7 +115,7 @@ code says `not yet implemented` until it lands.
   label-stated NCT ids, but P4 does not judge their prose. Unjudged units get reason
   `label_change_not_judged`. They must be read so a trial first described there is not attributed
   by D16 to a later supplement.
-- **D25 — approval letters are an indication source** (2026-09-24, **not yet implemented**).
+- **[PARTIALLY SUPERSEDED by D30, 2026-09-24 — coding and the source merge move into the single indication step]** **D25 — approval letters are an indication source** (2026-09-24, **letter reader implemented 2026-09-24; full download in progress**).
   `ApplicationDocsTypeID = 1`; the "provides for …" sentence states the approved indication of that
   exact submission. Coverage 95.2% of in-scope submissions since 1998, ~0% before; adds 454 with no
   label. **Not a trial source** — their study mentions are postmarketing requirements. The
@@ -146,6 +146,13 @@ code says `not yet implemented` until it lands.
   `judged_contradicts_direct`, `indication_mismatch`). Different trials from different routes for one
   approval is normal, not a conflict. Detail: `docs/DESIGN.md` §3c, which also records the open
   question on D17 tier A for judged links.
+- **D30 — indications: read once, normalise once, one table** (2026-09-24, **not yet
+  implemented**). Readers emit raw text (label §1 + §14 headings, letter sentence, reviews later);
+  one step codes all of it with one coder (exact disease name, then MeSH sweep) into `MESH:D…` +
+  `biokdeid` and writes `submission_indications.tsv` (source · source_key · text · ids · `chosen`).
+  P3 reads per-trial heading indications from it; the graph route reads chosen submission
+  indications instead of application-level `indications.tsv`. Replaces three separate coding paths;
+  `submission_indication_text.tsv` had no reader.
 
 ## Hard constraints
 
