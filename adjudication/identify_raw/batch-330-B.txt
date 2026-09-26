@@ -1,0 +1,20 @@
+NDA022024|ORIG|1|n=827 = NONE
+NDA022026|ORIG|1|PRAISE-2 = NONE
+NDA022026|ORIG|1|n=1153 = NONE
+NDA022026|ORIG|1|n=50 = NONE
+NDA022026|ORIG|1|n=800 = NONE
+NDA022038|SUPPL|4|Women’s Health Initiative Studies = NONE
+NDA022056|ORIG|1|Duodenal Ulcer Disease = NONE
+NDA022056|ORIG|1|Gastric Ulcer = NONE
+NDA022056|ORIG|1|Pathological Hypersecretory Conditions = NONE
+NDA022056|ORIG|1|Pediatric GERD = NONE
+NDA022056|SUPPL|18|Active Benign Gastric Ulcer = NONE
+NDA022056|SUPPL|18|Active Duodenal Ulcer = NONE
+NDA022056|SUPPL|18|GERD 562 = NONE
+NDA022056|SUPPL|18|H. pylori Eradication in Patients with Duodenal Ulcer Disease = NONE
+NDA022056|SUPPL|18|Pediatric Studies for the Treatment of Symptomatic GERD, Treatment of EE due to Acid-Mediat = NONE
+NDA022080|ORIG|1|Treatment of Paget’s Disease of Bone = NONE
+NDA022100|ORIG|1|AZOR™ = NCT00185133
+NDA022100|ORIG|1|Amlodipine = NONE
+NDA022100|SUPPL|2|Azor = NONE
+NDA022101|ORIG|1|Pathological Hypersecretory Conditions Including Zollinger-Ellison Syndrome = NONE

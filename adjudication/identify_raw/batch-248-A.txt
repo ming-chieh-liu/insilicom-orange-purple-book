@@ -1,0 +1,20 @@
+NDA022247|ORIG|1|Treatment of Moderate to Severe Vasomotor Symptoms Associated with = NONE
+NDA022247|ORIG|1|Women’s Health Initiative Studies = NONE
+NDA022562|ORIG|1|Responses of Patients with NAGS Deficiency to Acute and Chronic Treatment = NONE
+NDA203684|SUPPL|5|Echocardiography = NONE
+NDA203684|SUPPL|5|Ultrasonography of the Liver = NONE
+NDA204286|SUPPL|1|n=1175 = NONE
+NDA206966|ORIG|1|n=704 = NONE
+NDA208065|SUPPL|21|Adjuvant Treatment of Early-Stage EGFR Mutation-Positive Non-Small Cell Lung = NONE
+NDA208065|SUPPL|21|Previously Treated EGFR T790M Mutation-Positive Metastatic NSCLC = NONE
+NDA208065|SUPPL|21|Previously Untreated EGFR Mutation-Positive Metastatic NSCLC = NONE
+NDA208065|SUPPL|8|Previously Treated EGFR T790M Mutation-Positive Metastatic Non-Small Cell Lung = NONE
+NDA208065|SUPPL|8|Previously Untreated EGFR Mutation-Positive Metastatic Non-Small Cell Lung = NONE
+NDA209500|SUPPL|16|n=480 = NONE
+NDA209500|SUPPL|16|n=485 = NONE
+NDA209500|SUPPL|5|n=335 = NONE
+NDA209500|SUPPL|5|n=381 = NONE
+NDA209500|SUPPL|5|n=450 = NCT02282761
+NDA209500|SUPPL|5|n=529 = NONE
+NDA211527|ORIG|1|n=2420 = NONE
+NDA216196|ORIG|1|n=15 = NONE

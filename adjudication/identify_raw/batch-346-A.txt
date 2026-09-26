@@ -1,0 +1,20 @@
+NDA214657|ORIG|1|Non-Squamous NSCLC = NCT02578680
+NDA214679|ORIG|1|Monotherapy Epilepsy = NONE
+NDA214679|ORIG|1|Preventive Treatment of Migraine = NONE
+NDA214965|ORIG|1|n=118 = NONE
+NDA215029|ORIG|1|n=32 = NONE
+NDA215212|ORIG|1|Bacterial Meningitis = NONE
+NDA215331|ORIG|1|Multiple Myeloma = NONE
+NDA215423|ORIG|1|n=696 = NCT01139762
+NDA215441|ORIG|1|Multiple Myeloma = NONE
+NDA215441|ORIG|1|VBMCP 91 = NCT00048230
+NDA215813|ORIG|1|Adjuvant Treatment of Breast Cancer = NONE
+NDA215813|ORIG|1|Head and Neck Cancer = NCT00273546
+NDA215813|ORIG|1|Locally Advanced or Metastatic Breast Cancer = NONE
+NDA215813|ORIG|1|Non-small Cell Lung Cancer (NSCLC) = NONE
+NDA216099|SUPPL|5|CML in Pediatric Patients = NONE
+NDA216099|SUPPL|5|Imatinib-Resistant or -Intolerant CML or Ph+ ALL in Adults = NONE
+NDA216099|SUPPL|5|Newly Diagnosed Chronic Phase CML in Adults = NCT00481247
+NDA216099|SUPPL|5|Ph+ ALL in Pediatric Patients = NONE
+NDA216117|ORIG|1|n=416 = NONE
+NDA216338|ORIG|1|Adenocarcinoma of the Pancreas = NONE

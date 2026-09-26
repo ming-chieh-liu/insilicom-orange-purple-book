@@ -1,0 +1,20 @@
+NDA021676|SUPPL|8|Acne Clinical Trials = NONE
+NDA021676|SUPPL|8|Oral Contraceptive Clinical Trial = NONE
+NDA022561|ORIG|1|n=1326 = NCT00213135
+NDA204441|ORIG|1|n=1519 = NONE
+NDA205422|SUPPL|9|Agitation Associated with Dementia Due to Alzheimer’s Disease = NCT01862640
+NDA210365|ORIG|1|Dravet Syndrome = NCT02091375
+NDA020505|SUPPL|18|n=470 = NONE
+NDA020505|SUPPL|18|n=487 = NONE
+NDA020844|SUPPL|15|n=470 = NONE
+NDA020844|SUPPL|15|n=487 = NONE
+NDA021266|SUPPL|39|Candidemia in Non-neutropenic Patients and Other Deep Tissue CandidaInfections = NONE
+NDA021266|SUPPL|39|Invasive Aspergillosis(IA) = NONE
+NDA021266|SUPPL|39|Other Serious Fungal Pathogens = NONE
+NDA021266|SUPPL|39|Pediatric Studies = NCT00836875
+NDA021267|SUPPL|50|Candidemia in Non-neutropenic Patients and Other Deep Tissue CandidaInfections = NONE
+NDA021267|SUPPL|50|Invasive Aspergillosis(IA) = NONE
+NDA021267|SUPPL|50|Other Serious Fungal Pathogens = NONE
+NDA021267|SUPPL|50|Pediatric Studies = NCT00836875
+NDA021630|SUPPL|29|Candidemia in Non-neutropenic Patients and Other Deep Tissue CandidaInfections = NONE
+NDA021630|SUPPL|29|Invasive Aspergillosis(IA) = NONE

@@ -1,0 +1,20 @@
+NDA020732|ORIG|1|n=575 = NONE
+NDA020732|ORIG|1|n=731 = NONE
+NDA020954|ORIG|1|n=138 = NONE
+NDA020954|ORIG|1|n=61 = NONE
+NDA021372|SUPPL|19|Postoperative Nausea and Vomiting • Store at controlled temperature of 20–25°C (68°F–77°F). = NONE
+NDA022231|ORIG|1|n=300 = NCT02770716
+NDA022341|ORIG|1|Combination Therapy = NCT00318422
+NDA022341|ORIG|1|Monotherapy = NCT00294723
+NDA022445|ORIG|1|n=733 = NONE
+NDA204412|ORIG|1|Mildly to Moderately Active Ulcerative Colitis = NONE
+NDA210259|SUPPL|7|Chronic Lymphocytic Leukemia = NCT02475681
+NDA212125|ORIG|1|Treatment of Esophageal Candidiasis in Adult and Pediatric Patients 4 Months of Age and Old = NONE
+NDA212156|ORIG|1|Treatment of Esophageal Candidiasis in Adult and Pediatric Patients 4 Months of Age and Old = NONE
+NDA019651|SUPPL|24|Treatment of Mildly to Moderately Active Ulcerative Colitis = NONE
+NDA021304|SUPPL|1|n=160 = NONE
+NDA022020|ORIG|1|n=35 = NONE
+NDA022020|ORIG|1|n=404 = NONE
+NDA022020|ORIG|1|n=603 = NONE
+NDA202806|SUPPL|4|BRAF V600E or V600K Unresectable or Metastatic = NONE
+NDA204412|SUPPL|3|Treatment of Mildly to Moderately Active Ulcerative Colitis = NONE

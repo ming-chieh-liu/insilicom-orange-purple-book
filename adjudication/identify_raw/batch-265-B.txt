@@ -1,0 +1,20 @@
+NDA215833|SUPPL|21|PSMA-Positive mCRPC Previously Treated With ARPI Therapy = NCT04689828
+BLA125521|SUPPL|4|Psoriatic Arthritis = NONE
+NDA021486|ORIG|1|n=40 = NONE
+NDA021671|ORIG|1|n=314 = NONE
+NDA021671|ORIG|1|n=487 = NONE
+NDA021671|ORIG|1|n=75 = NONE
+NDA021671|ORIG|1|n=876 = NONE
+NDA022064|SUPPL|17|Seasonal and Perennial Allergic Rhinitis = NONE
+NDA022353|ORIG|1|n=15 = NONE
+NDA022353|ORIG|1|n=22 = NONE
+NDA022387|SUPPL|17|Pulmonary Hypertension Associated with ILD (WHO Group 3) = NCT02630316
+NDA022393|SUPPL|4|Cutaneous T-Cell Lymphoma = NONE
+NDA203441|SUPPL|13|Treatment of SBS in Pediatric Patients = NONE
+NDA206255|ORIG|1|n=1371 = NONE
+NDA209394|SUPPL|13|Description of Clinical Trials = NONE
+NDA209394|SUPPL|6|Clinical Trial in Pediatric Subjects (12 years to less than 18 years) = NONE
+NDA209394|SUPPL|6|SVR12 98 = NONE
+NDA210496|SUPPL|6|BRAF V600E Mutation-Positive Metastatic Colorectal Cancer (CRC) = NCT02928224
+NDA210496|SUPPL|6|BRAF V600E or V600K Mutation-Positive Unresectable or Metastatic Melanoma = NCT01909453
+NDA210868|SUPPL|4|n=119 = NONE

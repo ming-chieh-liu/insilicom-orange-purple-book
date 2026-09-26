@@ -1,0 +1,20 @@
+NDA204508|SUPPL|22|n=179 = NONE
+NDA204508|SUPPL|22|n=18 = NONE
+NDA204508|SUPPL|22|n=22 = NONE
+NDA204767|ORIG|1|Adult Acute Pain = NCT00564486
+NDA204767|ORIG|1|Pediatric Acute Pain and Fever = NONE
+NDA204803|ORIG|1|n=60 = NONE
+NDA204957|ORIG|1|Adult Acute Pain = NONE
+NDA205004|ORIG|1|Multiple Myeloma = NONE
+NDA205004|ORIG|1|VBMCP 91 = NCT00048230
+NDA205103|ORIG|1|n=524 = NONE
+NDA205122|ORIG|1|Immediate-Release: Monotherapy Treatment in Patients with Partial Onset or = NCT00230698
+NDA205122|SUPPL|5|Immediate-Release: Migraine Prophylaxis = NONE
+NDA205410|ORIG|1|n=101 = NONE
+NDA205410|ORIG|1|n=23 = NONE
+NDA205489|ORIG|1|n=87 = NONE
+NDA205572|ORIG|1|Acute Bacterial Exacerbation of Chronic Bronchitis = NONE
+NDA205572|ORIG|1|Acute Bacterial Sinusitis = NONE
+NDA205572|ORIG|1|Community Acquired Pneumonia = NONE
+NDA205572|ORIG|1|Complicated Intra-Abdominal Infections = NONE
+NDA205572|ORIG|1|Complicated Skin and Skin Structure Infections = NONE

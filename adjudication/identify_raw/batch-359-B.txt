@@ -1,0 +1,20 @@
+NDA210428|ORIG|1|Hypertension = NONE
+NDA210709|ORIG|1|Aliskiren Monotherapy = NONE
+NDA210709|ORIG|1|Pediatric Hypertension = NCT01151410
+NDA212379|ORIG|1|n=2418 = NONE
+NDA213422|ORIG|1|n=794 = NONE
+NDA213426|ORIG|1|n=637 = NCT03108482
+NDA214952|ORIG|1|SUPER-1 = NONE
+NDA216793|ORIG|1|PCWG-3 = NONE
+NDA217512|ORIG|1|Pathological Hypersecretion Associated with Zollinger-Ellison Syndrome = NONE
+NDA217513|ORIG|1|Adjuvant Treatment of BRAF V600E or V600K Mutation-Positive Melanoma = NCT01682083
+NDA217513|ORIG|1|BRAF V600E Mutation-Positive Low-Grade Glioma = NONE
+NDA217513|ORIG|1|BRAF V600E Mutation-Positive Metastatic Non-Small Cell Lung Cancer = NONE
+NDA217513|ORIG|1|BRAF V600E Mutation-Positive Unresectable or Metastatic Solid Tumors = NONE
+NDA217513|ORIG|1|BRAF V600E or V600K Mutation-Positive Unresectable or Metastatic Melanoma = NCT01584648
+NDA217513|ORIG|1|ECOG 0 = NONE
+NDA217513|ORIG|1|Lack of Clinical Activity in Metastatic Melanoma Following BRAF-Inhibitor Therapy = NCT01037127
+NDA217513|ORIG|1|RANO 2010 = NONE
+BLA103000|SUPPL|5215|Blepharospasm = NONE
+BLA103000|SUPPL|5215|Primary Axilary Hyperhidrosis = NONE
+BLA103000|SUPPL|5215|Upper Limb Spasticity = NONE

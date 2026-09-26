@@ -1,0 +1,20 @@
+NDA200327|SUPPL|17|n=3 = NONE
+NDA205053|ORIG|1|Posaconazole Oral Suspension Treatment of Oropharyngeal Candidiasis Refractory to = NONE
+NDA205836|ORIG|1|n=1550 = NONE
+NDA205837|ORIG|1|n=1550 = NONE
+NDA205838|ORIG|1|n=1550 = NONE
+NDA208030|SUPPL|5|LA38-0411 = NCT02041299
+NDA208030|SUPPL|5|Transfusional Iron Overload in Patients with Sickle Cell Disease and other Anemias = NCT02443545
+NDA208030|SUPPL|5|Transfusional Iron Overload in Patients with Thalassemia Syndromes = NONE
+NDA208276|ORIG|1|Clinical Trials in Pulmonary Arterial Hypertension (PAH) = NONE
+NDA211192|SUPPL|11|R132C 9 = NONE
+NDA212269|ORIG|1|n=236 = NONE
+NDA212269|SUPPL|1|LA38-0411 = NCT02041299
+NDA212269|SUPPL|1|Transfusional Iron Overload in Patients with Sickle Cell Disease and other Anemias = NCT02443545
+NDA212269|SUPPL|1|Transfusional Iron Overload in Patients with Thalassemia Syndromes = NONE
+NDA213491|ORIG|1|Clinical Trials with Immediate-Release Cysteamine = NONE
+NDA213491|ORIG|1|RP103-03 = NCT01000961
+NDA213491|ORIG|1|RP103-08 = NCT01744782
+BLA103411|SUPPL|5052|GRADE 3 = NONE
+BLA103411|SUPPL|5052|INFORMATION 5 = NONE
+BLA103411|SUPPL|5052|INTERACTIONS 12 = NONE

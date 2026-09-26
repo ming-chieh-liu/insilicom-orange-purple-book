@@ -1,0 +1,20 @@
+NDA218879|ORIG|1|Epilepsy = NONE
+NDA219097|ORIG|1|Aggressive Systemic Mastocytosis = NONE
+NDA219097|ORIG|1|Chronic Myeloid Leukemia = NCT00333840
+NDA219097|ORIG|1|Dermatofibrosarcoma Protuberans = NONE
+NDA219097|ORIG|1|Gastrointestinal Stromal Tumors = NONE
+NDA219097|ORIG|1|Hypereosinophilic Syndrome/Chronic Eosinophilic Leukemia = NONE
+NDA219097|ORIG|1|Myelodysplastic/Myeloproliferative Diseases = NONE
+NDA219097|ORIG|1|Pediatric CML = NONE
+NDA219108|ORIG|1|Adult Patients = NONE
+NDA219108|ORIG|1|Pediatric Patients = NONE
+NDA219423|ORIG|1|n=1385 = NCT04518293
+NDA219531|ORIG|1|Effects in Documented Coronary Artery Disease = NONE
+NDA219531|ORIG|1|Effects in Hypertension = NONE
+NDA219531|ORIG|1|Effects in Vasospastic Angina = NONE
+NDA219531|ORIG|1|Studies in Patients with Heart Failure = NONE
+NDA219920|ORIG|1|Breast Cancer = NONE
+NDA219920|ORIG|1|Non-Small Cell Lung Cancer = NONE
+NDA219920|ORIG|1|Ovarian Cancer = NCT00102414
+NDA219920|ORIG|1|Pancreatic Cancer = NONE
+NDA219921|ORIG|1|Use as a Single Agent for Secondary Treatment of Advanced Ovarian Cancer = NONE

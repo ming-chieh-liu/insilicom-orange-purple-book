@@ -1,0 +1,20 @@
+NDA207999|ORIG|1|n=4 = NONE
+NDA208159|ORIG|1|n=135 = NONE
+NDA208169|ORIG|1|n=4 = NONE
+NDA210854|SUPPL|20|Treatment of Acute Uncomplicated Influenza—Otherwise Healthy Subjects (12 Years of Age = NONE
+NDA210854|SUPPL|20|Treatment of Acute Uncomplicated Influenza—Otherwise Healthy and High-Risk Pediatric = NCT03629184
+NDA211371|ORIG|1|n=38 = NONE
+NDA214410|SUPPL|6|Treatment of Acute Uncomplicated Influenza—Otherwise Healthy Subjects (12 Years of Age = NONE
+NDA214410|SUPPL|6|Treatment of Acute Uncomplicated Influenza—Otherwise Healthy and High-Risk Pediatric = NCT03629184
+NDA214410|SUPPL|8|Treatment of Acute Uncomplicated Influenza—Otherwise Healthy Subjects (12 Years of Age and = NONE
+NDA214938|ORIG|1|n=121 = NCT03197766
+NDA214938|SUPPL|2|Pediatric Patients 5 Years of Age and Older = NCT03197766
+NDA215498|ORIG|1|n=13 = NONE
+NDA215498|ORIG|1|n=62 = NCT03566238
+NDA215596|ORIG|1|HSCT 52 = NCT02931539
+NDA215596|ORIG|1|HSCT 93 = NCT02931539
+NDA215596|ORIG|1|LLOQ 48 = NCT02931539
+NDA215596|ORIG|1|Treatment of Adults with Post-transplant CMV Infection/Disease That Is Refractory (with or = NONE
+NDA216962|ORIG|1|n=141 = NCT04380142
+NDA218139|ORIG|1|Benign Prostatic Hyperplasia = NONE
+NDA218275|ORIG|1|ABSSSI 81 = NCT03138733

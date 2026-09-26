@@ -1,0 +1,20 @@
+NDA050807|ORIG|1|GFEA-05 = NONE
+NDA050807|ORIG|1|GFEA-053 = NONE
+NDA200045|ORIG|1|HCTZ 150 = NONE
+NDA200045|ORIG|1|HCTZ 300 = NONE
+NDA200199|ORIG|1|Small Cell Lung Cancer = NONE
+NDA200582|ORIG|1|Small Cell Lung Cancer = NONE
+NDA200795|ORIG|1|Breast Cancer = NONE
+NDA200795|ORIG|1|IIIA 7 = NONE
+NDA200795|ORIG|1|Non-Small Cell Lung Cancer (NSCLC) = NONE
+NDA200795|ORIG|1|Ovarian Cancer = NCT00102414
+NDA200795|ORIG|1|Pancreatic Cancer = NONE
+NDA201195|ORIG|1|Adjuvant Treatment of Breast Cancer = NCT00688740
+NDA201195|ORIG|1|Head and Neck Cancer = NCT00003888
+NDA201195|ORIG|1|Locally Advanced or Metastatic Breast Cancer = NONE
+NDA201195|ORIG|1|Non-Small Cell Lung Cancer (NSCLC) = NONE
+NDA201635|ORIG|1|Monotherapy Treatment in Patients with Partial Onset or Primary = NCT00230698
+NDA201635|SUPPL|14|Monotherapy Treatment in Patients with Partial Onset or Primary Generalized Tonic-Clonic = NCT00230698
+NDA201635|SUPPL|17|Migraine Prophylaxis = NONE
+NDA202020|ORIG|1|ACR20 47 = NONE
+NDA202020|ORIG|1|n=350 = NONE

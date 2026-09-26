@@ -1,0 +1,20 @@
+NDA212782|ORIG|1|VBMCP 91 = NCT00048230
+NDA212849|ORIG|1|Bipolar Disorder - Adjunctive Therapy = NCT00094926
+NDA212849|ORIG|1|Bipolar Disorder - Monotherapy = NCT00132678
+NDA212994|ORIG|1|n=150 = NONE
+NDA213135|ORIG|1|BLI4700-301 = NONE
+NDA213378|ORIG|2|Bipolar I Disorder = NONE
+NDA213586|SUPPL|8|Bipolar Disorder – Adjunctive Therapy = NCT00094926
+NDA213586|SUPPL|8|Bipolar Disorder – Monotherapy = NCT00132678
+NDA214218|ORIG|1|Mesothelioma = NONE
+NDA214218|ORIG|1|Non-Squamous NSCLC = NONE
+NDA214358|ORIG|1|Reduction in the Risk of Recurrence of VTE in Pediatric Patients = NCT02197416
+NDA214358|ORIG|1|Treatment of VTE in Pediatric Patients = NCT01895777
+NDA214408|ORIG|1|Mesothelioma = NONE
+NDA214408|ORIG|1|Non-Squamous NSCLC = NCT02578680
+NDA214439|ORIG|1|Effects in Documented Coronary Artery Disease = NONE
+NDA214439|ORIG|1|Effects in Hypertension = NONE
+NDA214439|ORIG|1|Effects in Vasospastic Angina = NONE
+NDA214439|ORIG|1|PRAISE-2 = NONE
+NDA214439|ORIG|1|Studies in Patients with Heart Failure = NONE
+NDA214657|ORIG|1|Mesothelioma = NONE

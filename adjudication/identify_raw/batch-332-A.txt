@@ -1,0 +1,20 @@
+NDA022285|SUPPL|18|Immediate-release KEPPRA in Pediatric Patients 4 Years to 16 Years = NCT00615615
+NDA022285|SUPPL|18|KEPPRA XR in Adults = NONE
+NDA022314|ORIG|1|HCTZ 10 = NCT00327587
+NDA022314|ORIG|1|n=268 = NONE
+NDA022348|ORIG|1|Analgesia (Pain) hours of treatment, measured as the area above the temperature = NCT00225732
+NDA022348|SUPPL|5|Analgesia (Pain) = NCT00225732
+NDA022372|SUPPL|13|n=89 = NONE
+NDA022386|ORIG|1|Patients with Inadequate Glycemic Control on Metformin HCl Monotherapy = NONE
+NDA022401|ORIG|1|Amlodipine = NONE
+NDA022401|ORIG|1|TWYNSTA Tablets = NCT00281580
+NDA022450|ORIG|1|Adult Acute Pain = NONE
+NDA022450|ORIG|1|Pediatric Acute Pain and Fever = NONE
+NDA022453|ORIG|1|Small Cell Lung Cancer = NONE
+NDA022456|ORIG|1|Gastric Ulcer In this and five other controlled GERD studies, significantly more patients = NONE
+NDA022456|ORIG|1|Gastroesophageal Reflux Disease (GERD) = NONE
+NDA022504|ORIG|1|Clinical Studies in Hypogonadal Men = NONE
+NDA022516|ORIG|1|CLBP-1 = NONE
+NDA022516|ORIG|1|CLBP-2 = NCT00408876
+NDA022516|ORIG|1|CLBP-3 = NONE
+NDA022516|ORIG|1|Chronic Musculoskeletal Pain = NONE

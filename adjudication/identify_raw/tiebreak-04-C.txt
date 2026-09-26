@@ -1,0 +1,19 @@
+NDA022514|ORIG|1|n=14 = NCT00466167
+NDA021885|ORIG|1|n=10739 = NCT00000611
+NDA021885|ORIG|1|n=16608 = NCT00000611
+NDA022331|SUPPL|14|n=31 = NCT01439126
+NDA203214|SUPPL|17|Rheumatoid Arthritis = NCT00413660
+NDA021355|SUPPL|3|Women's Health Initiative Studies = NCT00000611
+NDA021790|SUPPL|6|RARS 17 = NCT00260065
+NDA208246|SUPPL|3|Rheumatoid Arthritis = NCT00413660
+NDA021797|SUPPL|18|Outcomes in Pediatric Subjects = NCT01079806
+NDA021798|SUPPL|19|Outcomes in Pediatric Subjects = NCT01079806
+BLA125504|SUPPL|1|ASAS 20 = NONE
+NDA202022|SUPPL|22|Treatment-Naïve Pediatric Subjects (2 to less than 12 Years of Age) = NONE
+NDA202022|SUPPL|22|Treatment-Naïve Pediatric Subjects (≥12 to less than 18 Years of Age) = NONE
+NDA219016|ORIG|1|Treatment-Naïve Pediatric Subjects (2 to less than 12 Years of Age) = NONE
+NDA219016|ORIG|1|Treatment-Naïve Pediatric Subjects (≥12 to less than 18 Years of Age) = NONE
+BLA125559|SUPPL|39|Clinical Trials in Pediatric Patients with HeFH = NCT03510884
+NDA021445|SUPPL|30|TABLE 8 = NCT03867318
+BLA125477|SUPPL|34|Hepatocellular Carcinoma = NCT02435433
+NDA213645|ORIG|1|S. aureus Bacteremia/Endocarditis = NCT00093067

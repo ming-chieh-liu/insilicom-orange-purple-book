@@ -1,0 +1,20 @@
+NDA021361|SUPPL|12|TLUS 21 = NONE
+NDA021361|SUPPL|12|Travelers’ Diarrhea = NONE
+NDA021872|ORIG|1|n=904 = NONE
+NDA021882|SUPPL|33|n=134 = NCT01709838
+NDA205834|ORIG|1|Overview of Clinical Trials = NONE
+NDA208562|ORIG|1|Candidemia in Non-neutropenic Patients and Other Deep Tissue Candida Infections = NONE
+NDA208562|ORIG|1|Invasive Aspergillosis = NONE
+NDA208562|ORIG|1|Other Serious Fungal Pathogens = NONE
+NDA210134|SUPPL|4|Adult Patients with Type 1 or Type 2 Diabetes Mellitus = NONE
+NDA022007|ORIG|1|Adult COPD Trial = NONE
+NDA022251|ORIG|1|Bipolar Disorder = NONE
+NDA022251|ORIG|1|Epilepsy = NONE
+NDA022532|ORIG|1|Acne Clinical Trials = NONE
+NDA022532|ORIG|1|Oral Contraceptive Clinical Trial = NONE
+NDA022532|ORIG|1|Premenstrual Dysphoric Disorder Clinical Trials = NONE
+NDA206910|SUPPL|15|n=134 = NCT01709838
+NDA207968|SUPPL|9|n=134 = NCT01709838
+NDA208692|SUPPL|2|ECOG 0 = NONE
+NDA209092|SUPPL|1|MONALEESA-2 = NCT01958021
+NDA209092|SUPPL|1|MONALEESA-3 = NCT02422615

@@ -1,0 +1,20 @@
+NDA022101|ORIG|1|Pediatric GERD = NONE
+NDA022101|ORIG|1|Risk Reduction of NSAID-Associated Gastric Ulcer = NONE
+NDA022107|ORIG|1|n=2730 = NONE
+NDA022107|ORIG|1|n=6200 = NONE
+NDA022137|SUPPL|15|n=31 = NONE
+NDA022137|SUPPL|15|n=48 = NONE
+NDA022148|ORIG|1|Diabetic Peripheral Neuropathic Pain = NONE
+NDA022148|ORIG|1|Fibromyalgia = NCT00673452
+NDA022148|ORIG|1|HAMD-17 = NONE
+NDA022148|ORIG|1|Major Depressive Disorder = NONE
+NDA022152|ORIG|1|Migraine = NONE
+NDA022234|ORIG|1|Adjuvant Treatment of Breast Cancer = NCT00688740
+NDA022234|ORIG|1|Locally Advanced or Metastatic Breast Cancer = NONE
+NDA022234|ORIG|1|Non-Small Cell Lung Cancer (NSCLC) = NONE
+NDA022234|SUPPL|3|Head and Neck Cancer = NCT00003888
+NDA022273|ORIG|1|n=107 = NONE
+NDA022273|ORIG|1|n=78 = NONE
+NDA022277|ORIG|1|Newly Diagnosed Glioblastoma Multiforme = NCT00006353
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma = NONE
+NDA022285|SUPPL|18|Immediate-release KEPPRA in Adults = NONE

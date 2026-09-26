@@ -1,0 +1,20 @@
+NDA208434|SUPPL|15|Treatment of Metastatic ALK-Positive NSCLC = NONE
+NDA211635|ORIG|1|n=91 = NONE
+NDA216142|ORIG|1|Treatment of Esophageal Candidiasis in Adult and Pediatric Patients 4 Months of Age and Old = NONE
+NDA217729|ORIG|1|Adult Patients with Imatinib-Resistant or -Intolerant Ph+ CP, AP, and BP CML = NCT00261846
+NDA217729|ORIG|1|Adult Patients with Newly-Diagnosed CP Ph+ CML = NCT02130557
+NDA217729|ORIG|1|Pediatric Patients with Newly-Diagnosed CP Ph+ CML or with CP Ph+ CML with Resistance or = NCT04258943
+NDA217806|ORIG|1|COVID-19 = NONE
+NDA020517|SUPPL|30|LUPRON DEPOT 30 mg for 4-Month Administration = NONE
+NDA020517|SUPPL|30|LUPRON DEPOT 45 mg for 6-Month Administration = NCT00056654
+NDA209115|SUPPL|14|BRCA-mutated Metastatic Castration-Resistant Prostate Cancer = NCT02975934
+NDA209531|SUPPL|16|HINE-2 = NONE
+NDA020263|SUPPL|36|CP07-167 = NONE
+NDA021999|SUPPL|14|Schizoaffective Disorder = NCT00397033
+NDA205832|ORIG|1|n=1231 = NONE
+NDA210491|ORIG|1|Trial in Patients with CF Who Were Heterozygous for the F508del Mutation and a Second Mutat = NCT02392234
+BLA125545|ORIG|1|Patients with Cancer on Chemotherapy = NONE
+BLA125545|ORIG|1|Patients with Chronic Kidney Disease = NONE
+BLA761037|SUPPL|15|JADAS-27 = NONE
+BLA761037|SUPPL|15|Polyarticular Juvenile Idiopathic Arthritis (pJIA) = NCT02776735
+BLA761105|SUPPL|14|Plaque Psoriasis = NONE

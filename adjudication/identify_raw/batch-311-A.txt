@@ -1,0 +1,20 @@
+NDA212888|SUPPL|3|Clinical Trials in Adults = NONE
+NDA202714|SUPPL|9|Monotherapy for Treatment of Patients with Relapsed and Refractory = NONE
+NDA202714|SUPPL|9|VGPR 151 = NONE
+NDA202895|ORIG|1|Treatment-Experienced Adult Subjects = NONE
+NDA202895|ORIG|1|Treatment-Naïve Adult Subjects = NCT00258557
+NDA208246|SUPPL|9|Ulcerative Colitis = NCT01458574
+NDA213645|ORIG|1|Complicated Skin and Skin Structure Infections = NCT00711802
+NDA213645|ORIG|1|S. aureus Bacteremia/Endocarditis = NONE
+BLA103909|SUPPL|5197|Acute Ischemic Stroke = NONE
+BLA125469|SUPPL|51|Glycemic Control Combination Therapy Trials in Adults with Type 2 Diabetes Mellitus = NCT00734474
+BLA761105|SUPPL|44|Clinical Trials in Subjects with Moderate-to-Severe Plaque Psoriasis = NONE
+NDA020637|SUPPL|16|n=12 = NONE
+NDA020637|SUPPL|16|n=120 = NONE
+NDA202667|ORIG|1|COSOPT PF Equivalence Study = NONE
+NDA203752|SUPPL|4|Effects on Bone Mineral Density = NONE
+NDA203752|SUPPL|4|Effects on Vasomotor Symptoms = NONE
+NDA203752|SUPPL|4|Women’s Health Initiative Studies = NCT00000611
+NDA207103|SUPPL|4|PALOMA-2 = NCT01740427
+NDA207103|SUPPL|4|PALOMA-3 = NCT01942135
+NDA207103|SUPPL|4|n=666 = NCT01740427

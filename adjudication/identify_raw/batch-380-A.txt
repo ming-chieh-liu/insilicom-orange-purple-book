@@ -1,0 +1,20 @@
+NDA210563|ORIG|1|Marginal Zone Lymphoma = NONE
+NDA210563|ORIG|1|RESONATE 2 = NONE
+NDA210563|ORIG|1|RESONATE-2 = NCT01722487
+NDA210563|SUPPL|1|Waldenström’s Macroglobulinemia = NONE
+NDA215859|ORIG|1|RECORD 2 = NCT00332020
+NDA215859|ORIG|1|RECORD 3 = NCT00361894
+NDA215859|ORIG|1|Reduction in the Risk of Recurrence of DVT and/or PE = NCT02064439
+NDA215859|ORIG|1|Stroke Prevention in Nonvalvular Atrial Fibrillation = NCT00403767
+NDA215859|ORIG|1|Treatment of Venous Thromboembolism and Reduction in Risk of = NONE
+NDA021344|SUPPL|37|n=726 = NCT02422615
+NDA204629|SUPPL|26|n=1545 = NCT01167881
+NDA204629|SUPPL|26|n=7020 = NCT01131676
+NDA204629|SUPPL|33|LVEF 50 = NCT03057951
+NDA204629|SUPPL|40|Glycemic Control Trial in Pediatric Patients Aged 10 to 17 Years with Type 2 Diabetes Melli = NCT03429543
+NDA204629|SUPPL|42|Cardiovascular Outcomes in Adults with Type 2 Diabetes Mellitus and Atherosclerotic = NCT01131676
+NDA204629|SUPPL|42|Glycemic Control Trial in Pediatric Patients Aged 10 to 17 years with Type 2 Diabetes Melli = NCT03429543
+NDA204629|SUPPL|42|Glycemic Control Trials in Adults with Type 2 Diabetes Mellitus = NCT01167881
+NDA207931|ORIG|1|SVR12 100 = NONE
+NDA208558|SUPPL|23|Adjuvant Treatment of Germline BRCA-mutated HER2-negative High Risk Early = NCT02032823
+NDA208558|SUPPL|23|IIIA 1 = NCT02032823

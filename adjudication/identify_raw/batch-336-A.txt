@@ -1,0 +1,20 @@
+NDA202100|ORIG|1|n=45 = NONE
+NDA202133|ORIG|1|Bulimia Nervosa = NONE
+NDA202133|ORIG|1|HAMD-17 = NONE
+NDA202342|ORIG|1|Pathological Hypersecretory Conditions Including Zollinger-Ellison Syndrome = NONE
+NDA202342|ORIG|1|Risk Reduction of NSAID-Associated Gastric Ulcer = NONE
+NDA202342|ORIG|1|Symptomatic Gastroesophageal Reflux Disease (GERD) = NONE
+NDA202356|ORIG|1|Adjuvant Treatment of Breast Cancer = NCT00688740
+NDA202356|ORIG|1|Head and Neck Cancer = NCT00003888
+NDA202356|ORIG|1|Locally Advanced or Metastatic Breast Cancer = NONE
+NDA202356|ORIG|1|Non-Small Cell Lung Cancer (NSCLC) = NONE
+NDA202497|ORIG|1|Acute Lymphoblastic Leukemia = NCT00495079
+NDA202763|ORIG|1|Clinical Trials in Adult Hypogonadal Males = NONE
+NDA202971|ORIG|1|n=403 = NONE
+NDA202971|SUPPL|10|Bipolar I Disorder – Maintenance Monotherapy = NONE
+NDA202971|SUPPL|10|Schizophrenia = NONE
+NDA202971|SUPPL|18|Bipolar I Disorder - Maintenance Monotherapy = NONE
+NDA203098|ORIG|1|Clinical Trials in Adult Hypogonadal Males = NONE
+NDA203231|ORIG|1|Hypercalcemia of Malignancy = NONE
+NDA204016|ORIG|1|Hypercalcemia of Malignancy = NONE
+NDA204017|ORIG|1|n=78 = NONE

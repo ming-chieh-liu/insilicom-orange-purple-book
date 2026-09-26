@@ -1,0 +1,20 @@
+NDA204412|SUPPL|6|Maintenance of Remission of Ulcerative Colitis = NONE
+BLA125118|SUPPL|86|Adult Rheumatoid Arthritis = NONE
+BLA761053|SUPPL|22|Safety Study of 2-Hour Infusions = NONE
+BLA761262|ORIG|1|PASI 100 = NONE
+BLA761262|ORIG|1|PASI 75 = NONE
+BLA761262|ORIG|1|PASI 90 = NONE
+BLA761262|ORIG|1|Plaque Psoriasis = NONE
+NDA019787|SUPPL|38|PRAISE-2 = NONE
+NDA019787|SUPPL|38|n=1153 = NONE
+NDA019787|SUPPL|38|n=1318 = NONE
+NDA019787|SUPPL|38|n=50 = NONE
+NDA019787|SUPPL|38|n=800 = NONE
+NDA019787|SUPPL|38|n=825 = NONE
+NDA021345|SUPPL|52|Extended Prophylaxis of Thromboembolic Events Following Hip Fracture Surgery = NONE
+NDA021345|SUPPL|52|Prophylaxis of Thromboembolic Events Following Abdominal Surgery in Patients = NONE
+NDA021345|SUPPL|52|Prophylaxis of Thromboembolic Events Following Hip Fracture Surgery in Adult = NONE
+NDA021345|SUPPL|52|Prophylaxis of Thromboembolic Events Following Hip Replacement Surgery in = NONE
+NDA021345|SUPPL|52|Prophylaxis of Thromboembolic Events Following Knee Replacement Surgery in = NONE
+NDA021345|SUPPL|52|Treatment of Deep Vein Thrombosis in Adult Patients = NONE
+NDA021345|SUPPL|52|Treatment of Pulmonary Embolism in Adult Patients = NONE

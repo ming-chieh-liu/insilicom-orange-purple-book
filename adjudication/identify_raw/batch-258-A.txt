@@ -1,0 +1,20 @@
+NDA021178|ORIG|1|n=173 = NONE
+NDA021632|SUPPL|27|Candidemia and Other Candida Infections (Intra-abdominal Abscess and Peritonitis) = NONE
+NDA021632|SUPPL|27|Esophageal Candidiasis = NONE
+NDA021877|SUPPL|10|Pediatric Clinical Trial in Relapsed or Refractory T-ALL and T-LBL = NONE
+NDA022352|ORIG|1|n=22 = NONE
+NDA022352|ORIG|1|n=5 = NONE
+NDA022406|SUPPL|2|RECORD 2 = NCT00332020
+NDA022406|SUPPL|2|Stroke Prevention in Nonvalvular Atrial Fibrillation = NCT00403767
+NDA022406|SUPPL|2|Treatment of Deep Vein Thrombosis (DVT), Pulmonary Embolism (PE), and = NCT00439725
+NDA201699|SUPPL|12|Clinical Studies of DIFICID in Pediatric Patients with CDAD = NCT02218372
+NDA204370|SUPPL|6|Schizophrenia = NCT01412060
+NDA204630|ORIG|1|Treatment of Acquired Methemoglobinemia = NONE
+NDA213138|ORIG|1|Clinical Studies of DIFICID in Pediatric Patients with CDAD = NCT02218372
+BLA125477|ORIG|1|Gastric Cancer = NCT00917384
+BLA125477|SUPPL|2|n=355 = NCT00917384
+BLA125477|SUPPL|2|n=665 = NCT01170663
+BLA125477|SUPPL|7|Non-Small Cell Lung Cancer = NCT01168973
+BLA761032|ORIG|1|PASI 100 = NONE
+BLA761032|ORIG|1|PASI 75 = NONE
+BLA761032|ORIG|1|n=4373 = NONE

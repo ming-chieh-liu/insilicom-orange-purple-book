@@ -1,0 +1,20 @@
+NDA021365|SUPPL|21|Major Depressive Disorder = NONE
+NDA202293|SUPPL|18|Cardiovascular Outcomes in Patients with Type 2 Diabetes Mellitus = NCT01730534
+NDA202293|SUPPL|18|Glycemic Control = NONE
+NDA202293|SUPPL|20|Glycemic Control in Patients with Type 2 Diabetes Mellitus = NONE
+NDA202293|SUPPL|24|Chronic Kidney Disease = NCT03036150
+NDA202293|SUPPL|31|Cardiovascular Outcomes in Adults with Type 2 Diabetes Mellitus = NCT01730534
+NDA202293|SUPPL|31|Chronic Kidney Disease in Adults = NCT03036150
+NDA204042|SUPPL|27|Cardiovascular Outcomes in Patients with Type 2 Diabetes Mellitus and = NONE
+NDA204042|SUPPL|32|ESKD 165 = NCT02065791
+NDA204042|SUPPL|43|Cardiovascular Outcomes in Adults with Type 2 Diabetes Mellitus and = NONE
+NDA205834|SUPPL|28|SVR12 93 = NONE
+NDA205834|SUPPL|29|Clinical Trial in Pediatric Subjects = NONE
+NDA208288|ORIG|1|n=20 = NONE
+NDA208288|ORIG|1|n=7 = NONE
+NDA208288|ORIG|1|n=9 = NONE
+NDA209935|SUPPL|2|MONALEESA-7 = NCT02278120
+NDA209935|SUPPL|2|n=672 = NCT02278120
+NDA212477|ORIG|1|Clinical Trial in Pediatric Subjects = NONE
+NDA212477|ORIG|1|Clinical Trials in Subjects with Genotype 4, 5, or 6 HCV = NONE
+NDA212477|ORIG|1|ELECTRON-2 = NONE

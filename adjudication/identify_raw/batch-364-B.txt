@@ -1,0 +1,20 @@
+NDA021226|SUPPL|40|Adult Patients with Prior Antiretroviral Therapy = NCT00358917
+NDA021251|SUPPL|31|Patients With Prior Antiretroviral Therapy = NCT00358917
+NDA021251|SUPPL|47|Adult Patients with Prior Antiretroviral Therapy = NCT00358917
+NDA021324|SUPPL|12|Maintenance of Clinical Remission of Mild to Moderate Crohn’s Disease = NONE
+NDA021324|SUPPL|12|Treatment of Mild to Moderate Active Crohn’s Disease = NONE
+NDA021360|SUPPL|31|ACTG 364 = NCT00001087
+NDA021360|SUPPL|31|PACTG 1021 = NONE
+NDA021360|SUPPL|31|PACTG 382 = NONE
+NDA021752|SUPPL|30|Study 934 = NONE
+NDA021906|SUPPL|24|Patients With Prior Antiretroviral Therapy = NCT00358917
+NDA021906|SUPPL|40|Adult Patients with Prior Antiretroviral Therapy = NCT00358917
+NDA021936|SUPPL|7|Asthma = NONE
+NDA021936|SUPPL|7|Chronic Obstructive Pulmonary Disease = NONE
+NDA022511|ORIG|1|n=428 = NONE
+NDA050794|SUPPL|34|Myelodysplastic Syndromes (MDS) = NONE
+NDA202714|SUPPL|21|VGPR 65 = NONE
+NDA202714|SUPPL|30|In Combination with Dexamethasone for Relapsed or Refractory Multiple = NCT02412878
+NDA202714|SUPPL|30|In Combination with Intravenous Daratumumab and Dexamethasone for = NCT03158688
+NDA202714|SUPPL|30|Monotherapy for Relapsed or Refractory Multiple Myeloma = NONE
+NDA202714|SUPPL|30|VGPR 127 = NCT03158688

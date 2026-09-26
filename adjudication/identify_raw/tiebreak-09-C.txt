@@ -1,0 +1,19 @@
+NDA217514|ORIG|1|BRAF V600E Mutation-Positive Metastatic Non-Small Cell Lung Cancer = NCT01336634
+NDA204671|SUPPL|14|Clinical Trials in Adult Subjects Coinfected with HCV and HIV-1 ─ Photon-1 = NONE
+NDA204671|SUPPL|6|Clinical Trials in Adult Subjects Coinfected with HCV and HIV-1 = NONE
+NDA205580|ORIG|1|Non-Hodgkin Lymphoma (NHL) = NONE
+NDA208194|ORIG|1|Non-Hodgkin Lymphoma (NHL) = NONE
+NDA212209|ORIG|1|Non-Hodgkin Lymphoma (NHL) = NONE
+NDA212480|ORIG|1|Clinical Trials in Adult Subjects Coinfected with HCV and HIV-1 ─ Photon-1 = NONE
+NDA215033|ORIG|1|Non-Hodgkin Lymphoma (NHL) = NONE
+NDA216078|ORIG|1|Non-Hodgkin Lymphoma (NHL) = NONE
+NDA219014|ORIG|1|Non-Hodgkin Lymphoma (NHL) = NONE
+NDA209935|SUPPL|2|n=672 = NONE
+NDA218785|ORIG|2|Chronic Lymphocytic Leukemia or Small Lymphocytic Lymphoma = NCT03336333
+BLA125514|SUPPL|97|KEYNOTE-059 = NCT02335411
+NDA205552|SUPPL|10|Chronic Lymphocytic Leukemia / Small Lymphocytic Lymphoma = NCT01578707
+NDA205552|SUPPL|16|Marginal Zone Lymphoma = NONE
+NDA205552|SUPPL|17|RESONATE 2 = NONE
+NDA204629|SUPPL|40|Glycemic Control Trial in Pediatric Patients Aged 10 to 17 Years with Type 2 Diabetes Melli = NCT03429543
+NDA204629|SUPPL|42|Glycemic Control Trial in Pediatric Patients Aged 10 to 17 years with Type 2 Diabetes Melli = NCT03429543
+NDA208558|SUPPL|23|IIIA 1 = NONE

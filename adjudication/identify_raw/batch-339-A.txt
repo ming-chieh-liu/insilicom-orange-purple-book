@@ -1,0 +1,20 @@
+NDA205572|ORIG|1|MDRSP 9 = NONE
+NDA205613|ORIG|1|n=546 = NONE
+NDA205626|ORIG|1|Adults = NONE
+NDA205649|ORIG|1|Initial Combination Therapy with Metformin Extended- = NONE
+NDA205649|SUPPL|11|Cardiovascular Outcomes in Patients with Type 2 Diabetes Mellitus = NONE
+NDA205649|SUPPL|11|Glycemic Control = NONE
+NDA205649|SUPPL|17|Chronic Kidney Disease = NCT03036150
+NDA205649|SUPPL|22|Cardiovascular Outcomes in Adults with Type 2 Diabetes Mellitus = NONE
+NDA205649|SUPPL|22|Glycemic Control Trials in Adults with Type 2 Diabetes Mellitus = NONE
+NDA205649|SUPPL|23|LVEF 50 = NCT03619213
+NDA205879|SUPPL|11|ESKD 165 = NONE
+NDA205879|SUPPL|23|Canagliflozin Cardiovascular Outcomes in Adults with Type 2 Diabetes = NONE
+NDA205879|SUPPL|7|Canagliflozin Cardiovascular Outcomes in Patients with Type 2 Diabetes = NONE
+NDA206111|ORIG|1|Combination Therapy = NCT01167881
+NDA206111|SUPPL|33|Empagliflozin Heart Failure Studies, Including Patients with Type 2 Diabetes Mellitus = NONE
+NDA206111|SUPPL|33|Glycemic Control Studies in Adult Patients with Type 2 Diabetes Mellitus = NONE
+NDA206111|SUPPL|33|LVEF 50 = NONE
+NDA206111|SUPPL|38|Empagliflozin Cardiovascular Outcome Trial in Adult Patients with Type 2 Diabetes Mellitus = NONE
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus = NONE
+NDA206111|SUPPL|38|Glycemic Control Trials in Adults with Type 2 Diabetes Mellitus = NONE

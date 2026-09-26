@@ -1,0 +1,20 @@
+NDA218466|ORIG|1|n=37 = NONE
+NDA021035|SUPPL|57|n=164 = NCT00160550
+NDA021505|SUPPL|13|n=164 = NCT00160550
+NDA208424|ORIG|1|n=51 = NONE
+NDA208587|ORIG|1|n=230 = NCT01179217
+NDA021356|SUPPL|25|Clinical Efficacy In Patients with Chronic Hepatitis B: = NONE
+NDA021356|SUPPL|25|Clinical Efficacy in Patients with HIV-1 Infection = NONE
+NDA022253|SUPPL|39|Monotherapy in Patients with Partial-Onset Seizures = NCT00520741
+NDA022254|SUPPL|30|Monotherapy in Patients with Partial-Onset Seizures = NCT00520741
+NDA022255|SUPPL|22|Monotherapy in Patients with Partial-Onset Seizures = NCT00520741
+NDA202022|SUPPL|22|Treatment-Naïve Pediatric Subjects (2 to less than 12 Years of Age) = NCT00799864
+NDA202022|SUPPL|22|Treatment-Naïve Pediatric Subjects (≥12 to less than 18 Years of Age) = NCT00799864
+NDA219016|ORIG|1|ATLAS-2M = NCT03299049
+NDA219016|ORIG|1|Treatment-Naïve Pediatric Subjects (2 to less than 12 Years of Age) = NCT00799864
+NDA219016|ORIG|1|Treatment-Naïve Pediatric Subjects (≥12 to less than 18 Years of Age) = NCT00799864
+BLA761041|ORIG|1|Metastatic Non-Small Cell Lung Cancer = NCT02008227
+BLA761041|ORIG|1|Urothelial Carcinoma = NONE
+NDA021368|SUPPL|21|CIALIS 5 mg for Once Daily Use for Benign Prostatic Hyperplasia (BPH) = NCT00384930
+NDA021368|SUPPL|21|CIALIS 5 mg for Once Daily Use for ED and BPH = NCT00855582
+NDA021368|SUPPL|21|CIALIS for Once Daily Use for ED = NCT00381732

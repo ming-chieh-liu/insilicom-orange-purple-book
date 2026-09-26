@@ -1,0 +1,20 @@
+NDA212035|ORIG|1|Heparin-Induced Thrombocytopenia = NONE
+NDA212035|ORIG|1|STUDY 1 = NONE
+NDA214665|ORIG|1|n=112 = NONE
+NDA215244|ORIG|1|n=12 = NCT03098797
+NDA215358|ORIG|1|Ph+ CML-CP with the T315I mutation = NONE
+NDA215358|ORIG|1|Ph+ CML-CP, Previously Treated With Two or More TKIs = NCT03106779
+NDA217064|ORIG|1|MIRA-2 = NCT04620213
+NDA217064|ORIG|1|MIRA-3 = NCT05134974
+BLA125486|ORIG|1|Chronic Lymphocytic Leukemia = NONE
+BLA761068|SUPPL|5|Tumor-induced Osteomalacia = NONE
+NDA021379|ORIG|1|n=116 = NONE
+NDA022008|ORIG|1|Study in Patients With Advanced Parkinson’s Disease (With L-dopa) = NCT00381472
+NDA022008|ORIG|1|Study in Patients With Early Parkinson’s Disease (Without L-dopa) = NONE
+NDA203389|ORIG|1|Clinical Trials with Immediate-release Cysteamine = NONE
+NDA203389|ORIG|1|RP103-01 = NCT00872729
+NDA203389|ORIG|1|RP103-02 = NONE
+NDA208772|SUPPL|8|n=275 = NCT02737501
+NDA209241|SUPPL|26|Chorea Associated with Huntington’s Disease = NCT04102579
+NDA209241|SUPPL|26|Tardive Dyskinesia = NCT02274558
+NDA210496|ORIG|1|CTLA-4 = NONE

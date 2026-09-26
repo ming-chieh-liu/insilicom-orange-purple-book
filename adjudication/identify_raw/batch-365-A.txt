@@ -1,0 +1,20 @@
+NDA202714|SUPPL|30|VGPR 28 = NONE
+NDA202714|SUPPL|33|In Combination with Daratumumab and Dexamethasone for Relapsed or = NCT03158688
+NDA202714|SUPPL|34|In Combination with Isatuximab and Dexamethasone for Relapsed or = NCT03275285
+NDA203985|SUPPL|13|Neuroendocrine Tumors (NET) = NCT01524783
+NDA203985|SUPPL|13|Renal Cell Carcinoma (RCC) = NCT00410124
+NDA203985|SUPPL|13|Tuberous Sclerosis Complex (TSC)-Associated Partial-Onset Seizures = NCT01713946
+NDA203985|SUPPL|13|Tuberous Sclerosis Complex (TSC)-Associated Renal Angiomyolipoma = NCT00790400
+NDA203985|SUPPL|13|Tuberous Sclerosis Complex (TSC)-Associated Subependymal Giant Cell Astrocytoma (SEGA) = NCT00789828
+NDA205551|ORIG|1|Adult Subjects = NCT01263015
+NDA205834|SUPPL|6|Clinical Trials in Subjects with Genotype 4, 5, or 6 HCV = NONE
+NDA205834|SUPPL|6|ELECTRON-2 = NONE
+NDA205834|SUPPL|6|SVR12 94 = NONE
+NDA205834|SUPPL|6|SVR12 96 = NONE
+NDA208216|ORIG|1|RARS 6 = NONE
+NDA208216|ORIG|1|n=83 = NONE
+NDA208573|SUPPL|13|IDH2 23 = NONE
+NDA208573|SUPPL|20|Acute Myeloid Leukemia = NCT02993523
+NDA208573|SUPPL|20|IDH2 61 = NONE
+NDA208573|SUPPL|20|TP53 15 = NONE
+NDA208573|SUPPL|20|TP53 22 = NONE

@@ -1,0 +1,20 @@
+NDA021936|ORIG|1|n=4 = NONE
+NDA021936|ORIG|1|n=5711 = NCT01126437
+NDA022047|SUPPL|6|Bipolar Disorder = NONE
+NDA022315|SUPPL|9|BCVA 16 = NONE
+NDA022315|SUPPL|9|BCVA 34 = NONE
+NDA022334|SUPPL|17|Renal Angiomyolipoma with Tuberous Sclerosis Complex = NCT00790400
+NDA022334|SUPPL|6|Advanced Renal Cell Carcinoma = NCT00410124
+NDA022334|SUPPL|6|Subependymal Giant Cell Astrocytoma = NCT00411619
+NDA022334|SUPPL|9|Advanced Neuroendocrine Tumors = NCT00412061
+NDA203050|SUPPL|3|Prevention of Postoperative Nausea and Vomiting in Adults = NONE
+NDA203985|ORIG|1|Advanced Neuroendocrine Tumors = NCT00412061
+NDA203985|ORIG|1|Advanced Renal Cell Carcinoma = NCT00410124
+NDA203985|ORIG|1|Renal Angiomyolipoma with Tuberous Sclerosis Complex = NCT00790400
+NDA203985|ORIG|1|Subependymal Giant Cell Astrocytoma with Tuberous Sclerosis Complex = NCT00411619
+NDA204114|SUPPL|24|BRAF V600E Mutation-Positive Unresectable or Metastatic Solid Tumors = NONE
+NDA204114|SUPPL|24|ECOG 0 = NONE
+NDA204114|SUPPL|25|BRAF V600E Mutation-Positive Low-Grade Glioma = NCT02684058
+NDA204114|SUPPL|25|RANO 2010 = NONE
+NDA204114|SUPPL|5|BRAF V600E Mutation-Positive Metastatic Non-Small Cell Lung Cancer (NSCLC) = NCT01336634
+NDA204114|SUPPL|5|BRAF V600E or V600K Mutation-Positive Unresectable or Metastatic Melanoma = NCT01584648

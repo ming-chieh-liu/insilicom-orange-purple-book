@@ -1,0 +1,20 @@
+NDA020635|SUPPL|67|Community-Acquired Pneumonia:7–14 day Treatment Regimen = NCT00257049
+NDA021636|ORIG|1|n=105 = NONE
+NDA021636|ORIG|1|n=293 = NONE
+NDA203388|SUPPL|12|n=96 = NCT00833417
+NDA211358|ORIG|1|n=76 = NONE
+NDA212273|ORIG|1|Trial 1 = NCT03525444
+BLA020604|SUPPL|27|TABLE 1 = NONE
+BLA020604|SUPPL|27|n=178 = NONE
+BLA020604|SUPPL|27|n=757 = NONE
+BLA125370|SUPPL|73|Clinical Trials with Intravenous Administration in Adults with Lupus Nephritis = NCT01639339
+BLA125370|SUPPL|73|Clinical Trials with Intravenous Administration in Adults with SLE = NCT00071487
+BLA125370|SUPPL|73|Clinical Trials with Intravenous Administration in Pediatric Patients with SLE = NCT01649765
+BLA761043|SUPPL|13|Clinical Trials with Intravenous Administration in Adults with Lupus Nephritis = NCT01639339
+BLA761043|SUPPL|13|Clinical Trials with Intravenous Administration in Adults with SLE = NCT00071487
+BLA761043|SUPPL|13|Clinical Trials with Intravenous Administration in Pediatric Patients with SLE = NCT01649765
+BLA761043|SUPPL|13|SLEDAI-2K = NCT01632241
+BLA761060|ORIG|1|Newly-Diagnosed CD33-positive AML = NCT00091234
+BLA761097|SUPPL|8|Cutaneous Squamous Cell Carcinoma (CSCC) = NCT02760498
+NDA021567|SUPPL|15|A1424-045 = NCT00035932
+NDA021567|SUPPL|15|ACTG 1020A = NONE

@@ -1,0 +1,20 @@
+NDA202811|ORIG|1|Chronic Idiopathic Constipation (CIC) = NCT00765882
+NDA202811|ORIG|1|Irritable Bowel Syndrome with Constipation (IBS-C) = NONE
+NDA206488|ORIG|1|n=12 = NONE
+NDA206488|ORIG|1|n=13 = NONE
+NDA208082|ORIG|1|n=87 = NCT01795859
+NDA208723|ORIG|1|Rescue after High-Dose Methotrexate Therapy in Patients with Osteosarcoma = NONE
+NDA210730|ORIG|1|SPID-24 = NCT02820324
+NDA210730|ORIG|1|SPID-48 = NONE
+NDA210806|ORIG|1|Adult Subjects with No Antiretroviral Treatment History = NCT02275780
+NDA210854|SUPPL|4|Treatment of Acute Uncomplicated Influenza—Otherwise Healthy Subjects = NONE
+NDA211996|ORIG|1|VYNDAQEL 20 = NONE
+NDA212320|SUPPL|19|Pediatric Patients with Iron Deficiency Anemia = NONE
+NDA214103|SUPPL|3|ILLUMINATE-C = NCT04152200
+NDA214200|ORIG|1|n=107 = NCT03041311
+NDA214200|ORIG|1|n=61 = NONE
+NDA214200|ORIG|1|n=77 = NONE
+NDA214410|ORIG|1|Treatment of Acute Uncomplicated Influenza—Otherwise Healthy Subjects = NONE
+NDA214907|ORIG|1|n=178 = NONE
+NDA215239|ORIG|1|n=121 = NCT03439670
+NDA217686|ORIG|1|n=730 = NCT03541174

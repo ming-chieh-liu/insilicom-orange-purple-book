@@ -1,0 +1,20 @@
+NDA022038|ORIG|1|n=10000 = NONE
+NDA022038|ORIG|1|n=10739 = NCT00000611
+NDA022038|ORIG|1|n=16608 = NCT00000611
+NDA202106|ORIG|1|Bacterial Meningitis = NONE
+NDA202106|ORIG|1|Complicated Skin and Skin Structure Infections = NCT00619710
+NDA206110|ORIG|1|Candidemia and the Following Other Candida Infections: Intra-Abdominal = NONE
+NDA206110|ORIG|1|MITT 36 = NONE
+NDA206110|ORIG|1|Pediatric Patients = NCT00082537
+NDA020907|SUPPL|9|TABLE 2 = NONE
+NDA020907|SUPPL|9|n=1176 = NONE
+NDA020907|SUPPL|9|n=92 = NONE
+NDA021399|ORIG|1|n=142 = NONE
+NDA022001|ORIG|1|TABLE 2 = NONE
+NDA022001|ORIG|1|n=1176 = NONE
+NDA022001|ORIG|1|n=92 = NONE
+NDA202293|ORIG|1|Initial Combination Therapy with Metformin = NONE
+NDA203341|SUPPL|25|Adult Patients with Imatinib-Resistant or -Intolerant Ph+ CP, AP, and BP CML = NCT00261846
+NDA203341|SUPPL|25|Adult Patients with Newly-Diagnosed CP Ph+ CML = NCT02130557
+NDA203341|SUPPL|25|Pediatric Patients with Newly-Diagnosed CP Ph+ CML or with CP Ph+ CML with Resistance or = NCT04258943
+NDA208434|SUPPL|15|Adjuvant Treatment of Resected ALK-Positive NSCLC = NONE

@@ -1,0 +1,20 @@
+NDA208647|SUPPL|7|n=5 = NONE
+NDA208647|SUPPL|7|n=984 = NCT00225589
+NDA208692|SUPPL|12|Differentiated Thyroid Cancer = NCT03690388
+NDA208692|SUPPL|17|Neuroendocrine Tumors = NCT03375320
+NDA209637|SUPPL|3|Cardiovascular Outcomes Trial ofOZEMPIC in Patients with Type 2 Diabetes Mellitusand = NCT01720446
+NDA210649|ORIG|1|Clinical Efficacy in Patients with HIV-1 Infection = NONE
+NDA211746|ORIG|1|n=2352 = NONE
+NDA211746|SUPPL|11|n=446 = NONE
+NDA213182|ORIG|1|Cardiovascular Outcomes Trial in Patients with Type 2 Diabetes Mellitusand Cardiovascular = NCT02692716
+NDA213182|ORIG|1|SGLT-2 = NCT02863419
+NDA213593|ORIG|1|Active Benign Gastric Ulcer = NONE
+NDA213593|ORIG|1|Reduction of Risk of Upper Gastrointestinal Bleeding in Critically Ill Patients = NONE
+NDA214187|ORIG|1|ASTRAL-1 = NONE
+NDA214187|ORIG|1|ASTRAL-2 = NCT02220998
+NDA214187|ORIG|1|ASTRAL-3 = NCT02201953
+NDA214187|ORIG|1|ASTRAL-4 = NONE
+NDA214187|ORIG|1|ASTRAL-5 = NONE
+NDA214187|ORIG|1|Clinical Trial in Pediatric Subjects = NONE
+NDA215428|ORIG|1|HAMD-17 = NONE
+NDA217514|ORIG|1|Adjuvant Treatment of BRAF V600E or V600K Mutation-Positive Melanoma = NCT01682083

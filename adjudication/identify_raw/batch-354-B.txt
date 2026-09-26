@@ -1,0 +1,20 @@
+NDA211321|ORIG|1|n=292 = NCT01390220
+NDA211875|ORIG|1|Adenocarcinoma of the Pancreas = NONE
+NDA211875|ORIG|1|ECOG 1 = NONE
+NDA211875|ORIG|1|Metastatic Breast Cancer = NONE
+NDA211913|ORIG|1|n=925 = NCT00975143
+NDA214044|ORIG|1|n=132 = NONE
+NDA214044|ORIG|1|n=59 = NONE
+NDA214133|ORIG|1|n=2 = NONE
+NDA214133|ORIG|1|n=39 = NONE
+NDA214133|ORIG|1|n=7 = NCT03277690
+NDA214846|ORIG|1|n=768 = NONE
+NDA214846|SUPPL|2|Heavy Menstrual Bleeding Associated with Uterine Fibroids = NONE
+NDA214846|SUPPL|2|Moderate to Severe Pain Associated with Endometriosis = NONE
+NDA216457|ORIG|1|n=1658 = NONE
+NDA216655|ORIG|1|PLACES 149 = NONE
+NDA219373|ORIG|1|Myocardial Infarction = NONE
+NDA220073|ORIG|1|Prophylaxis of Deep Vein Thrombosis Following Hip or Knee = NONE
+NDA220073|ORIG|1|Reduction of Risk of Stroke and Systemic Embolism in Nonvalvular = NCT00412984
+NDA220073|ORIG|1|Treatment of DVT and PE and Reduction in the Risk of Recurrence of = NCT00633893
+NDA220073|ORIG|1|Treatment of VTE and Prevention of Recurrent VTE in Pediatric Patients = NONE

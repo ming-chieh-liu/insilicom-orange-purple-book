@@ -1,0 +1,20 @@
+BLA103628|SUPPL|5189|n=301 = NONE
+BLA103628|SUPPL|5189|n=383 = NONE
+BLA761061|SUPPL|28|Clinical Studies in Adults with Crohn’s Disease = NONE
+BLA761061|SUPPL|28|Clinical Studies in Adults with Ulcerative Colitis = NONE
+BLA761061|SUPPL|28|Clinical Studies in Plaque Psoriasis = NONE
+NDA020541|SUPPL|24|Second-Line Therapy in Postmenopausal Women with Advanced Breast Cancer = NONE
+NDA021366|SUPPL|10|Homozygous Familial Hypercholesterolemia = NONE
+NDA021366|SUPPL|10|Slowing of the Progression of Atherosclerosis = NCT00225589
+NDA202324|SUPPL|11|Second-Line Advanced RCC = NONE
+NDA203045|ORIG|1|BENCHMRK 1 = NONE
+NDA203667|ORIG|1|n=743 = NONE
+NDA204426|ORIG|1|n=743 = NONE
+NDA210498|SUPPL|9|BRAF V600E Mutation-Positive Metastatic Non-Small Cell Lung Cancer = NONE
+NDA210498|SUPPL|9|BRAF V600E or V600K Mutation-Positive Unresectable or Metastatic Melanoma = NCT01909453
+BLA761359|ORIG|1|Clinical Studies in Crohn’s Disease = NCT00783692
+BLA761359|ORIG|1|Clinical Studies in Ulcerative Colitis = NCT00783718
+NDA021427|SUPPL|11|HAMD-17 = NONE
+NDA021427|SUPPL|11|n=334 = NONE
+NDA021427|SUPPL|11|n=791 = NONE
+BLA125559|SUPPL|47|Clinical Trials in Adult Patients with Primary Hypercholesterolemia = NONE

@@ -1,0 +1,20 @@
+NDA022006|SUPPL|13|Complex Partial Seizures = NONE
+NDA022030|ORIG|1|n=290 = NONE
+NDA022081|ORIG|1|ARIES-1 = NONE
+NDA022081|ORIG|1|ARIES-2 = NONE
+NDA022081|ORIG|1|Pulmonary Arterial Hypertension (PAH) = NONE
+NDA022081|ORIG|1|Use in Patients with Prior Endothelin Receptor Antagonist (ERA) Related = NCT00423592
+NDA022434|ORIG|1|Heparin-Induced Thrombocytopenia = NONE
+NDA022485|ORIG|1|Heparin-Induced Thrombocytopenia = NONE
+NDA022563|ORIG|1|n=10 = NONE
+NDA201743|ORIG|1|Heparin-Induced Thrombocytopenia = NONE
+NDA203049|ORIG|1|Heparin-Induced Thrombocytopenia = NONE
+NDA203049|ORIG|1|STUDY 1 = NONE
+NDA203975|ORIG|1|Dose-Ranging Trials = NONE
+NDA203975|ORIG|1|ELLIPTA 413 = NONE
+NDA204410|ORIG|1|Pulmonary Arterial Hypertension = NCT00660179
+NDA204819|ORIG|1|CHEST-2 = NCT00910429
+NDA204819|ORIG|1|Chronic-Thromboembolic Pulmonary Hypertension = NCT00855465
+NDA204819|ORIG|1|PATENT-2 = NCT00863681
+NDA204819|ORIG|1|Pulmonary Arterial Hypertension = NCT00810693
+NDA204958|ORIG|1|NSTEMI 74 = NONE

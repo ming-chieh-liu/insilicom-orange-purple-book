@@ -1,0 +1,20 @@
+NDA021806|ORIG|1|n=5 = NONE
+NDA022157|ORIG|1|Seasonal and Perennial Allergic Rhinitis = NONE
+NDA204734|ORIG|1|Open-Label Active-Controlled Studies = NONE
+NDA205858|ORIG|1|Relapsed Chronic Lymphocytic Leukemia = NCT01539512
+NDA205858|ORIG|1|Relapsed Follicular B-cell non-Hodgkin Lymphoma = NCT01282424
+NDA205858|ORIG|1|Relapsed Small Lymphocytic Lymphoma = NCT01282424
+NDA206545|ORIG|1|Relapsed Chronic Lymphocytic Leukemia = NCT01539512
+NDA206545|ORIG|1|Relapsed Follicular B-cell non-Hodgkin Lymphoma = NCT01282424
+NDA206545|ORIG|1|Relapsed Small Lymphocytic Lymphoma = NCT01282424
+NDA208434|SUPPL|3|n=138 = NCT01801111
+NDA208434|SUPPL|3|n=16 = NONE
+NDA208434|SUPPL|3|n=303 = NCT02075840
+NDA208434|SUPPL|3|n=43 = NONE
+NDA208434|SUPPL|3|n=51 = NONE
+NDA208434|SUPPL|3|n=87 = NCT01871805
+NDA213246|ORIG|1|RET Fusion-Positive Thyroid Cancer = NONE
+BLA125249|SUPPL|49|Recurrent Pericarditis = NCT03737110
+NDA020214|SUPPL|30|Adult Patients = NONE
+NDA020214|SUPPL|30|Pediatric Patients = NONE
+NDA020717|SUPPL|8|ICSD-10 = NONE

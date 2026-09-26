@@ -1,0 +1,20 @@
+NDA203188|ORIG|1|Trial in Patients Homozygous for the F508del Mutation in the CFTR Gene = NCT00953706
+NDA203284|SUPPL|5|Clinical Studies in Pediatric Patients Ages 2 Months to Less Than 2 = NCT02246218
+NDA203284|SUPPL|5|Clinical Studies in Pediatric Patients Ages 2 to 17 Years with UCDs = NONE
+NDA203469|ORIG|1|n=449 = NCT01207440
+NDA208630|ORIG|1|n=349 = NONE
+NDA208630|ORIG|1|n=4 = NONE
+NDA208630|ORIG|1|n=415 = NONE
+NDA209803|ORIG|1|Clinical Study of STEGLATRO in Patients with Moderate Renal Impairment and Type 2 = NCT01986855
+NDA210868|ORIG|1|ALK-Positive Metastatic NSCLC Previously Treated with an ALK Kinase Inhibitor = NCT01970865
+NDA211150|ORIG|1|ICSD-2 = NONE
+NDA211150|ORIG|1|n=166 = NCT01638403
+NDA211150|ORIG|1|n=95 = NCT01067222
+NDA212725|ORIG|1|NTRK Gene Fusion-Positive Solid Tumors = NONE
+NDA212725|ORIG|1|NTRK3 1 = NONE
+NDA212725|ORIG|1|NTRK3 25 = NONE
+NDA212725|ORIG|1|ROS1-Positive Non-Small Cell Lung Cancer = NONE
+NDA212726|ORIG|1|NTRK Gene Fusion-Positive Solid Tumors = NONE
+NDA212726|ORIG|1|NTRK3 1 = NONE
+NDA212726|ORIG|1|NTRK3 25 = NONE
+NDA212726|ORIG|1|ROS1-Positive Non-Small Cell Lung Cancer = NONE

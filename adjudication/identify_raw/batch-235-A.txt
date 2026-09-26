@@ -1,0 +1,20 @@
+NDA020593|SUPPL|6|DEPAKOTE 131 = NONE
+NDA020593|SUPPL|6|DEPAKOTE 75 = NONE
+NDA020838|SUPPL|15|n=1268 = NONE
+NDA021024|SUPPL|11|Latent Tuberculosis Infection = NONE
+NDA021506|SUPPL|8|Prophylaxis of Candida Infections in Hematopoietic Stem Cell Transplant Recipients = NCT00001937
+NDA021506|SUPPL|8|Treatment of Esophageal Candidiasis = NONE
+NDA022287|SUPPL|8|Healing of Erosive Esophagitis = NONE
+NDA022287|SUPPL|8|Maintenance of Healed Erosive Esophagitis = NCT00321737
+NDA022287|SUPPL|8|Symptomatic Non-Erosive GERD = NCT00321984
+NDA200738|ORIG|1|n=805 = NONE
+NDA201532|ORIG|1|n=762 = NCT00388726
+NDA203565|ORIG|1|Trial 1: Iron Deficiency Anemia in Patients Who Are Intolerant to Oral Iron or = NONE
+NDA205677|SUPPL|7|Nighttime Sleep Disturbances in Smith-Magenis Syndrome (SMS) = NCT02231008
+NDA205677|SUPPL|7|Non-24-Hour Sleep-Wake Disorder (Non-24) = NCT01163032
+NDA208700|ORIG|1|Progressive, Well-differentiated Advanced or Metastatic Somatostatin Receptor-Positive Midg = NCT01578239
+NDA208700|ORIG|1|Somatostatin Receptor-Positive Gastroenteropancreatic Neuroendocrine Tumors (GEP-NETs) = NONE
+NDA211616|ORIG|1|n=2230 = NCT02666664
+NDA211616|ORIG|1|n=3009 = NONE
+NDA211616|ORIG|1|n=779 = NCT02991118
+NDA211801|ORIG|1|n=620 = NONE

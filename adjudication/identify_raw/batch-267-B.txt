@@ -1,0 +1,20 @@
+BLA761210|SUPPL|5|First Line Treatment of NSCLC with Exon 19 deletion or Exon 21 L858R = NCT04487080
+NDA019962|SUPPL|27|n=3991 = NONE
+NDA020988|SUPPL|27|Pathological Hypersecretion Associated with Zollinger-Ellison Syndrome = NONE
+NDA020998|SUPPL|10|n=2100 = NONE
+NDA020998|SUPPL|10|n=4200 = NONE
+NDA020998|SUPPL|10|n=58 = NONE
+NDA020998|SUPPL|10|n=83 = NONE
+NDA021324|SUPPL|5|TABLE 1 = NONE
+NDA021324|SUPPL|5|n=380 = NONE
+NDA021814|SUPPL|5|Adult Patients = NONE
+NDA021814|SUPPL|5|Pediatric Patients = NONE
+NDA021822|ORIG|1|Adult Patients = NONE
+NDA021822|ORIG|1|Pediatric Patients = NONE
+NDA021822|ORIG|1|RESIST 1 = NCT00054717
+NDA022287|SUPPL|22|Healing of Erosive Esophagitis in Adults = NONE
+NDA022287|SUPPL|22|Maintenance of Healed Erosive Esophagitis and Relief of Heartburn in Adults = NCT00321737
+NDA022287|SUPPL|22|Pediatric GERD = NCT01642615
+NDA022287|SUPPL|22|Treatment of Symptomatic Non-Erosive GERD in Adults = NCT00321984
+NDA022292|ORIG|1|Adult Patients = NONE
+NDA022292|ORIG|1|Pediatric Patients = NONE

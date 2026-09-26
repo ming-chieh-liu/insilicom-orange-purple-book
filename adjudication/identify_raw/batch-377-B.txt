@@ -1,0 +1,20 @@
+BLA125514|SUPPL|97|KEYNOTE-059 = NCT02335411
+BLA761049|SUPPL|3|Locally Advanced or Metastatic Urothelial Carcinoma = NCT01772004
+BLA761049|SUPPL|3|Metastatic Merkel Cell Carcinoma = NONE
+NDA021344|SUPPL|34|PALOMA-3 = NCT01942135
+NDA021344|SUPPL|34|n=462 = NCT01602380
+NDA022518|ORIG|1|Asthma = NONE
+NDA022518|ORIG|1|TRIAL 1 = NONE
+NDA202439|SUPPL|25|Reduction in the Risk of Recurrence of DVT and/or PE = NCT02064439
+NDA205832|SUPPL|12|DLCO 30 = NONE
+NDA205832|SUPPL|12|Idiopathic Pulmonary Fibrosis = NONE
+NDA205832|SUPPL|12|Systemic Sclerosis-Associated Interstitial Lung Disease = NCT02597933
+NDA205832|SUPPL|13|Chronic Fibrosing Interstitial Lung Diseases with a Progressive Phenotype = NCT02999178
+NDA208090|ORIG|1|n=740 = NONE
+NDA208558|ORIG|1|SOLO-2 = NONE
+NDA208558|SUPPL|10|First-Line Maintenance Treatment of BRCA-mutated Advanced Ovarian Cancer = NONE
+NDA208558|SUPPL|10|First-Line Maintenance Treatment of Germline BRCA-mutated Metastatic Pancreatic = NCT02184195
+NDA208558|SUPPL|10|Maintenance Treatment of Recurrent Ovarian Cancer = NONE
+NDA208558|SUPPL|10|Treatment of Germline BRCA-mutated HER2-negative Metastatic Breast Cancer = NCT02000622
+NDA208716|SUPPL|17|MONARCH 1 = NCT02102490
+NDA211566|ORIG|1|Monotherapy = NCT00095056

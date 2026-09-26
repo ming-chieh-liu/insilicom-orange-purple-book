@@ -1,0 +1,20 @@
+NDA208573|SUPPL|4|Chronic Lymphocytic Leukemia/Small Lymphocytic Lymphoma, Combination = NCT02005471
+NDA208573|SUPPL|9|Chronic Lymphocytic Leukemia/Small Lymphocytic Lymphoma = NCT02005471
+NDA208573|SUPPL|9|TP53 21 = NONE
+NDA208573|SUPPL|9|TP53 8 = NONE
+NDA211929|ORIG|1|Maintenance of Clinical Remission of Mild to Moderate Crohn’s Disease = NONE
+NDA211929|ORIG|1|Treatment of Mild to Moderate Active Crohn’s Disease = NONE
+NDA213051|ORIG|1|Cardiovascular Outcomes Trial of RYBELSUS in Patients with Type 2 Diabetes Mellitus = NONE
+NDA213051|ORIG|1|SGLT-2 = NCT02863419
+NDA213082|ORIG|1|ACR20 24 = NCT01882439
+NDA213082|ORIG|1|ACR20 33 = NONE
+NDA213082|ORIG|1|DAS28-4 = NONE
+NDA213082|ORIG|1|Psoriatic Arthritis = NCT01877668
+NDA213082|ORIG|1|Rheumatoid Arthritis = NCT00413660
+NDA213082|ORIG|1|Ulcerative Colitis = NONE
+NDA213260|ORIG|1|n=10001 = NCT00327691
+NDA213260|ORIG|1|n=163 = NONE
+NDA213260|ORIG|1|n=2838 = NONE
+NDA213260|ORIG|1|n=64 = NONE
+NDA215133|ORIG|1|HAMD-17 = NONE
+NDA215256|ORIG|1|Weight Management Studies in Adults with Overweight or Obesity = NCT03548987

@@ -1,0 +1,20 @@
+NDA216482|ORIG|1|Kidney Transplantation = NONE
+NDA216482|ORIG|1|MOFETIL 1 = NONE
+NDA216490|ORIG|1|Treatment of Adults with Hypoparathyroidism = NONE
+NDA217003|ORIG|1|Chronic Graft versus Host Disease = NCT02195869
+NDA217003|ORIG|1|Chronic Lymphocytic Leukemia / Small Lymphocytic Lymphoma = NCT01578707
+NDA217003|ORIG|1|Marginal Zone Lymphoma = NONE
+NDA217003|ORIG|1|RESONATE-2 = NCT01722487
+NDA217003|ORIG|1|Waldenström’s Macroglobulinemia = NONE
+NDA217006|ORIG|1|Bipolar I Disorder - Maintenance Monotherapy = NONE
+NDA217006|ORIG|1|Schizophrenia = NONE
+NDA217472|ORIG|1|Adult Patients = NONE
+NDA217472|ORIG|1|Pediatric Patients = NONE
+NDA217645|ORIG|1|n=31 = NONE
+NDA218527|ORIG|1|CHEWTADZY 5 mg for Once Daily Use for Benign Prostatic Hyperplasia (BPH) = NCT00384930
+NDA218527|ORIG|1|CHEWTADZY 5 mg for Once Daily Use for ED and BPH = NCT00855582
+NDA218527|ORIG|1|CHEWTADZY for Use as Needed for ED = NONE
+NDA218718|ORIG|1|n=743 = NONE
+NDA218772|ORIG|1|Hypertension = NONE
+NDA218772|ORIG|1|Nephropathy in Type 2 Diabetic Patients = NCT00308347
+NDA218879|ORIG|1|Bipolar Disorder = NONE

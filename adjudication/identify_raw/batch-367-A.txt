@@ -1,0 +1,20 @@
+NDA215727|ORIG|1|n=5522 = NONE
+NDA216185|ORIG|1|Monotherapy in Patients with Partial-Onset Seizures = NCT00520741
+NDA216793|SUPPL|1|BRCA2-mutated Metastatic Castration-Sensitive Prostate Cancer (mCSPC) = NONE
+NDA217110|ORIG|1|n=203 = NONE
+NDA217469|ORIG|1|n=1369 = NONE
+NDA218771|ORIG|1|Treatment of Men and Women with Glucocorticoid-Induced Osteoporosis = NCT00051558
+NDA218771|ORIG|1|Treatment of Osteoporosis in Postmenopausal Women = NCT00670501
+NDA218771|ORIG|1|Treatment to Increase Bone Mass in Men with Primary or Hypogonadal Osteoporosis = NONE
+BLA761270|ORIG|1|Metastatic NSCLC = NCT03164616
+BLA761349|ORIG|1|Adult Plaque Psoriasis = NONE
+BLA761349|ORIG|1|Adult Psoriatic Arthritis = NONE
+BLA761349|ORIG|1|Ankylosing Spondylitis = NONE
+BLA761349|ORIG|1|PASI 75 = NCT02471144
+BLA761349|ORIG|1|PASI 90 = NONE
+NDA020998|SUPPL|18|ASAS 20 = NONE
+NDA021747|ORIG|1|n=1460 = NCT00400153
+NDA022018|ORIG|1|EPIVIR 150 = NONE
+NDA022108|SUPPL|7|HAMD-17 = NONE
+NDA022142|ORIG|1|Clinical Efficacy in Patients with HIV-1 Infection = NONE
+NDA022264|SUPPL|13|Schizoaffective Disorder = NCT01193153

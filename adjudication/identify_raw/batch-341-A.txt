@@ -1,0 +1,20 @@
+NDA207958|SUPPL|19|Partial-Onset Seizures = NONE
+NDA207960|ORIG|1|n=90 = NONE
+NDA207962|ORIG|1|n=32 = NONE
+NDA207962|ORIG|1|n=54 = NONE
+NDA208264|ORIG|1|n=25 = NONE
+NDA208313|ORIG|1|Breast Cancer = NONE
+NDA208313|ORIG|1|Non-Small Cell Lung Cancer (NSCLC) = NONE
+NDA208313|ORIG|1|Ovarian Cancer = NCT00102414
+NDA208313|ORIG|1|Pancreatic Cancer = NONE
+NDA208419|ORIG|1|Non-Squamous NSCLC = NONE
+NDA208419|SUPPL|2|Mesothelioma = NONE
+NDA208564|ORIG|1|Women’s Health Initiative Studies = NONE
+NDA208658|ORIG|1|Combination Therapy = NCT01167881
+NDA208658|SUPPL|1|Empagliflozin Cardiovascular Outcome Study in Patients with Type 2 Diabetes Mellitus and = NONE
+NDA208658|SUPPL|1|SYNJARDY XR Glycemic Control Studies = NONE
+NDA208658|SUPPL|21|Empagliflozin Heart Failure Studies, Including Patients with Type 2 Diabetes Mellitus = NONE
+NDA208658|SUPPL|21|Glycemic Control Studies in Adult Patients with Type 2 Diabetes Mellitus = NONE
+NDA208658|SUPPL|21|LVEF 50 = NONE
+NDA208692|SUPPL|3|Hepatocellular Carcinoma = NCT01908426
+NDA208910|ORIG|1|Diarrhea Associated with Clostridium difficile = NONE

@@ -1,0 +1,20 @@
+NDA021660|ORIG|1|n=63 = NONE
+NDA021743|SUPPL|11|NSCLC - TARCEVA Administered Concurrently with Chemotherapy = NONE
+NDA021743|SUPPL|11|Non-Small Cell Lung Cancer (NSCLC) – TARCEVA Administered as a Single-agent = NONE
+NDA021743|SUPPL|11|Pancreatic Cancer - TARCEVA Administered Concurrently with Gemcitabine = NCT00026338
+NDA021743|SUPPL|16|IIIB 116 = NONE
+NDA021743|SUPPL|16|NSCLC – Maintenance Study = NONE
+NDA021743|SUPPL|16|NSCLC – Second/Third Line Study = NONE
+NDA021743|SUPPL|18|NSCLC - Maintenance Treatment = NONE
+NDA021743|SUPPL|18|NSCLC – Lack of Efficacy of TARCEVA Administered Concurrently with Chemotherapy = NONE
+NDA021743|SUPPL|18|NSCLC –Second/Third Line Treatment = NONE
+NDA021743|SUPPL|18|Non-Small Cell Lung Cancer (NSCLC) – First-Line Treatment of Patients with EGFR Mutations = NCT00446225
+NDA021743|SUPPL|25|NSCLC - Lack of Efficacy of TARCEVA in Maintenance Treatment of Patients without EGFR Mutat = NCT01328951
+NDA021743|SUPPL|25|NSCLC – Maintenance Treatment or Second/Third Line Treatment = NONE
+NDA021743|SUPPL|3|n=1000 = NONE
+NDA021743|SUPPL|3|n=285 = NCT00026338
+NDA021743|SUPPL|3|n=731 = NONE
+NDA021759|ORIG|1|n=2246 = NCT00275210
+NDA021802|SUPPL|14|Adults = NONE
+NDA021802|SUPPL|14|Children and Adolescents = NONE
+NDA021807|ORIG|1|DCIS 35 = NONE

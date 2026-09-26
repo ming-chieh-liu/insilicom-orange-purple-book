@@ -1,0 +1,20 @@
+NDA021065|SUPPL|12|n=1265 = NONE
+NDA021065|SUPPL|12|n=16608 = NONE
+NDA021065|SUPPL|12|n=66 = NONE
+NDA021814|SUPPL|3|RESIST 1 = NCT00054717
+NDA021814|SUPPL|3|n=1483 = NONE
+NDA022154|ORIG|1|Clinical Experience in Nucleoside-Naïve Adults = NCT00057265
+NDA208700|SUPPL|1|Progressive, Well-differentiated Advanced or Metastatic Somatostatin Receptor- = NCT01578239
+NDA208700|SUPPL|1|Somatostatin Receptor-Positive Gastroenteropancreatic Neuroendocrine Tumors = NONE
+NDA209394|SUPPL|2|ENDURANCE-3 = NCT02640157
+NDA209394|SUPPL|2|EXPEDITION-2 = NCT02738138
+NDA209394|SUPPL|2|EXPEDITION-4 = NCT02651194
+NDA209394|SUPPL|2|MAGELLAN-2 = NONE
+NDA211302|ORIG|1|n=32 = NONE
+NDA211302|ORIG|1|n=8 = NONE
+NDA212099|SUPPL|2|n=125 = NONE
+NDA219428|ORIG|1|n=1474 = NONE
+BLA125103|SUPPL|120|Lack of Effcacy: Autologous transplantation preparative regimen using high dose melphalan = NONE
+BLA125338|SUPPL|61|Dupuytren’s Contracture = NONE
+BLA208471|ORIG|1|Add-on Combination Therapy to Metformin (Alone or in Combination with = NONE
+BLA208471|ORIG|1|Add-on Combination Therapy to a Sulfonylurea (Alone or in Combination with = NCT00713830

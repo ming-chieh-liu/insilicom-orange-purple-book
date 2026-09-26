@@ -1,0 +1,20 @@
+NDA021345|SUPPL|52|Treatment of Venous Thromboembolism in Pediatric Patients = NONE
+NDA021592|ORIG|1|n=249 = NONE
+NDA021721|SUPPL|28|Community-Acquired Pneumonia: 5-day Treatment Regimen = NONE
+NDA021721|SUPPL|28|Community-Acquired Pneumonia:7–14 day Treatment Regimen = NCT00257049
+NDA201657|ORIG|1|n=5 = NONE
+NDA205917|ORIG|1|n=5 = NONE
+NDA206910|ORIG|1|n=133 = NCT01709838
+NDA206910|ORIG|1|n=166 = NCT00873041
+NDA206910|ORIG|1|n=184 = NONE
+NDA206910|ORIG|1|n=195 = NONE
+NDA206910|ORIG|1|n=39 = NONE
+NDA206910|ORIG|1|n=55 = NCT00873041
+NDA206910|ORIG|1|n=586 = NCT00061750
+NDA206910|ORIG|1|n=627 = NONE
+NDA208700|SUPPL|31|Progressive, Well-Differentiated Advanced or Metastatic Somatostatin Receptor-Positive Midg = NCT01578239
+BLA019640|SUPPL|33|n=239 = NONE
+BLA019640|SUPPL|33|n=71 = NONE
+NDA020634|SUPPL|61|Community-Acquired Pneumonia: 5-day Treatment Regimen = NONE
+NDA020634|SUPPL|61|Community-Acquired Pneumonia:7–14 day Treatment Regimen = NCT00257049
+NDA020635|SUPPL|67|Community-Acquired Pneumonia: 5-day Treatment Regimen = NONE

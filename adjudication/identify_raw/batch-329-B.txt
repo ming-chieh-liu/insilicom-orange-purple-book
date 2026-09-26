@@ -1,0 +1,20 @@
+NDA021849|ORIG|1|n=520 = NONE
+NDA021872|SUPPL|16|Partial Onset Seizures = NONE
+NDA021872|SUPPL|16|Primary Generalized Tonic-Clonic Seizures = NCT00160550
+NDA021872|SUPPL|5|Partial Onset Seizures frequency over = NONE
+NDA021923|SUPPL|16|Differentiated Thyroid Carcinoma = NCT00984282
+NDA021923|SUPPL|6|Hepatocellular Carcinoma = NCT00105443
+NDA021923|SUPPL|6|Renal Cell Carcinoma = NCT00073307
+NDA021925|ORIG|1|n=560 = NONE
+NDA021925|ORIG|1|n=702 = NONE
+NDA021929|SUPPL|13|Chronic Obstructive Pulmonary Disease = NONE
+NDA021957|ORIG|1|n=1429 = NONE
+NDA021957|ORIG|1|n=21 = NONE
+NDA021986|SUPPL|20|CML in Pediatric Patients = NONE
+NDA021986|SUPPL|20|Imatinib-Resistant or -Intolerant CML or Ph+ ALL in Adults = NCT00123487
+NDA021986|SUPPL|20|Newly Diagnosed Chronic Phase CML in Adults = NCT00481247
+NDA021986|SUPPL|21|Ph+ ALL in Pediatric Patients = NONE
+NDA021986|SUPPL|4|Advanced Phase CML and Ph+ ALL = NCT00123487
+NDA021986|SUPPL|7|Imatinib Resistant or Intolerant CML or Ph+ ALL = NCT00123487
+NDA021986|SUPPL|7|Newly Diagnosed Chronic Phase CML = NCT00481247
+NDA022024|ORIG|1|n=328 = NONE

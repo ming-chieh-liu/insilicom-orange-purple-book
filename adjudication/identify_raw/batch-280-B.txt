@@ -1,0 +1,20 @@
+NDA021762|SUPPL|4|Treatment of Postmenopausal Osteoporosis = NONE
+NDA021762|SUPPL|4|Treatment to Increase Bone Mass in Men with Osteoporosis = NONE
+NDA022063|ORIG|1|n=157 = NONE
+NDA202872|SUPPL|2|n=54 = NONE
+NDA208277|ORIG|1|Primary Generalized Tonic-Clonic (PGTC) Seizures = NCT01393743
+BLA125514|ORIG|1|n=8 = NONE
+BLA125557|SUPPL|13|MRD-positive B-cell Precursor ALL = NONE
+BLA125557|SUPPL|13|Relapsed/Refractory B-cell Precursor ALL = NCT02013167
+NDA021445|SUPPL|13|n=625 = NONE
+NDA022083|SUPPL|19|n=716 = NCT00948766
+NDA201153|ORIG|1|Actinic Keratosis = NONE
+NDA201153|ORIG|1|EGW1 53 = NONE
+NDA201153|ORIG|1|External Genital Warts = NONE
+NDA210498|ORIG|1|CTLA-4 = NONE
+NDA210498|ORIG|1|n=577 = NCT01909453
+NDA210895|ORIG|1|Primary Hyperlipidemia = NONE
+NDA210895|ORIG|1|Type 2 Diabetes Mellitus = NONE
+NDA212819|SUPPL|8|Hospital-acquired Bacterial Pneumonia and Ventilator-associated Bacterial Pneumonia in = NCT02493764
+NDA212819|SUPPL|8|VABP 5 = NONE
+NDA020509|SUPPL|5|IIIA 7 = NONE

@@ -1,0 +1,20 @@
+NDA204061|ORIG|1|n=3667 = NONE
+NDA204096|SUPPL|5|ASTAGRAF XL with Basiliximab Induction = NONE
+NDA204096|SUPPL|5|Clinical Study of ASTAGRAF XL without Induction = NONE
+NDA204275|ORIG|1|Confirmatory Trials = NONE
+NDA204275|ORIG|1|Dose-Ranging Trials = NONE
+NDA204275|ORIG|1|ELLIPTA 214 = NONE
+NDA204275|SUPPL|1|Asthma = NONE
+NDA204275|SUPPL|1|Chronic Obstructive Pulmonary Disease = NONE
+NDA204275|SUPPL|1|ELLIPTA 100 = NONE
+NDA204275|SUPPL|1|ELLIPTA 200 = NONE
+NDA204275|SUPPL|1|ELLIPTA 204 = NONE
+NDA204275|SUPPL|22|ELLIPTA 108 = NONE
+NDA204275|SUPPL|22|ELLIPTA 50 = NONE
+NDA204275|SUPPL|22|ELLIPTA 89 = NONE
+NDA204353|SUPPL|25|Canagliflozin Cardiovascular Outcomes in Patients with Type 2 Diabetes = NONE
+NDA204353|SUPPL|33|ESKD 165 = NONE
+NDA204353|SUPPL|46|Canagliflozin Cardiovascular Outcomes in Adults with Type 2 Diabetes = NONE
+NDA204417|ORIG|1|Immediate-Release Levetiracetam Tablets in Adults = NONE
+NDA204417|ORIG|1|Immediate-release Levetiracetam in Pediatric Patients 4 Years to 16 Years = NONE
+NDA204417|ORIG|1|Levetiracetam Extended-Release Tablets in Adults = NONE

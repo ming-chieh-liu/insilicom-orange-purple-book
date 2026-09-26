@@ -1,0 +1,20 @@
+NDA204384|SUPPL|20|SIRTURO Use in Adult Patients With Pulmonary Tuberculosis = NONE
+NDA204384|SUPPL|20|SIRTURO Use in Pediatric Patients (2 years to less than 18 years of age) With = NONE
+NDA205053|SUPPL|11|Noxafil Oral Suspension Treatment of Oropharyngeal Candidiasis Refractory to Treatment = NONE
+NDA205596|SUPPL|13|Noxafil Oral Suspension Treatment of Oropharyngeal Candidiasis Refractory to Treatment = NONE
+NDA209510|ORIG|1|Prevention of Postoperative Nausea and Vomiting = NCT02337062
+NDA209510|ORIG|1|Treatment of Postoperative Nausea and Vomiting = NONE
+NDA210864|ORIG|1|TABLE 7 = NONE
+NDA211243|ORIG|1|Effects on Driving = NCT02919579
+NDA214770|ORIG|1|Noxafil Oral Suspension Treatment of Oropharyngeal Candidiasis Refractory to Treatment = NONE
+BLA125268|SUPPL|163|Pediatric Patients with ITP = NONE
+BLA761036|SUPPL|5|Combination Treatment with Pomalidomide and Dexamethasone = NCT01998971
+BLA761121|SUPPL|8|Relapsed or Refractory DLBCL, NOS = NONE
+NDA209080|ORIG|1|n=155 = NONE
+NDA209080|ORIG|1|n=959 = NONE
+NDA211675|SUPPL|4|Atopic Dermatitis = NONE
+NDA211675|SUPPL|4|EASI-75 = NONE
+NDA211675|SUPPL|4|EASI-90 = NONE
+NDA214665|SUPPL|9|KRAS G12C-mutated Locally Advanced or Metastatic Non-Small Cell Lung Cancer = NONE
+BLA761061|SUPPL|7|Plaque Psoriasis = NONE
+NDA203214|ORIG|1|DAS28-4 = NCT00847613

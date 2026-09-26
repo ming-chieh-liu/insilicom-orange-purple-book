@@ -1,0 +1,20 @@
+NDA021588|SUPPL|1|n=3 = NONE
+NDA021588|SUPPL|1|n=532 = NCT00171223
+NDA208510|ORIG|1|Attention Deficit Hyperactivity Disorder (ADHD) = NCT00784654
+NDA209092|SUPPL|8|n=39 = NONE
+NDA217581|ORIG|1|PROFILE 1001 = NCT00585195
+NDA217581|ORIG|1|PROFILE 1007 = NCT00932893
+NDA217581|ORIG|1|PROFILE 1014 = NCT01154140
+NDA217630|ORIG|1|Complicated Skin and Skin Structure Infections = NCT00711802
+NDA217630|ORIG|1|S. aureus Bacteremia/Endocarditis = NCT00093067
+BLA019640|SUPPL|68|Adult Patients with Growth Hormone Deficiency = NONE
+BLA019640|SUPPL|68|Pediatric Patients with Idiopathic Short Stature = NONE
+BLA019640|SUPPL|68|Pediatric Patients with SHOX Deficiency = NCT00190658
+BLA019774|SUPPL|40|Pediatric Patients with Short Stature Due to Growth Hormone Deficiency = NCT00884000
+BLA019774|SUPPL|48|Pediatric Patients with Growth Failure Due to Inadequate Secretion of Endogenous Growth Hor = NCT00884000
+BLA019774|SUPPL|48|Pediatric Patients with Idiopathic Short Stature = NONE
+BLA019774|SUPPL|48|Pediatric Patients with Short Stature or Growth Failure with SHOX Deficiency = NCT00190658
+BLA020280|SUPPL|49|n=22 = NONE
+BLA020280|SUPPL|49|n=38 = NONE
+BLA020280|SUPPL|60|Idiopathic Short Stature = NONE
+BLA020280|SUPPL|60|Turner Syndrome = NONE

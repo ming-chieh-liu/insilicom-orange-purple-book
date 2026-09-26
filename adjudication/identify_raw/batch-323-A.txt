@@ -1,0 +1,20 @@
+NDA020933|SUPPL|17|Clinical Studies in Adults = NONE
+NDA021029|SUPPL|36|FIGURE 1 = NONE
+NDA021029|SUPPL|36|Newly Diagnosed Glioblastoma = NCT00006353
+NDA021035|SUPPL|73|Partial Onset Seizures = NONE
+NDA021035|SUPPL|73|Primary Generalized Tonic-Clonic Seizures = NCT00160550
+NDA021038|SUPPL|21|Intensive Care Unit Sedation = NONE
+NDA021041|ORIG|1|TABLE 1 = NONE
+NDA021041|SUPPL|18|n=24 = NONE
+NDA021077|SUPPL|29|Chronic Obstructive Pulmonary Disease = NONE
+NDA021085|SUPPL|60|Acute Bacterial Exacerbation of Chronic Bronchitis = NONE
+NDA021085|SUPPL|60|Acute Bacterial Sinusitis = NONE
+NDA021085|SUPPL|60|Community Acquired Pneumonia = NONE
+NDA021085|SUPPL|60|Complicated Intra-Abdominal Infections = NONE
+NDA021085|SUPPL|60|Complicated Skin and Skin Structure Infections = NCT00402727
+NDA021085|SUPPL|60|MDRSP 9 = NONE
+NDA021121|SUPPL|17|Children = NONE
+NDA021152|SUPPL|4|n=438 = NONE
+NDA021153|SUPPL|23|n=21 = NONE
+NDA021168|SUPPL|12|LABELING 10 = NONE
+NDA021168|SUPPL|12|LABELING 7 = NONE

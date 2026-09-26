@@ -1,0 +1,19 @@
+NDA020489|SUPPL|25|n=35 = NCT01104246
+NDA020489|SUPPL|25|n=40 = NCT01104246
+NDA020505|SUPPL|37|Monotherapy Epilepsy Controlled Trial = NONE
+NDA020844|SUPPL|31|Monotherapy Epilepsy Controlled Trial = NONE
+NDA020850|SUPPL|25|Cardiovascular Risk Reduction = NCT00153101
+NDA020896|SUPPL|44|IRIN 983 = NCT00009737
+NDA020896|SUPPL|44|ORIN 933 = NCT00009737
+NDA020933|SUPPL|17|Clinical Studies in Adults = NCT00002368
+NDA021035|SUPPL|73|Partial Onset Seizures = NCT00615615
+NDA021427|SUPPL|30|Fibromyalgia = NCT00673452
+NDA021427|SUPPL|30|Major Depressive Disorder = NONE
+NDA021427|SUPPL|52|Major Depressive Disorder in Adults = NONE
+NDA021505|SUPPL|19|Partial Onset Seizures = NCT00615615
+NDA022038|SUPPL|4|Women’s Health Initiative Studies = NCT00000611
+NDA022148|ORIG|1|Major Depressive Disorder = NONE
+NDA022277|ORIG|1|Newly Diagnosed Glioblastoma Multiforme = NONE
+NDA022450|ORIG|1|Adult Acute Pain = NCT00564486
+NDA022519|ORIG|1|n=213 = NCT00450216
+NDA201635|ORIG|1|Monotherapy Treatment in Patients with Partial Onset or Primary = NONE

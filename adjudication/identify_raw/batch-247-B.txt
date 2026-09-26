@@ -1,0 +1,20 @@
+NDA021609|ORIG|1|n=10000 = NONE
+NDA021609|ORIG|1|n=16608 = NONE
+NDA021732|ORIG|1|n=111 = NCT01697384
+NDA021732|ORIG|1|n=134 = NCT01697384
+NDA021732|ORIG|1|n=17 = NONE
+NDA021732|ORIG|1|n=18 = NONE
+NDA021732|ORIG|1|n=42 = NONE
+NDA022058|ORIG|1|n=36 = NONE
+NDA022068|SUPPL|26|Treatment discontinuation in Ph+ CML-CP patients who have achieved a sustained molecular = NONE
+NDA022068|SUPPL|26|Treatment discontinuation in newly diagnosed Ph+ CML-CP patients who have achieved a = NONE
+NDA022068|SUPPL|27|Adult Newly Diagnosed Ph+ CML-CP = NONE
+NDA022068|SUPPL|27|Adult Patients with Resistant or Intolerant Ph+ CML-CP and CML-AP = NONE
+NDA022068|SUPPL|35|Adult Patients With Resistant or Intolerant Ph+ CML-CP and CML-AP = NONE
+NDA022068|SUPPL|35|Treatment Discontinuation in Newly Diagnosed Ph+ CML-CP Patients Who Have Achieved a = NONE
+NDA022068|SUPPL|35|Treatment Discontinuation in Ph+ CML-CP Patients Who Have Achieved a Sustained Molecular = NONE
+NDA022068|SUPPL|5|n=282 = NONE
+NDA022068|SUPPL|6|Newly Diagnosed Ph+ CML-CP = NONE
+NDA022068|SUPPL|6|Patients with Resistant or Intolerant Ph+ CML-CP and CML-AP = NONE
+NDA022247|ORIG|1|Prevention of Postmenopausal Osteoporosis in Women with a Uterus = NONE
+NDA022247|ORIG|1|STUDY 1 = NONE
