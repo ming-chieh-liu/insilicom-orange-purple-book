@@ -113,6 +113,10 @@ class Candidate(NamedTuple):
     #: pool rests on, so a candidate that skipped it is weaker evidence and P5
     #: holds its link below tier A — the same guard stem-derived drugs get.
     injected: bool = False
+    #: The registering sponsor and the primary completion date, shown to the
+    #: per-candidate judge (P4 v2, D33) alongside the fields above.
+    lead_sponsor: str = ""
+    primary_completion: str = ""
 
 
 class Unit(NamedTuple):
@@ -598,6 +602,8 @@ def index_studies(
             conditions=";".join(facts.conditions)[:300],
             interventions=";".join(facts.interventions)[:300],
             biosimilar=looks_biosimilar(facts.brief_title, facts.interventions),
+            lead_sponsor=facts.lead_sponsor,
+            primary_completion=facts.primary_completion,
         )
         # CT.gov's own curation first, the synonym index only where it is
         # absent. NLM assigns MeSH to 46% of studies' interventions and 79% of

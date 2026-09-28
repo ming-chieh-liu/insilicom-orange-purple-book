@@ -1015,3 +1015,15 @@ def test_an_id_the_excerpt_does_not_show_is_not_paired_with_its_name() -> None:
     out = candidates.collapse([_desc("KEYNOTE-045", "NCT03924895", excerpt="Table 78 ...")])
     assert {(row["acronym"], row["nct_id"]) for row in out} == {
         ("", "NCT03924895"), ("KEYNOTE-045", "")}
+
+
+def test_the_shortlist_carries_sponsor_and_primary_completion() -> None:
+    """The per-candidate judge (D33) is shown both."""
+    study = _candidate("NCT1")._replace(
+        lead_sponsor="Merck Sharp & Dohme LLC", primary_completion="2017-11-08"
+    )
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "", {"NCT1": study}, {"MESH:D1": {"NCT1"}}, {}
+    )
+    assert got[0].lead_sponsor == "Merck Sharp & Dohme LLC"
+    assert got[0].primary_completion == "2017-11-08"
