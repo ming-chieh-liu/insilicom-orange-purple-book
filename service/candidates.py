@@ -732,41 +732,43 @@ def shortlist(
         }
         pool &= started_before
         injected &= started_before
-    if len(pool) > CANDIDATE_CAP:
-        matching = by_condition.get(indication_mesh, set()) if indication_mesh else set()
-        target = int(stated_enrollment) if stated_enrollment.isdigit() else None
+    matching = by_condition.get(indication_mesh, set()) if indication_mesh else set()
+    target = int(stated_enrollment) if stated_enrollment.isdigit() else None
 
-        def rank(nct: str) -> tuple[int, int, int, int, int, int, int, str]:
-            candidate = studies[nct]
-            enrolled = candidate.enrollment
-            if target is None or not enrolled.isdigit():
-                distance = 10**9
-            else:
-                distance = abs(int(enrolled) - target)
-            return (
-                0 if prefer_biosimilar and candidate.biosimilar else 1,
-                0 if names_match(label_name, candidate) else 1,
-                0 if nct in from_graph else 1,
-                0 if nct in matching else 1,
-                0 if "PHASE3" in candidate.phases else 1,
-                _years_before(candidate.start_date, approval_date),
-                distance,
-                nct,
-            )
-
-        pool = set(sorted(pool, key=rank)[:CANDIDATE_CAP])
-    # Injected candidates are **appended, never in competition**. They are the
-    # only route to a drug whose id space the trial index cannot be joined to,
-    # and making them fight for the same 100 slots evicted the right answer
-    # from 48 units that previously had it -- a 456/48 trade that is positive
-    # but needlessly lossy. Appending costs little: the graph names a median of
-    # 5 trials per application, p99 38, max 87.
-    pool |= injected
-    return tuple(
-        sorted(
-            (studies[nct]._replace(injected=nct in injected) for nct in pool),
-            key=lambda c: c.nct_id,
+    def rank(nct: str) -> tuple[int, int, int, int, int, int, int, str]:
+        candidate = studies[nct]
+        enrolled = candidate.enrollment
+        if target is None or not enrolled.isdigit():
+            distance = 10**9
+        else:
+            distance = abs(int(enrolled) - target)
+        return (
+            0 if prefer_biosimilar and candidate.biosimilar else 1,
+            0 if names_match(label_name, candidate) else 1,
+            0 if nct in from_graph else 1,
+            0 if nct in matching else 1,
+            0 if "PHASE3" in candidate.phases else 1,
+            _years_before(candidate.start_date, approval_date),
+            distance,
+            nct,
         )
+
+    if len(pool) > CANDIDATE_CAP:
+        pool = set(sorted(pool, key=rank)[:CANDIDATE_CAP])
+    # Injected candidates are **exempt from the cap, never in competition for
+    # it**. They are the only route to a drug whose id space the trial index
+    # cannot be joined to, and making them fight for the same 100 slots evicted
+    # the right answer from 48 units that previously had it -- a 456/48 trade
+    # that is positive but needlessly lossy. Exempting them costs little: the
+    # graph names a median of 5 trials per application, p99 38, max 87.
+    pool |= injected
+    # The shortlist is returned **in rank order**, every candidate included,
+    # so a judge can work down it in tiers (1-10, 11-20, ...) and stop at the
+    # first tier holding a match. Injected candidates are ranked by the same key
+    # as everything else; being named by the literature is key 3, so they rise.
+    return tuple(
+        studies[nct]._replace(injected=nct in injected)
+        for nct in sorted(pool, key=rank)
     )
 
 

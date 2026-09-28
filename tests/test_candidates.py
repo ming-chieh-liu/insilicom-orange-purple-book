@@ -238,10 +238,35 @@ def test_an_unknown_drug_yields_no_candidates(registry: _Registry) -> None:
 
 def test_the_shortlist_is_ordered_deterministically(registry: _Registry) -> None:
     studies, by_drug, by_condition = registry
+    args = ({"MESH:C582435"}, "", "", studies, by_drug, by_condition)
+    assert [c.nct_id for c in candidates.shortlist(*args)] == [
+        c.nct_id for c in candidates.shortlist(*args)
+    ]
+
+
+def test_the_shortlist_is_returned_in_rank_order_below_the_cap() -> None:
+    """Pools under the cap are ranked too, so tiers of 10 mean something."""
+    studies = {
+        "NCT1": _candidate("NCT1")._replace(phases="PHASE2"),
+        "NCT2": _candidate("NCT2")._replace(phases="PHASE3"),
+    }
+    by_drug = {"MESH:D1": {"NCT1", "NCT2"}}
+    got = candidates.shortlist({"MESH:D1"}, "", "", studies, by_drug, {})
+    assert [c.nct_id for c in got] == ["NCT2", "NCT1"]
+
+
+def test_injected_candidates_are_ranked_not_appended() -> None:
+    """A graph-named trial outranks an un-named phase 3 from the drug pool."""
+    studies = {
+        "NCT1": _candidate("NCT1")._replace(phases="PHASE3"),
+        "NCT9": _candidate("NCT9")._replace(phases="PHASE2"),
+    }
+    by_drug = {"MESH:D1": {"NCT1"}}
     got = candidates.shortlist(
-        {"MESH:C582435"}, "", "", studies, by_drug, by_condition
+        {"MESH:D1"}, "", "", studies, by_drug, {}, from_graph=frozenset({"NCT9"})
     )
-    assert [c.nct_id for c in got] == sorted(c.nct_id for c in got)
+    assert [c.nct_id for c in got] == ["NCT9", "NCT1"]
+    assert got[0].injected
 
 
 # ---------------------------------------------------------------------------
