@@ -183,6 +183,18 @@ code says `not yet implemented` until it lands.
   the P4 prompt tells the judge the count is its strongest signal, so D17 rewarded the evidence
   the judge chose on; and a ±15% match was unique in only 45 of 2,363 known cases. On the rebuilt
   scope 366 judged links move A → B; submissions with a tier-A link 1,709 → 1,448.
+- **D33 — P4 judges each candidate Yes/No, in ranked tiers of 10, with one judge** (2026-09-28,
+  **implemented in code 2026-09-28; pilot not yet run**). P3 returns every shortlist in rank order,
+  with no cap for literature-injected candidates (commit 308887d); P4 works down it in tiers of 10
+  (ranks 1–10, 11–20, …) and a description stops at the first tier holding a Yes, taking its
+  highest-ranked Yes; every tier No is NONE. Ten candidates share one call, each answered on its
+  own (prompt `docs/prompts/trial-candidate-match.md` v1, runbook
+  `docs/runbooks/trial-candidate-match.md`). **The full run uses one judge** — a recorded
+  exception to the two-judge convention, taken for cost; the pilot runs two judges plus a third
+  on disagreement to measure agreement. Decisions go to `identify_verdicts.jsonl` stamped
+  `prompt_version 2`, superseding the pick-one answer (the pick-one prompt, runbook and
+  `identify-*` modes stay for reuse). Why: manager's request; measured on 11,792 known answers
+  the true trial sits at median rank 2 and 74% of shortlisted answers are in tier 1.
 
 ## Hard constraints
 

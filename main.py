@@ -40,6 +40,7 @@ from dao.tsv_repository import TsvRepository
 from source import label_pdf, mesh_descriptors, moiety, review_docs, trial_studies
 from source.raw_table import read_rows
 from service import (
+    candidate_match,
     adjudication,
     assemble,
     candidates,
@@ -120,6 +121,12 @@ MODES: dict[str, str] = {
     "identify-combine": "pair the judges' answer files in "
     "adjudication/identify_raw/ and report what needs a tiebreak",
     "identify-record": "validate and append judged identifications from --from",
+    "match-prepare": "P4 per-candidate matching (D33): write each undecided "
+    "description's next tier of 10 and the judge batches "
+    "(see docs/runbooks/trial-candidate-match.md; --limit = pilot descriptions)",
+    "match-combine": "record every tier whose judge answers are complete "
+    "(--judges 2 for the pilot, 1 for the full run)",
+    "match-record": "append newly decided descriptions to identify_verdicts.jsonl",
     "assemble": "join the units, the verdicts and the spine into "
     "trial_submission_map.tsv and unlinked_submissions.tsv",
     "validate": "score the map against the links the FDA states outright: "
@@ -168,6 +175,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="adjudicate-prepare / labels: cap the units or submissions processed (pilot)",
+    )
+    parser.add_argument(
+        "--judges",
+        type=int,
+        choices=(1, 2),
+        default=1,
+        help="match-combine: judges per candidate (2 for the pilot, 1 for the full run)",
     )
     parser.add_argument(
         "--from",
@@ -507,6 +521,24 @@ def main(argv: list[str] | None = None) -> int:
         )
         print(assemble.render(assemble_report))
         print(f"\nwritten to {repository.out_dir}/")
+        return 0
+
+    if args.mode in ("match-prepare", "match-record"):
+        out_dir = Path(args.out)
+        match_units = candidate_match.select_units(
+            out_dir / "candidates.jsonl",
+            out_dir / "approval_events.tsv",
+            out_dir / "drug_map.tsv",
+            args.limit,
+        )
+        if args.mode == "match-prepare":
+            print(candidate_match.prepare_round(match_units, Path(args.adjudication)))
+        else:
+            print(candidate_match.record_round(match_units, Path(args.adjudication)))
+        return 0
+
+    if args.mode == "match-combine":
+        print(candidate_match.combine_round(Path(args.adjudication), args.judges))
         return 0
 
     if args.mode == "identify-prepare":
