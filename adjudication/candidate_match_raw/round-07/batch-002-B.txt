@@ -1,0 +1,86 @@
+NDA022372|SUPPL|13|n=89#T4 | NCT02499393 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT01099449 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT00998738 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT00965874 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT00632606 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT00316914 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT00313963 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT01136421 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT00059332 = No
+NDA022372|SUPPL|13|n=89#T4 | NCT00553072 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00014222 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00668616 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT02115204 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00129922 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00003893 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00010140 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT01031030 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00002784 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00002953 = No
+NDA050807|ORIG|1|GFEA-053#T4 | NCT00003012 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT01329978 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT01359644 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT01441180 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT01474811 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT01188772 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT01260350 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT02081079 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT01944527 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT03163849 = No
+NDA209195|SUPPL|3|POLARIS-4#T4 | NCT03801707 = No
+NDA208843|ORIG|1|n=120#T4 | NCT01848925 = No
+NDA208843|ORIG|1|n=120#T4 | NCT01783990 = No
+NDA208843|ORIG|1|n=120#T4 | NCT01389024 = No
+NDA208843|ORIG|1|n=120#T4 | NCT01506544 = No
+NDA208843|ORIG|1|n=120#T4 | NCT01609192 = No
+NDA208843|ORIG|1|n=120#T4 | NCT00784082 = No
+NDA208843|ORIG|1|n=120#T4 | NCT02516579 = Yes
+NDA208843|ORIG|1|n=120#T4 | NCT00890396 = No
+NDA208843|ORIG|1|n=120#T4 | NCT00744692 = No
+NDA208843|ORIG|1|n=120#T4 | NCT00532883 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT02261493 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT02261467 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT02195687 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT02106351 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT02078895 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT01818076 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT01821573 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT01910363 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT01776606 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T4 | NCT01603459 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03448419 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03349684 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03529123 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03429543 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03968224 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03332212 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT05451147 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03419624 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03057977 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T4 | NCT03268005 = No
+NDA213082|ORIG|1|ACR20 33#T4 | NCT00678561 = No
+NDA213082|ORIG|1|ACR20 33#T4 | NCT01743677 = No
+NDA213082|ORIG|1|ACR20 33#T4 | NCT01736696 = No
+NDA203108|ORIG|1|n=36#T4 | NCT01428622 = No
+NDA203108|ORIG|1|n=36#T4 | NCT01153724 = No
+NDA203108|ORIG|1|n=36#T4 | NCT01153711 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT03247140 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT03753477 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT03226275 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT03461081 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT02665832 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT02974439 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT02814500 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT02707913 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT02996916 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T4 | NCT02233218 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT06814067 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT07136545 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT06736379 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT06161545 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT06868433 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT07213934 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT06894771 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT05668949 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT05879484 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T4 | NCT06771674 = No

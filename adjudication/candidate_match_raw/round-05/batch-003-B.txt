@@ -1,0 +1,12 @@
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT04199104 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT04428333 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT05523323 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT04157985 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT03040999 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT03358472 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT02252042 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT07218003 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT06789172 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T3 | NCT06806852 = No
+BLA019640|SUPPL|33|n=239#T3 | NCT01516229 = No
+BLA019640|SUPPL|33|n=239#T3 | NCT01697644 = No

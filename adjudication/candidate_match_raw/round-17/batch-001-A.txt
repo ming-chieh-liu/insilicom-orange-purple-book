@@ -1,0 +1,92 @@
+NDA203415|SUPPL|14|n=4692#T9 | NCT01927627 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT02228265 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT02225093 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT01885949 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT01664923 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT01547299 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT01565928 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT01302041 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT01534052 = No
+NDA203415|SUPPL|14|n=4692#T9 | NCT01284920 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01199523 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01232413 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT00936871 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01173536 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01090661 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01191723 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT02508753 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01140425 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01198626 = No
+NDA205572|ORIG|1|Community Acquired Pneumonia#T9 | NCT01195675 = No
+NDA022101|ORIG|1|Pediatric GERD#T9 | NCT00628667 = No
+NDA022101|ORIG|1|Pediatric GERD#T9 | NCT00641264 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT02599090 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00597402 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00433381 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00441142 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00875355 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00486603 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00404495 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00458601 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT00525525 = No
+NDA022277|ORIG|1|Refractory Anaplastic Astrocytoma#T9 | NCT01242566 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT03103555 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02518750 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02613598 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02783625 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02201576 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02352558 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02500251 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02522572 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02139397 = No
+NDA212782|ORIG|1|GHOP 244#T9 | NCT02265510 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03703349 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03698474 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03322878 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03208452 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03846284 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03289429 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03038334 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03237000 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03318211 = No
+NDA022372|SUPPL|13|n=89#T9 | NCT03132701 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT01962441 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT01625338 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT03313414 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT03776760 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT03949764 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT04111367 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT04159246 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT04211844 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT04246723 = No
+NDA209195|SUPPL|3|POLARIS-4#T9 | NCT04952207 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT04917731 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT04750291 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT04631588 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT03935295 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT05309564 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT05089851 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT03861936 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT04281095 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT03799484 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T9 | NCT03284047 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT00649519 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT01155895 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT00649402 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT00129233 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT00841542 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT00841815 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT01131923 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT01131936 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT00143195 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T9 | NCT00159718 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05077709 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05286619 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05585034 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05286060 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05323656 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05172258 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05578170 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT04754321 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT05366166 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T9 | NCT04943445 = No

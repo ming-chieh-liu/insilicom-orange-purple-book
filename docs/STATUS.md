@@ -21,7 +21,9 @@ row says what was checked.
 | P3 | candidates | **rebuilt 2026-09-30 under D35 + D36** — routes: label 3,572 · C 3,034 · D 3,168 · review 279 · guard 1,043 · biosimilar 199; units with candidates B 3,737 · C 2,358 · D 125; recall 78.1% (earliest) | `candidates.jsonl`, `submission_routes.tsv` 2026-09-30 |
 | P4 | identify, pick-one v1 | done on the old shortlists — 3,668 units (commit da0f281); **replaced by D33/D35**, kept for comparison | |
 | P4 | D33 pilot | **obsolete, archived** — built on the pre-D34 order; 27/50 decided | `adjudication/archive/d33-pilot-pre-d35/` |
-| P4 | cases C and D (D35) | **code done 2026-09-29**, not run | prompt `trial-candidate-match-nolabel` v1 |
+| P4 | case B pilot (D35) | **done 2026-09-30** — 50/50 decided, 2 judges + third: 16 identified (T1 13 · T2 1 · T4 1 · T5 1), 34 NONE; A=B 1,750/1,751 candidates | see "D35 pilots" below |
+| P4 | cases C and D pilot (D35) | **done 2026-09-30** — 50/50 decided (48 C, 2 D): 23 identified (T1 17 · T2 5 · T10 1), all case C; 27 NONE; A=B 820/827 | prompt `trial-candidate-match-nolabel` v1 |
+| P4 | full runs B, C/D | **not started** — waits on the user's review of the pilots | |
 | P4b | D28 label roles | not piloted | |
 | P5 | assemble | **not run on the D23 scope** — `trial_submission_map.tsv` is from 2026-09-23 | |
 | P6 | validate | not run | |
@@ -29,6 +31,28 @@ row says what was checked.
 **Correction:** an earlier version of this file (2026-09-28) said "P0–P3 on the D23 scope: done"
 and listed no review step. The review download was never finished (131 files missing, retry step
 never run) and review roles are 20% judged; both are now listed.
+
+## D35 pilots (2026-09-30) — two judges + third, `--limit 50` each
+
+Answers `adjudication/candidate_match_answers.jsonl`; decisions `identify_verdicts.jsonl`
+`prompt_version 3`; raw `candidate_match_raw/round-01..23`, tiebreaks `raw/tiebreak/`.
+
+| | Case B (excerpt prompt v1) | Cases C/D (no-label prompt v1) |
+|---|---|---|
+| units | 50 descriptions | 50 submissions (48 C, 2 D) |
+| candidates judged | 1,751 | 827 |
+| judge A = B | 1,750 (99.94%), 1 tiebreak | 820 (99.2%), 7 tiebreaks |
+| identified | 16 (T1 13 · T2 1 · T4 1 · T5 1) | 23 (T1 17 · T2 5 · T10 1), all C; D 0/2 |
+| NONE | 34 | 27 |
+| tier calls per judge | 192 (3.8 / unit; 24 stop at T1, 6 run all 10 tiers, 3 reach literature tiers 11–12) | 99 (2.0 / unit; 33 stop at T1) |
+| units with > 1 Yes in the deciding tier | 1 | 11 (up to 5) |
+
+Case B against the old pick-one P4 on the same 49 descriptions that have an old answer: same
+trial 12, same NONE 31, **new identification where the old said NONE 4** (NDA206111 S38 →
+NCT03057951 · NDA211371 n=38 → NCT02942004 · NDA211616 S24 → NCT02666664 · NDA218785 IWWM-6 →
+NCT03053440), **old identification now NONE 2**: NDA022509 PGTC Seizures (old NCT00043901 sits at
+rank 6 of 16; both new judges said No) and NDA213082 "ACR20 33" (an endpoint read as a trial name;
+the old pick is no longer on the filtered shortlist). **Hand-check these six.**
 
 ## D33 pilot (50 descriptions, `--limit 50`, two judges) — OBSOLETE, archived 2026-09-29
 
