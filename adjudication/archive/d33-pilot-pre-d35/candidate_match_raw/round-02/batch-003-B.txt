@@ -1,0 +1,60 @@
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT01249417 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT01251380 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT01489904 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT00261131 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT06218316 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT06583343 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT04290169 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT03788317 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT03344952 = No
+BLA125360|SUPPL|108|Upper Facial Lines (Glabellar Lines, Horizontal Forehead Lines, and Lateral Canthal Lines)#T2 | NCT03234413 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05326490 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05132439 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05601336 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05641337 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05468554 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05364190 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05230758 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05373680 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT05098470 = No
+NDA206111|SUPPL|38|Empagliflozin Heart Failure Trials, Including Adult Patients with Type 2 Diabetes Mellitus#T2 | NCT04826692 = No
+NDA203108|ORIG|1|n=36#T2 | NCT01040793 = No
+NDA203108|ORIG|1|n=36#T2 | NCT00931385 = No
+NDA203108|ORIG|1|n=36#T2 | NCT00932646 = No
+NDA203108|ORIG|1|n=36#T2 | NCT00782509 = No
+NDA203108|ORIG|1|n=36#T2 | NCT00793624 = No
+NDA203108|ORIG|1|n=36#T2 | NCT00796653 = No
+NDA203108|ORIG|1|n=36#T2 | NCT00782210 = No
+NDA203108|ORIG|1|n=36#T2 | NCT01311661 = No
+NDA203108|ORIG|1|n=36#T2 | NCT01013753 = No
+NDA203108|ORIG|1|n=36#T2 | NCT01040403 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02723084 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02738138 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02446717 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02604017 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02636595 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02640157 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02640482 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02642432 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02651194 = No
+NDA215110|ORIG|1|VOYAGE-1#T2 | NCT02243293 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT04518293 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT05155137 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT03785067 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT04158076 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT04074551 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT04161001 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT03991442 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT03082014 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT05288400 = No
+NDA219531|ORIG|1|Effects in Vasospastic Angina#T2 | NCT02969265 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT02447003 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT02054806 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT02089685 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT02085070 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT02133742 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT02267603 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT02179918 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT01848834 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT01704287 = No
+BLA761467|SUPPL|1|Head and Neck Squamous Cell Cancer#T2 | NCT01295827 = No

@@ -3897,3 +3897,30 @@
 {"unit_id": "NDA208294|ORIG|1|n=822", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
 {"unit_id": "NDA210595|ORIG|1|Dose-Ranging Trials", "judge_a": "NCT01120093", "judge_b": "NCT01120093", "tiebreak": null, "final": "NCT01120093", "prompt_version": 1}
 {"unit_id": "NDA210595|ORIG|1|PRESSAIR 400", "judge_a": "NONE", "judge_b": "NONE", "tiebreak": null, "final": "NONE", "prompt_version": 1}
+{"unit_id": "NDA218785|ORIG|2|IWWM-6", "judge_a": "NCT03053440", "judge_b": "", "tiebreak": null, "final": "NCT03053440", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA022387|SUPPL|17|Pulmonary Hypertension Associated with ILD (WHO Group 3)", "judge_a": "NCT02630316", "judge_b": "", "tiebreak": null, "final": "NCT02630316", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA019627|SUPPL|35|TABLE 4", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "BLA125504|SUPPL|35|Non-radiographic axial spondyloarthritis", "judge_a": "NCT02696031", "judge_b": "", "tiebreak": null, "final": "NCT02696031", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA213411|ORIG|1|HER2-Positive Metastatic Breast Cancer", "judge_a": "NCT02614794", "judge_b": "", "tiebreak": null, "final": "NCT02614794", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA211616|SUPPL|24|Primary Hypercholesterolemia Trials in Adults", "judge_a": "NCT02666664", "judge_b": "", "tiebreak": null, "final": "NCT02666664", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA020427|SUPPL|11|Complex Partial Seizures", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA216354|ORIG|1|Chorea Associated with Huntington\u2019s Disease", "judge_a": "NCT01795859", "judge_b": "", "tiebreak": null, "final": "NCT01795859", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA213217|SUPPL|4|IWWM-6", "judge_a": "NCT03053440", "judge_b": "", "tiebreak": null, "final": "NCT03053440", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA022068|SUPPL|27|Adult Patients with Resistant or Intolerant Ph+ CML-CP and CML-AP", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA020630|SUPPL|5|n=929", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA021351|ORIG|1|n=520", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA020610|SUPPL|16|Pediatric Studies", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA219485|ORIG|1|PFIC 1", "judge_a": "NCT03905330", "judge_b": "", "tiebreak": null, "final": "NCT03905330", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA022331|SUPPL|14|n=31", "judge_a": "NCT01439126", "judge_b": "", "tiebreak": null, "final": "NCT01439126", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA211371|ORIG|1|n=38", "judge_a": "NCT02942004", "judge_b": "", "tiebreak": null, "final": "NCT02942004", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA020882|SUPPL|2|FIGURE 1", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA215110|ORIG|1|VOYAGE-2", "judge_a": "NCT03235349", "judge_b": "", "tiebreak": null, "final": "NCT03235349", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA021641|ORIG|1|n=159", "judge_a": "NCT00203034", "judge_b": "", "tiebreak": null, "final": "NCT00203034", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA213082|ORIG|1|ACR20 33", "judge_a": "NCT01877668", "judge_b": "", "tiebreak": null, "final": "NCT01877668", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA022303|ORIG|1|Non-Hodgkin\u2019s Lymphoma (NHL)", "judge_a": "NCT00139841", "judge_b": "", "tiebreak": null, "final": "NCT00139841", "prompt_version": 2, "method": "candidate_match", "tier": 1, "tiers_judged": 1}
+{"unit_id": "NDA021732|ORIG|1|n=17", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA019627|SUPPL|35|TABLE 2", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA208169|ORIG|1|n=4", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 1}
+{"unit_id": "NDA212520|ORIG|1|n=164", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 2}
+{"unit_id": "NDA020634|SUPPL|43|Community-Acquired Pneumonia: 7-14 day Treatment Regimen", "judge_a": "NCT00257049", "judge_b": "", "tiebreak": null, "final": "NCT00257049", "prompt_version": 2, "method": "candidate_match", "tier": 3, "tiers_judged": 3}
+{"unit_id": "NDA215110|ORIG|1|VOYAGE-1", "judge_a": "NONE", "judge_b": "", "tiebreak": null, "final": "NONE", "prompt_version": 2, "method": "candidate_match", "tier": 0, "tiers_judged": 3}
