@@ -722,9 +722,17 @@ def main(argv: list[str] | None = None) -> int:
         if not cand_vocabulary.exists:
             print(f"{cand_vocabulary.descriptors} not found — pass --mesh")
             return 1
+        # D35 (2026-09-30): a submission whose review names a PIVOTAL or
+        # SUPPORTING trial is served at tier A and gets no case C/D unit.
+        review_linked = frozenset(
+            key for key, _nct, role, _protocol
+            in assemble.review_judgements(Path(args.adjudication))
+            if role in review_role.LINKING
+        )
         candidates_report = candidates.build(
             data, archive, out_dir,
             ancestors=mesh_descriptors.ancestors(mesh_descriptors.read(cand_vocabulary)),
+            review_linked=review_linked,
         )
         TsvRepository(args.out).save(
             "submission_routes", ("submission", "route"),

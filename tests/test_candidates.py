@@ -610,6 +610,17 @@ def test_a_literature_candidate_is_never_filtered_on_the_indication(
     assert next(c for c in unit.candidates if c.nct_id == "NCT00000002").injected
 
 
+def test_a_review_with_a_linking_trial_routes_to_review_not_c_or_d() -> None:
+    """D35, 2026-09-30: the FDA review already names the evidence."""
+    got = candidates.route([("R|ORIG|1", "full"), ("S|ORIG|1", "full")], set(),
+                           {"R|ORIG|1": ["MESH:D1"], "S|ORIG|1": ["MESH:D1"]}, {}, set(),
+                           frozenset({"R|ORIG|1"}))
+    assert got == [("R|ORIG|1", "review"), ("S|ORIG|1", "C")]
+    # owning a §14 description still wins: B is judged regardless of the review
+    assert candidates.route([("R|ORIG|1", "full")], {"R|ORIG|1"}, {}, {}, set(),
+                            frozenset({"R|ORIG|1"})) == [("R|ORIG|1", "label")]
+
+
 def test_route_and_ownership_edge_cases() -> None:
     assert candidates.route([("X|ORIG|1", "full")], set(), {}, {}, set()) == [("X|ORIG|1", "D")]
     assert candidates.read_drug_only(Path("/nonexistent")) == {}

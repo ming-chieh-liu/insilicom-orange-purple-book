@@ -1,0 +1,43 @@
+Below is an excerpt from Section 14 (Clinical Studies) of an FDA-approved drug
+label. It describes one clinical trial.
+
+<excerpt>
+{{excerpt}}
+</excerpt>
+
+The label calls this trial: {{acronym}}
+The label says it enrolled: {{enrollment}} patients
+
+Below is a numbered list of registered studies. Exactly one of them may be the
+trial the excerpt describes, or none of them may be.
+
+<candidates>
+{{candidates}}
+</candidates>
+
+Question: which candidate is the trial the excerpt describes?
+
+Rules:
+- Judge ONLY from the excerpt and the candidate list above. Do not use outside
+  knowledge about this drug, this trial or this disease. Do not look anything
+  up. Do not search the web or read any file.
+- The strongest single signal is the enrollment count. A candidate whose
+  enrollment matches the number the label states is very likely the trial. A
+  candidate whose enrollment is far from it is very likely not.
+- The trial name is the next strongest signal: a candidate whose acronym or
+  sponsor protocol id matches the name the label uses is likely the trial.
+- Then compare the disease, the treatment, and the study design words
+  (randomized, double-blind, placebo-controlled, open-label, single-arm).
+- Counts need not match exactly. A label may report the number analysed where
+  the registry reports the number enrolled, so a small difference is normal and
+  a large one is not.
+- Answer NONE if no candidate fits, if two or more fit equally well, or if the
+  excerpt does not give you enough to tell them apart. NONE is a correct and
+  expected answer. A wrong match invents a link between a trial and a drug
+  approval that does not exist, which is far worse than no link at all.
+
+Output exactly one line, with no explanation, no punctuation and no preamble —
+either the NCT id of the one candidate you chose, or the word NONE:
+
+NCT01234567
+NONE

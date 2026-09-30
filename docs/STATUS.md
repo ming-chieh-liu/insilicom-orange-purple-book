@@ -1,6 +1,6 @@
 # Rebuild status and to-do
 
-**Last updated:** 2026-09-29. Update this file whenever a stage finishes or is paused; the short
+**Last updated:** 2026-09-30. Update this file whenever a stage finishes or is paused; the short
 to-do list in `CLAUDE.md` ("Current status") points here.
 
 ## Where the rebuild stands (audited 2026-09-29 against the files on disk)
@@ -17,8 +17,8 @@ row says what was checked.
 | P2c | reviews — download + protocol-id parse | **download ~99% complete, not 100%**: 60 review documents (20 PDFs, 40 table-of-contents pages) and 71 TOC component PDFs never fetched; runbook step 1.1 (retry the `&amp;` components and earlier 404s) **was never run**. Parse done on what is cached | 3,045 + 3,353 documents and 10,418 components cached; `review_trial_mentions.tsv` and 4,825 role units written 2026-09-25 11:31, after the last download |
 | P2c | reviews — **role judging (P4r)** | **done 2026-09-30**: 4,825 of 4,825 decided under prompt v2 (PIVOTAL 1,469 · SUPPORTING 723 · PK_CLINPHARM 1,275 · OTHER 946 · NOT_FOR_THIS_APPROVAL 320 · FAILED 92) | commits ed91306, 283e378, 730e040, e6a2e11 |
 | P2i | indication table | **done, rebuilt 2026-09-29 (D34)** | `submission_indications.tsv` |
-| P2g | literature candidates (`graph-trials`) | **stale** — built 2026-09-25 on the pre-D34 indications; D35 adds protocol ids | `graph_trials.tsv` 2026-09-25 |
-| P3 | candidates | **rebuilt 2026-09-29 but superseded by D35** (no filter, no cap rule, stale graph input) | `candidates.jsonl` 2026-09-29 |
+| P2g | literature candidates | **done 2026-09-30**: `graph-trials` 2,147 applications (116 pairs via protocol id); `graph-links` 179 case-D submissions | `graph_trials.tsv`, `drug_only_trials.tsv` |
+| P3 | candidates | **rebuilt 2026-09-30 under D35 + D36** — routes: label 3,572 · C 3,034 · D 3,168 · review 279 · guard 1,043 · biosimilar 199; units with candidates B 3,737 · C 2,358 · D 125; recall 78.1% (earliest) | `candidates.jsonl`, `submission_routes.tsv` 2026-09-30 |
 | P4 | identify, pick-one v1 | done on the old shortlists — 3,668 units (commit da0f281); **replaced by D33/D35**, kept for comparison | |
 | P4 | D33 pilot | **obsolete, archived** — built on the pre-D34 order; 27/50 decided | `adjudication/archive/d33-pilot-pre-d35/` |
 | P4 | cases C and D (D35) | **code done 2026-09-29**, not run | prompt `trial-candidate-match-nolabel` v1 |

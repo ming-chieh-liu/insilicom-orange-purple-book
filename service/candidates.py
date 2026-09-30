@@ -385,6 +385,7 @@ def pick_indication(heading_ids: list[str], chosen_ids: list[str]) -> str:
 ROUTE_LABEL = "label"          # the submission holds a §14 description of its own (A/B)
 ROUTE_GUARD = "guard"          # D24: read for D16, never judged
 ROUTE_BIOSIMILAR = "biosimilar_copied_label"
+ROUTE_REVIEW = "review"        # D35 (2026-09-30): the FDA review names a pivotal/supporting trial
 
 
 class SubmissionRoute(NamedTuple):
@@ -430,14 +431,18 @@ def route(
     chosen_ids: Mapping[str, list[str]],
     drug_of_app: Mapping[str, set[str]],
     borrowed: set[str],
+    review_linked: frozenset[str] = frozenset(),
 ) -> list[tuple[str, str]]:
     """D35: which case each trial-relevant submission ``(key, trial_scope)`` is.
 
     ``label`` when it owns a §14 description (cases A/B, handled per
     description); ``guard`` for a D24 submission; ``biosimilar_copied_label``
     for a 351(k) whose drug resolved only through its reference product's
-    stem, whose trials legally cannot be its evidence; otherwise ``C`` when it
-    has a chosen indication and ``D`` when it has none.
+    stem, whose trials legally cannot be its evidence; ``review`` when its FDA
+    review names a trial judged PIVOTAL or SUPPORTING (``review_linked``) — the
+    evidence is already identified at tier A, so no weaker C/D search is run;
+    otherwise ``C`` when it has a chosen indication and ``D`` when it has none.
+    A review naming only non-linking trials (PK, failed, …) does not count.
 
     >>> route([("A|ORIG|1", "full"), ("B|ORIG|1", "guard"), ("C|ORIG|1", "full"),
     ...        ("D|ORIG|1", "full"), ("E|ORIG|1", "full")],
@@ -453,6 +458,8 @@ def route(
             case = ROUTE_GUARD
         elif drug_of_app.get(application, set()) & borrowed:
             case = ROUTE_BIOSIMILAR
+        elif key in review_linked:
+            case = ROUTE_REVIEW
         elif chosen_ids.get(key):
             case = CASE_C
         else:
@@ -1017,6 +1024,7 @@ __all__ = [
     "ROUTE_BIOSIMILAR",
     "ROUTE_GUARD",
     "ROUTE_LABEL",
+    "ROUTE_REVIEW",
     "indication_allows",
     "owned_submissions",
     "read_chosen_text",
@@ -1054,6 +1062,7 @@ def build(
     archive: TrialArchive,
     out_dir: Path,
     ancestors: Mapping[str, frozenset[str]] | None = None,
+    review_linked: frozenset[str] = frozenset(),
 ) -> CandidatesReport:
     """Collapse the descriptions, index the registry, and shortlist each unit.
 
@@ -1208,7 +1217,7 @@ def build(
     routes = route(
         [(f"{r.application}|{r.submission_type}|{r.submission_no}", r.trial_scope)
          for r in spine.rows if r.trial_relevant == "true"],
-        owned_submissions(units), chosen_ids, drug_of_app, borrowed,
+        owned_submissions(units), chosen_ids, drug_of_app, borrowed, review_linked,
     )
     chosen_text = read_chosen_text(out_dir)
     drug_only = read_drug_only(out_dir)

@@ -207,7 +207,7 @@ code says `not yet implemented` until it lands.
   every id of the submission's own letter + label §1, instead of refusing on two. Condition still
   ranks, never filters. Why: 36% of judged descriptions had no id and an exact filter lost 51% of
   answers; detail `docs/DESIGN.md` §3.
-- **D35 — route by what the FDA documents give; four tiers; indication filters before the cap**
+- **[PARTIALLY SUPERSEDED by D36, 2026-09-30 — a submission whose FDA review names a PIVOTAL or SUPPORTING trial is case A and gets no C/D unit]** **D35 — route by what the FDA documents give; four tiers; indication filters before the cap**
   (2026-09-29, **implemented in code 2026-09-29; not yet run**). Tiers are defined in `docs/TIERS.md`.
   **A**: an FDA document names the trial (label NCT, review protocol id, label name = review id) →
   role judge (P4r, P4b) keeps pivotal/supporting. **B**: a §14 description with no id → drug + date
@@ -223,6 +223,13 @@ code says `not yet implemented` until it lands.
   Why: the user's routing — the tier-C trigger was a missing label, the real gap a missing
   indication. Measured: the filter nets −28 of 2,412 label-stated answers (115 dropped, 87
   recovered from below the cap) and cuts judge calls 17,662 → 13,983 (−21%).
+- **D36 — a submission whose review names a linking trial is not searched as case C/D**
+  (2026-09-30, **implemented in code 2026-09-30; P3 rebuilt**). P3 routes it `review` (tier A via
+  P4r) when the FDA review names a trial judged PIVOTAL or SUPPORTING; one whose review trials are
+  all non-linking (PK, other, failed, not for this approval) stays C/D. A §14 description (case B)
+  is judged regardless. Why: the evidence is already identified, and a drug + indication search
+  would only add a weaker link. Measured: 279 submissions routed `review`; C/D units with
+  candidates 2,734 → 2,483 (−251).
 
 ## Current status and to-do
 
