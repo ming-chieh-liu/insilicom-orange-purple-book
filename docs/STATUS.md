@@ -15,7 +15,7 @@ row says what was checked.
 | P2a | labels | **done, 28 PDFs never fetched** | 6,423 of 6,451 PDFs cached, 1 unreadable, 114 scanned; re-read offline 2026-09-29 (D34 `heading_full`) |
 | P2b | letters | **done, 66 letters never fetched** | 6,596 of 6,662 in-scope letter URLs cached (99.0%); `letter_indications.tsv` 2026-09-25; letter agent 653 units located and verified (commit 3b61ff1) |
 | P2c | reviews — download + protocol-id parse | **download ~99% complete, not 100%**: 60 review documents (20 PDFs, 40 table-of-contents pages) and 71 TOC component PDFs never fetched; runbook step 1.1 (retry the `&amp;` components and earlier 404s) **was never run**. Parse done on what is cached | 3,045 + 3,353 documents and 10,418 components cached; `review_trial_mentions.tsv` and 4,825 role units written 2026-09-25 11:31, after the last download |
-| P2c | reviews — **role judging (P4r)** | **not done: 966 of 4,825 units (20%)** | commit ccedc8d; later raw files on disk, uncombined |
+| P2c | reviews — **role judging (P4r)** | **done 2026-09-30**: 4,825 of 4,825 decided under prompt v2 (PIVOTAL 1,469 · SUPPORTING 723 · PK_CLINPHARM 1,275 · OTHER 946 · NOT_FOR_THIS_APPROVAL 320 · FAILED 92) | commits ed91306, 283e378, 730e040, e6a2e11 |
 | P2i | indication table | **done, rebuilt 2026-09-29 (D34)** | `submission_indications.tsv` |
 | P2g | literature candidates (`graph-trials`) | **stale** — built 2026-09-25 on the pre-D34 indications; D35 adds protocol ids | `graph_trials.tsv` 2026-09-25 |
 | P3 | candidates | **rebuilt 2026-09-29 but superseded by D35** (no filter, no cap rule, stale graph input) | `candidates.jsonl` 2026-09-29 |

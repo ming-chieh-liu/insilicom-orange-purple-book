@@ -229,8 +229,8 @@ code says `not yet implemented` until it lands.
 Full detail, evidence and commands: **`docs/STATUS.md`** (audited 2026-09-29) — read it at the
 start of a session and update it when a stage finishes or pauses. As of 2026-09-29:
 
-1. **P2c review download is ~99%, not done** — 131 files never fetched and the retry step never
-   run; **P4r review roles 966 / 4,825**.
+1. **P2c review route done** — download as complete as FDA allows (118 of 131 missing files are
+   404 on FDA); **P4r review roles 4,825 / 4,825 decided (2026-09-30)**.
 2. **D34 implemented and rebuilt through P3; D35 implemented in code (Phase 1 done); both uncommitted.**
 3. Next (Phase 2): finish the review download → rebuild P2g (`graph-trials`, `graph-links`) → P3 → pilots B and C/D (two
    judges) → full runs (one judge) with P4r alongside → P5 → D28 → P5 → P6.
