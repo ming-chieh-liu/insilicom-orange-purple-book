@@ -177,7 +177,7 @@ def test_a_judged_link_with_agreeing_counts_reaches_tier_a(
                 "judge_b": "NCT02578680",
                 "tiebreak": None,
                 "final": "NCT02578680",
-                "prompt_version": 1,
+                "prompt_version": 3,
             }
         )
         + "\n",
@@ -214,7 +214,7 @@ def test_a_judged_link_whose_counts_diverge_is_demoted(
                 "judge_b": "NCT01733316",
                 "tiebreak": None,
                 "final": "NCT01733316",
-                "prompt_version": 1,
+                "prompt_version": 3,
             }
         )
         + "\n",
@@ -238,7 +238,7 @@ def test_a_judged_none_is_recorded_as_unlinked(
                 "judge_b": "NONE",
                 "tiebreak": None,
                 "final": "NONE",
-                "prompt_version": 1,
+                "prompt_version": 3,
             }
         )
         + "\n",
@@ -678,7 +678,7 @@ def test_non_linking_roles_are_context_and_v1_is_ignored(workspace: tuple[Path, 
 def _identify(adj: Path, unit_id: str, final: str) -> None:
     (adj / "identify_verdicts.jsonl").write_text(json.dumps({
         "unit_id": unit_id, "judge_a": final, "judge_b": final, "tiebreak": None,
-        "final": final, "prompt_version": 1,
+        "final": final, "prompt_version": 3,
     }) + "\n", encoding="utf-8")
 
 
@@ -859,68 +859,91 @@ def test_a_label_role_rejecting_what_the_review_links_is_role_disagrees(
 
 
 # ---------------------------------------------------------------------------
-# Tier C joins P5 (D14, D31) — never above, never moving, a stronger link
+# Tiers C and D join P5 (D35) — never above, never moving, a stronger link
 # ---------------------------------------------------------------------------
 
 
-def _graph_picks(adj: Path, rows: list[tuple[str, str, int]]) -> None:
-    (adj / "graph_verdicts.jsonl").write_text("\n".join(
-        json.dumps({"unit_id": f"{key}|graph", "final": nct, "prompt_version": v})
-        for key, nct, v in rows) + "\n", encoding="utf-8")
+def _case_unit(key: str, case: str, ncts: list[str]) -> dict[str, object]:
+    application, submission_type, submission_no = key.split("|")
+    return {
+        "unit_id": f"{key}|{'indication' if case == 'C' else 'drug_only'}",
+        "application": application, "submission_type": submission_type,
+        "submission_no": submission_no, "approval_date": "2019-01-01",
+        "heading": "", "indication_mesh": "", "drug_mesh": "MESH:C582435",
+        "stated_nct": "", "acronym": "", "enrollment": "", "excerpt": "",
+        "candidates": [{"nct_id": n, "enrollment": "500"} for n in ncts], "case": case,
+    }
 
 
-def test_a_graph_pick_on_an_unlinked_submission_is_a_tier_c_link(
+def _picks(adj: Path, rows: list[tuple[str, str]]) -> None:
+    with (adj / "identify_verdicts.jsonl").open("a", encoding="utf-8") as handle:
+        for unit_id, nct in rows:
+            handle.write(json.dumps({"unit_id": unit_id, "judge_a": nct, "judge_b": "",
+                                     "final": nct, "prompt_version": 3}) + "\n")
+
+
+def test_a_case_c_pick_is_a_tier_c_link_and_a_case_d_pick_tier_d(
     workspace: tuple[Path, Path],
 ) -> None:
     out, adj = workspace
-    _write_units(out, [_unit()])
-    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT07777777", 2)])
-    link = next(l for l in assemble.build(out, adj).links if l.nct_id == "NCT07777777")
-    assert (link.evidence_tier, link.evidence_source, link.sources) == (
-        "C", "kg_abstract", "kg_abstract")
-    assert link.submission_no == "45"
+    _write_units(out, [_unit(), _case_unit("BLA125514|SUPPL|45", "C", ["NCT07777777"]),
+                       _case_unit("NDA021029|SUPPL|38", "D", ["NCT07777778"])])
+    _picks(adj, [("BLA125514|SUPPL|45|indication", "NCT07777777"),
+                 ("NDA021029|SUPPL|38|drug_only", "NCT07777778")])
+    got = {l.nct_id: l for l in assemble.build(out, adj).links}
+    assert (got["NCT07777777"].evidence_tier, got["NCT07777777"].evidence_source) == (
+        "C", "indication_candidate")
+    assert (got["NCT07777778"].evidence_tier, got["NCT07777778"].sources) == ("D", "kg_abstract")
+    assert got["NCT07777777"].registry_enrollment == "500"
 
 
-def test_a_graph_pick_agreeing_with_a_label_link_only_adds_a_source(
+def test_a_case_pick_agreeing_with_a_label_link_only_adds_a_source(
     workspace: tuple[Path, Path],
 ) -> None:
     out, adj = workspace
-    _write_units(out, [_unit()])
-    _graph_picks(adj, [("BLA125514|SUPPL|35", "NCT02578680", 2)])
+    _write_units(out, [_unit(), _case_unit("BLA125514|SUPPL|35", "D", ["NCT02578680"])])
+    _picks(adj, [("BLA125514|SUPPL|35|drug_only", "NCT02578680")])
     [link] = assemble.build(out, adj).links
     assert link.evidence_tier == "A" and link.sources == "label_nct;kg_abstract"
 
 
-def test_a_graph_pick_never_moves_a_trial_another_route_attributes(
+def test_a_case_pick_never_moves_a_trial_another_route_attributes(
     workspace: tuple[Path, Path],
 ) -> None:
     out, adj = workspace
-    _write_units(out, [_unit()])
-    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT02578680", 2)])
+    _write_units(out, [_unit(), _case_unit("BLA125514|SUPPL|45", "C", ["NCT02578680"])])
+    _picks(adj, [("BLA125514|SUPPL|45|indication", "NCT02578680")])
     links = assemble.build(out, adj).links
     assert [(l.submission_no, l.evidence_tier) for l in links] == [("35", "A")]
 
 
-def test_among_graph_picks_the_earliest_submission_keeps_the_trial(
+def test_among_case_picks_the_higher_tier_then_the_earliest_keeps_the_trial(
     workspace: tuple[Path, Path],
 ) -> None:
     out, adj = workspace
-    _write_units(out, [_unit()])
-    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT07777777", 2),
-                       ("BLA125514|SUPPL|35", "NCT07777777", 2),
-                       ("BLA999999|ORIG|1", "NCT07777778", 2),      # not in the spine
-                       ("BLA125514|SUPPL|45", "NCT07777779", 1)])   # old prompt version
-    graph = [l for l in assemble.build(out, adj).links if l.evidence_tier == "C"]
-    assert [(l.nct_id, l.submission_no) for l in graph] == [("NCT07777777", "35")]
+    d_early = _case_unit("BLA125514|SUPPL|35", "D", ["NCT07777777"])
+    c_late = _case_unit("BLA125514|SUPPL|45", "C", ["NCT07777777"])
+    outside = _case_unit("BLA999999|ORIG|1", "C", ["NCT07777778"])     # not in the spine
+    _write_units(out, [d_early, c_late, outside])
+    _picks(adj, [(str(d_early["unit_id"]), "NCT07777777"), (str(c_late["unit_id"]), "NCT07777777"),
+                 (str(outside["unit_id"]), "NCT07777778")])
+    links = [l for l in assemble.build(out, adj).links if l.evidence_tier in "CD"]
+    assert [(l.nct_id, l.submission_no, l.evidence_tier) for l in links] == [
+        ("NCT07777777", "45", "C")]
 
 
-def test_a_later_none_verdict_withdraws_a_graph_pick(workspace: tuple[Path, Path]) -> None:
-    """Append-only: the last verdict for a unit wins, so a re-judged NONE removes it."""
+def test_undecided_and_none_case_units_are_unlinked_with_a_reason(
+    workspace: tuple[Path, Path],
+) -> None:
     out, adj = workspace
-    _write_units(out, [_unit()])
-    _graph_picks(adj, [("BLA125514|SUPPL|45", "NCT07777777", 2),
-                       ("BLA125514|SUPPL|45", "NONE", 2)])
-    assert all(l.evidence_tier != "C" for l in assemble.build(out, adj).links)
+    none = _case_unit("BLA125514|SUPPL|45", "C", ["NCT07777777"])
+    pending = _case_unit("NDA021029|SUPPL|36", "D", ["NCT07777778"])
+    empty = {**_case_unit("BLA125514|SUPPL|35", "C", []), "drug_mesh": ""}
+    _write_units(out, [none, pending, empty])
+    _picks(adj, [(str(none["unit_id"]), "NONE")])
+    reasons = {(u.submission_no, u.reason) for u in assemble.build(out, adj).unlinked}
+    assert {("45", "judged_none"), ("36", "not_yet_judged"),
+            ("35", "no_drug_resolved")} <= reasons
 
 
 def test_the_graph_cross_check_corroborates_without_a_judge(
@@ -944,3 +967,17 @@ def test_the_cross_check_is_silent_when_the_literature_does_not_name_it(
     (out / "graph_trials.tsv").write_text(
         "application\tnct_id\tmentions\nBLA999999\tNCT02578680\t3\n", encoding="utf-8")
     assert assemble.build(out, adj).links[0].sources == "label_nct"
+
+
+def test_an_identification_made_before_d35_is_not_linked(workspace: tuple[Path, Path]) -> None:
+    """Pick-one (v1) and first-pilot (v2) answers were made on the pre-D35
+    shortlists; until re-decided the description is not_yet_judged."""
+    out, adj = workspace
+    unit = _unit(stated_nct="", unit_id="BLA125514|SUPPL|35|KEYNOTE-189")
+    _write_units(out, [unit])
+    (adj / "identify_verdicts.jsonl").write_text(json.dumps(
+        {"unit_id": unit["unit_id"], "judge_a": "NCT02578680", "judge_b": "NCT02578680",
+         "final": "NCT02578680", "prompt_version": 2}) + "\n", encoding="utf-8")
+    report = assemble.build(out, adj)
+    assert report.links == ()
+    assert [u.reason for u in report.unlinked if u.submission_no == "35"] == ["not_yet_judged"]

@@ -618,3 +618,44 @@ def test_a_drug_only_candidate_with_no_registry_record_is_dropped(workspace: Pat
     )
     [unit] = report.units
     assert [c.nct_id for c in unit.candidates] == ["NCT00000101"]
+
+
+# --- D35: protocol ids in abstracts, case D scope, one walk per drug ---------
+
+
+def test_a_protocol_id_in_an_abstract_names_its_trial_once() -> None:
+    repo = _repository([], [
+        {"pmid": "1", "abstract": "In Study DR-103-301 (NCT00000009) and Study AB-12",
+         "articleTitle": "a", "publicationType": []},
+        {"pmid": "2", "abstract": "Results of Study DR-103-301.", "articleTitle": "b",
+         "publicationType": []},
+    ])
+
+    def resolve(text: str) -> list[tuple[str, str]]:
+        return [("NCT00000009", "DR-103-301")] if "DR-103-301" in text else []
+
+    found = repo.mentions_in(["1", "2"], resolve)
+    assert [(m.pmid, m.nct_id, m.protocol_id) for m in found] == [
+        ("1", "NCT00000009", ""), ("2", "NCT00000009", "DR-103-301")]
+    [candidate] = graph_links.rank(found[1:])
+    assert candidate.protocol_id == "DR-103-301"
+    assert graph_links.rank(found)[0].protocol_id == ""
+
+
+def test_submissions_of_one_drug_share_one_literature_walk(workspace: Path) -> None:
+    (workspace / "submission_indications.tsv").write_text(
+        "application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext\tmesh_id"
+        "\tbiokdeid\tterm\tchosen\nNDA999999\tORIG\t1\tletter\t\tx\tMESH:D1\tb1\tOne\ttrue\n",
+        encoding="utf-8")
+    repo = _graph([_treats("d1", "Dwarfism", ["1"])], [_paper("1", "NCT00000101")])
+    report = graph_links.build(
+        workspace, repo, {"NCT00000101": ("2001-01-01", "200", "PHASE3", "2003-01-01")},
+        {"NDA000002|ORIG|1", "NDA019640|SUPPL|58"},
+        {"NDA000002": frozenset({"SOMATROPIN"}), "NDA019640": frozenset({"SOMATROPIN"})},
+    )
+    assert len(report.units) == 2
+    walks = [q for q in repo._relations.queries if "relationship_type" in q]
+    assert len(walks) == 1
+    rows = graph_links.drug_only_rows(report.units)
+    assert [(r.application, r.nct_id, r.diseases) for r in rows] == [
+        ("NDA000002", "NCT00000101", "Dwarfism"), ("NDA019640", "NCT00000101", "Dwarfism")]

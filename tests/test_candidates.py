@@ -105,6 +105,33 @@ def test_a_heading_naming_no_disease_falls_back_to_the_submission() -> None:
     assert candidates.pick_indication([], []) == ""
 
 
+def test_pick_indications_keeps_every_disease_instead_of_refusing() -> None:
+    """D34: a two-disease heading ranks on both; no heading falls back to all
+    of the submission's own documents."""
+    assert candidates.pick_indications(["MESH:D008545", "MESH:D008175"], ["MESH:D1"]) == (
+        "MESH:D008175", "MESH:D008545")
+    assert candidates.pick_indications([], ["MESH:D1", "MESH:D2", "MESH:D1"]) == (
+        "MESH:D1", "MESH:D2")
+    assert candidates.pick_indications([], []) == ()
+
+
+def test_read_submission_ids_takes_own_documents_not_openfda(tmp_path: Path) -> None:
+    (tmp_path / "submission_indications.tsv").write_text(
+        "application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext"
+        "\tmesh_id\tbiokdeid\tterm\tchosen\n"
+        "NDA211651\tSUPPL\t10\tletter\t\tx\tMESH:D011471\tb\tt\ttrue\n"
+        "NDA211651\tSUPPL\t10\tlabel_section_1\t\tx\tMESH:D001943\tb\tt\tfalse\n"
+        "NDA211651\tSUPPL\t10\tlabel_section_1\t\tx\tMESH:D001943\tb\tt\tfalse\n"
+        "NDA211651\tSUPPL\t10\tlabel_14_heading\tH\tH\tMESH:D5\tb\tt\tfalse\n"
+        "NDA211651\tSUPPL\t10\topenfda_current\t\t\tMESH:D6\tb\tt\tfalse\n"
+        "NDA211651\tSUPPL\t10\tletter\t\tx\t\t\t\tfalse\n",
+        encoding="utf-8",
+    )
+    assert candidates.read_submission_ids(tmp_path) == {
+        "NDA211651|SUPPL|10": ["MESH:D011471", "MESH:D001943"]
+    }
+
+
 def test_read_indications_splits_headings_from_chosen(tmp_path: Path) -> None:
     (tmp_path / "submission_indications.tsv").write_text(
         "application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext"
@@ -191,6 +218,17 @@ def test_a_long_list_is_ranked_not_cut() -> None:
     )
     assert len(got) == candidates.CANDIDATE_CAP
     assert {"NCT1", "NCT2"} <= {c.nct_id for c in got}
+
+
+def test_several_indications_rank_a_match_on_any_of_them_first() -> None:
+    """D34: a description about two diseases ranks trials of either first."""
+    studies = {f"NCT{n}": _candidate(f"NCT{n}") for n in range(5)}
+    by_condition = {"MESH:D1": {"NCT3"}, "MESH:D2": {"NCT4"}}
+    got = candidates.shortlist(
+        {"MESH:X"}, ("MESH:D1", "MESH:D2"), "", studies,
+        {"MESH:X": set(studies)}, by_condition,
+    )
+    assert [c.nct_id for c in got][:2] == ["NCT3", "NCT4"]
 
 
 def test_the_stated_count_ranks_a_long_list() -> None:
@@ -423,7 +461,11 @@ def test_a_name_the_submissions_review_resolved_skips_the_shortlist(
 
 
 def _run_pass(
-    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mentions: str = ""
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, mentions: str = "",
+    extra_rows: tuple["candidates.approval_events.EventRow", ...] = (),
+    files: dict[str, str] | None = None,
+    ancestors: dict[str, frozenset[str]] | None = None,
+    facts: tuple[trial_studies.StudyFacts, ...] = (),
 ) -> "candidates.CandidatesReport":
     out = tmp_path / "output"
     out.mkdir()
@@ -451,7 +493,7 @@ def _run_pass(
     monkeypatch.setattr(
         candidates.trial_studies,
         "read_study_facts",
-        lambda archive: iter([_facts("NCT02578680")]),
+        lambda archive: iter([_facts("NCT02578680"), *facts]),
     )
     monkeypatch.setattr(
         candidates.approval_events,
@@ -463,6 +505,7 @@ def _run_pass(
                     "Efficacy-New Indication", "2018-08-20", "2008+", "P",
                     "false", "true", "true",
                 ),
+                *extra_rows,
             ),
             submissions_seen=1, approved=1, applications=1,
             indication_changing=1, trial_relevant=1, originals=0,
@@ -477,9 +520,100 @@ def _run_pass(
     )
     if mentions:
         (out / "review_trial_mentions.tsv").write_text(mentions, encoding="utf-8")
+    for name, text in (files or {}).items():
+        (out / name).write_text(text, encoding="utf-8")
     return candidates.build(
-        object(), object(), out  # type: ignore[arg-type]
+        object(), object(), out, ancestors=ancestors  # type: ignore[arg-type]
     )
+
+
+def _event(number: str, date: str, scope: str = "full") -> "candidates.approval_events.EventRow":
+    return candidates.approval_events.EventRow(
+        "BLA125514", "BLA", "SUPPL", number, "Efficacy", "Efficacy-New Indication",
+        date, "2008+", "P", "false", "true", "true", "EFFICACY", scope)
+
+
+_INDICATIONS_HEAD = ("application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext"
+                     "\tmesh_id\tbiokdeid\tterm\tchosen\n")
+
+
+def test_submissions_without_their_own_description_become_cases_c_and_d(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D35: SUPPL 50 has an indication and no label → C, its candidates the
+    drug pool; SUPPL 51 has none → D, its candidates the drug-only literature;
+    a guard submission is never a case."""
+    report = _run_pass(
+        tmp_path, monkeypatch,
+        extra_rows=(_event("50", "2019-01-01"), _event("51", "2020-01-01"),
+                    _event("52", "2020-01-01", "guard")),
+        files={
+            "submission_indications.tsv": _INDICATIONS_HEAD
+            + "BLA125514\tSUPPL\t50\tletter\t\tprovides for NSCLC\tMESH:D002289\tb\tt\ttrue\n",
+            "drug_only_trials.tsv": "application\tsubmission_type\tsubmission_no\tnct_id"
+            "\tmentions\tdiseases\tprotocol_id\n"
+            "BLA125514\tSUPPL\t51\tNCT02578680\t2\tMelanoma\t\n"
+            "BLA125514\tSUPPL\t51\tNCT00000404\t1\tMelanoma\t\n",
+        },
+    )
+    routes = dict(report.routes)
+    assert (routes["BLA125514|SUPPL|35"], routes["BLA125514|SUPPL|50"],
+            routes["BLA125514|SUPPL|51"], routes["BLA125514|SUPPL|52"]) == (
+        "label", "C", "D", "guard")
+    c = next(u for u in report.units if u.case == "C")
+    d = next(u for u in report.units if u.case == "D")
+    assert c.unit_id == "BLA125514|SUPPL|50|indication" and c.indication_text == "provides for NSCLC"
+    assert [x.nct_id for x in c.candidates] == ["NCT02578680"] and c.drug == "PEMBROLIZUMAB"
+    assert [(x.nct_id, x.found_under) for x in d.candidates] == [("NCT02578680", "Melanoma")]
+    assert (report.case_c_with_candidates, report.case_d_with_candidates) == (1, 1)
+    assert "case D units with candidates                     1" in candidates.render(report)
+
+
+def test_the_indication_filter_runs_before_the_cap_but_spares_the_literature(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A trial registered for an unrelated disease leaves the pool; one with no
+    condition id stays; the literature's own candidate is never filtered."""
+    melanoma = trial_studies.StudyFacts(
+        nct_id="NCT00000002", brief_title="t", org_study_id="", acronym="",
+        start_date="2015-01-01", phases=("PHASE3",), enrollment="100",
+        interventions=("Keytruda",), conditions=("Melanoma",),
+        derived_condition_mesh=("MESH:D008545",))
+    report = _run_pass(
+        tmp_path, monkeypatch,
+        facts=(melanoma,),
+        ancestors={"MESH:D002289": frozenset(), "MESH:D008545": frozenset()},
+        files={"submission_indications.tsv": _INDICATIONS_HEAD
+               + "BLA125514\tSUPPL\t35\tlabel_14_heading\tNSCLC\tNSCLC\tMESH:D002289\tb\tt\tfalse\n"},
+    )
+    unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
+    assert [c.nct_id for c in unit.candidates] == ["NCT02578680"]
+
+
+def test_a_literature_candidate_is_never_filtered_on_the_indication(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    melanoma = trial_studies.StudyFacts(
+        nct_id="NCT00000002", brief_title="t", org_study_id="", acronym="",
+        start_date="2015-01-01", phases=("PHASE3",), enrollment="100",
+        interventions=("Other drug",), conditions=("Melanoma",),
+        derived_condition_mesh=("MESH:D008545",))
+    report = _run_pass(
+        tmp_path, monkeypatch, facts=(melanoma,),
+        ancestors={"MESH:D002289": frozenset(), "MESH:D008545": frozenset()},
+        files={"submission_indications.tsv": _INDICATIONS_HEAD
+               + "BLA125514\tSUPPL\t35\tlabel_14_heading\tNSCLC\tNSCLC\tMESH:D002289\tb\tt\tfalse\n",
+               "graph_trials.tsv": "application\tnct_id\tmentions\tvia\nBLA125514\tNCT00000002\t1\tprotocol\n"},
+    )
+    unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
+    assert {c.nct_id for c in unit.candidates} == {"NCT02578680", "NCT00000002"}
+    assert next(c for c in unit.candidates if c.nct_id == "NCT00000002").injected
+
+
+def test_route_and_ownership_edge_cases() -> None:
+    assert candidates.route([("X|ORIG|1", "full")], set(), {}, {}, set()) == [("X|ORIG|1", "D")]
+    assert candidates.read_drug_only(Path("/nonexistent")) == {}
+    assert candidates.read_chosen_text(Path("/nonexistent")) == {}
 
 
 _MENTIONS_HEAD = ("application\tsubmission_type\tsubmission_no\tprotocol_id\tnct_id"

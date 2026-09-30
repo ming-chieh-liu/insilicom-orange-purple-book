@@ -28,7 +28,7 @@ from __future__ import annotations
 
 import csv
 from collections import Counter, defaultdict
-from collections.abc import Mapping
+from collections.abc import Callable, Iterable, Mapping
 from pathlib import Path
 from typing import NamedTuple
 
@@ -106,6 +106,9 @@ class GraphCandidate(NamedTuple):
     #: trial is about when the approval's own indication is unknown.
     diseases: str = ""
     primary_completion: str = ""
+    #: The protocol id an abstract used for it, when no abstract printed the
+    #: NCT id (D35); empty otherwise.
+    protocol_id: str = ""
 
 
 #: How a unit's candidates were gathered.
@@ -181,6 +184,7 @@ def rank(mentions: list[Mention]) -> list[GraphCandidate]:
     out: list[GraphCandidate] = []
     for nct, group in grouped.items():
         typed = next((m for m in group if m.is_trial_report), group[0])
+        by_protocol = "" if any(not m.protocol_id for m in group) else group[0].protocol_id
         out.append(
             GraphCandidate(
                 nct_id=nct,
@@ -191,6 +195,7 @@ def rank(mentions: list[Mention]) -> list[GraphCandidate]:
                 start_date="",
                 enrollment="",
                 phases="",
+                protocol_id=by_protocol,
             )
         )
     return sorted(out, key=lambda c: (not c.trial_report, -c.mentions, c.nct_id))
@@ -281,8 +286,11 @@ __all__ = [
     "GraphUnit",
     "BASIS_DRUG_ONLY",
     "BASIS_INDICATION",
+    "DrugOnlyTrial",
     "build",
     "completed_by",
+    "drug_only_rows",
+    "no_indication_scope",
     "exhausted_only",
     "rank",
     "render",
@@ -299,6 +307,7 @@ def build(
     ingredients: dict[str, frozenset[str]],
     limit: int | None = None,
     budget: int = ABSTRACT_BUDGET,
+    resolve: Callable[[str], list[tuple[str, str]]] | None = None,
 ) -> GraphReport:
     """Gather graph candidates for approvals the label route did not serve.
 
@@ -315,6 +324,11 @@ def build(
     best-scored ones read, and their registry ids offered with the disease each
     came from. Such a unit is marked :data:`BASIS_DRUG_ONLY` and is also held to
     the primary-completion bound. The indication path is unchanged.
+
+    Under D35 the caller passes the submissions with **no indication** (case
+    D), so the drug-only path is the one that runs; its walk depends only on
+    the drug, so it is done once per drug set and reused across that drug's
+    submissions. ``resolve`` also reads full protocol ids in the abstracts.
     """
     spine = {
         f"{r['application']}|{r['submission_type']}|{r['submission_no']}": r
@@ -345,6 +359,7 @@ def build(
     considered = with_drug = with_disease = with_edge = with_candidates = 0
     drug_only = drug_only_found = 0
     sizes: Counter[int] = Counter()
+    walked: dict[frozenset[str], tuple[list[Mention], dict[str, list[str]], int]] = {}
 
     for key in sorted(unserved):
         if key not in spine:
@@ -367,7 +382,8 @@ def build(
             continue
         if not diseases:
             drug_only += 1
-            unit = _drug_only_unit(key, row, drugs, repository, studies, budget)
+            unit = _drug_only_unit(key, row, drugs, repository, studies, budget,
+                                   resolve, walked)
             if unit is not None:
                 unit = unit._replace(
                     drug=_names(ingredients.get(row["application"], frozenset())))
@@ -381,6 +397,11 @@ def build(
                 break
             continue
 
+        # DEPRECATED since D35: literature for a drug + indication is now a P3
+        # candidate source (graph_trials.tsv); this path runs only when a
+        # caller passes submissions that have an indication.
+        _log.warning("graph_links: %s has an indication — the indication basis is "
+                     "deprecated (D35); its literature is P3's graph_trials.tsv", key)
         pmids: list[str] = []
         pair: tuple[str, str] = ("", "")
         term = ""
@@ -396,7 +417,7 @@ def build(
             continue
         with_edge += 1
 
-        mentions = repository.mentions_in(pmids[:budget])
+        mentions = repository.mentions_in(pmids[:budget], resolve)
         candidates = within_date(rank(mentions), row["approval_date"])
         candidates = [_with_registry(candidate, studies) for candidate in candidates]
         candidates = within_date(candidates, row["approval_date"])
@@ -441,6 +462,54 @@ def build(
     )
 
 
+def no_indication_scope(
+    spine_rows: list[dict[str, str]], chosen: Mapping[str, object]
+) -> set[str]:
+    """Case D's search scope (D35): in-scope submissions with no indication.
+
+    Every trial-relevant, non-guard submission (D24) whose indication table
+    holds no chosen indication. P3 later keeps a D unit only for a submission
+    the label route does not serve, so this may be wider than the final set.
+
+    >>> rows = [{"application": "NDA1", "submission_type": "ORIG", "submission_no": "1",
+    ...          "trial_relevant": "true", "trial_scope": "core"},
+    ...         {"application": "NDA2", "submission_type": "ORIG", "submission_no": "1",
+    ...          "trial_relevant": "true", "trial_scope": "guard"},
+    ...         {"application": "NDA3", "submission_type": "ORIG", "submission_no": "1",
+    ...          "trial_relevant": "true", "trial_scope": "core"}]
+    >>> sorted(no_indication_scope(rows, {"NDA3|ORIG|1": {("1", "x")}}))
+    ['NDA1|ORIG|1']
+    """
+    return {
+        f"{r['application']}|{r['submission_type']}|{r['submission_no']}"
+        for r in spine_rows
+        if r.get("trial_relevant") == "true" and r.get("trial_scope") != "guard"
+        and f"{r['application']}|{r['submission_type']}|{r['submission_no']}" not in chosen
+    }
+
+
+class DrugOnlyTrial(NamedTuple):
+    """One case-D candidate, as ``drug_only_trials.tsv`` holds it (D35)."""
+
+    application: str
+    submission_type: str
+    submission_no: str
+    nct_id: str
+    mentions: int
+    diseases: str
+    protocol_id: str
+
+
+def drug_only_rows(units: Iterable[GraphUnit]) -> list[DrugOnlyTrial]:
+    """The drug-only units' candidates, flattened for P3, best first."""
+    return [
+        DrugOnlyTrial(u.application, u.submission_type, u.submission_no, c.nct_id,
+                      c.mentions, c.diseases, c.protocol_id)
+        for u in units if u.basis == BASIS_DRUG_ONLY
+        for c in u.candidates
+    ]
+
+
 def _names(ingredients: frozenset[str]) -> str:
     """``"A; B"`` — the approved ingredient names, sorted.
 
@@ -465,16 +534,28 @@ def _drug_only_unit(
     repository: GraphEvidenceRepository,
     studies: Mapping[str, tuple[str, ...]],
     budget: int,
+    resolve: Callable[[str], list[tuple[str, str]]] | None = None,
+    walked: dict[frozenset[str], tuple[list[Mention], dict[str, list[str]], int]] | None = None,
 ) -> GraphUnit | None:
-    """The D31 unit for an approval with a drug and no indication, or None."""
-    edges: list[TreatmentEdge] = []
-    for drug in sorted(drugs)[:3]:
-        edges.extend(repository.treatment_edges(drug))
-    edges.sort(key=lambda e: (-e.score, e.disease_biokdeid))
-    pmids, diseases_of = treatment_pmids(edges, budget)
-    if not pmids:
+    """The D31 unit for an approval with a drug and no indication, or None.
+
+    ``walked`` caches the literature walk per drug set: it does not depend on
+    the submission, only the date bounds applied after it do.
+    """
+    cache = walked if walked is not None else {}
+    held = cache.get(frozenset(drugs))
+    if held is None:
+        edges: list[TreatmentEdge] = []
+        for drug in sorted(drugs)[:3]:
+            edges.extend(repository.treatment_edges(drug))
+        edges.sort(key=lambda e: (-e.score, e.disease_biokdeid))
+        pmids, diseases_of = treatment_pmids(edges, budget)
+        found = repository.mentions_in(pmids, resolve) if pmids else []
+        held = (found, diseases_of, len(pmids))
+        cache[frozenset(drugs)] = held
+    mentions, diseases_of, examined = held
+    if not examined:
         return None
-    mentions = repository.mentions_in(pmids)
     found_under: dict[str, list[str]] = defaultdict(list)
     for mention in mentions:
         for name in diseases_of.get(mention.pmid, []):
@@ -502,7 +583,7 @@ def _drug_only_unit(
         drug_biokdeid=sorted(drugs)[0],
         disease_biokdeid="",
         indication_term="",
-        pmids_examined=len(pmids),
+        pmids_examined=examined,
         candidates=tuple(candidates),
         basis=BASIS_DRUG_ONLY,
     )

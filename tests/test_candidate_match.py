@@ -255,3 +255,61 @@ def test_two_judge_combine_writes_the_tiebreak_list(tmp_path: Path) -> None:
     (raw / "tiebreak-001-C.txt").write_text(f"{tid} | NCT00000001 = Yes\n", encoding="utf-8")
     assert "candidate answers recorded                     1" in cm.combine_round(adj, 2)
     assert (adj / cm.TIEBREAK_FILE).read_text() == ""
+
+
+# --- D35: cases C and D, judged with the no-label prompt ---------------------
+
+
+def _case_unit(case: str, n: int = 3) -> dict[str, object]:
+    return {
+        **_unit(n, f"NDA000001|SUPPL|7|{'indication' if case == 'C' else 'drug_only'}"),
+        "case": case, "excerpt": "", "acronym": "", "enrollment": "",
+        "indication_text": "provides for asthma" if case == "C" else "",
+        "drug": "DRUGX",
+        "candidates": [
+            {"nct_id": f"NCT{i:08d}", "brief_title": "t",
+             "found_under": "Asthma" if case == "D" else ""}
+            for i in range(1, n + 1)
+        ],
+    }
+
+
+def test_a_no_label_tier_carries_drug_indication_and_date() -> None:
+    c = cm.build_tier(_case_unit("C"), 1)
+    assert (c.prompt, c.drug, c.indication, c.approval_date) == (
+        cm.NOLABEL_PROMPT, "DRUGX", "provides for asthma", "2020-01-01")
+    d = cm.build_tier(_case_unit("D"), 1)
+    assert d.indication == "not recorded" and "Named in literature on: Asthma" in d.candidates
+    b = cm.build_tier(_unit(2), 1)
+    assert (b.prompt, b.drug, b.indication) == (cm.EXCERPT_PROMPT, "", "")
+
+
+def test_select_units_takes_cases_c_and_d_from_the_candidates_file(tmp_path: Path) -> None:
+    path = tmp_path / "candidates.jsonl"
+    empty = {**_case_unit("D"), "unit_id": "X|ORIG|1|drug_only", "candidates": []}
+    _write_candidates(path, [_unit(2), _case_unit("C"), _case_unit("D"), empty])
+    none = tmp_path / "none.tsv"
+    assert sorted(str(u["case"]) for u in cm.select_units(path, none, none, None, case="CD")) == [
+        "C", "D"]
+    assert [u["case"] for u in cm.select_units(path, none, none, None, case="C")] == ["C"]
+    assert len(cm.select_units(path, none, none, None)) == 1
+
+
+def test_no_label_tiers_get_their_own_batch_files_and_prompt_stamp(tmp_path: Path) -> None:
+    adj = tmp_path / "adj"
+    units = [_unit(2), _case_unit("C", 2)]
+    cm.prepare_round(units, adj)
+    round_dir = adj / cm.BATCH_DIR / "round-01"
+    assert sorted(p.name for p in round_dir.iterdir()) == ["batch-001.ids", "nolabel-001.ids"]
+    tid = (round_dir / "nolabel-001.ids").read_text().split("\n")[0]
+    assert cm.read_tiers(adj / cm.TIERS_FILE)[tid].prompt == cm.NOLABEL_PROMPT
+    raw = adj / cm.RAW_DIR / "round-01"
+    raw.mkdir(parents=True)
+    (raw / "nolabel-001-A.txt").write_text(
+        f"{tid} | NCT00000001 = No\n{tid} | NCT00000002 = Yes\n", encoding="utf-8")
+    cm.combine_round(adj, 1)
+    rows = [json.loads(line) for line in (adj / cm.ANSWERS_FILE).read_text().splitlines()]
+    assert {(r["prompt"], r["prompt_version"]) for r in rows} == {
+        (cm.NOLABEL_PROMPT, cm.NOLABEL_PROMPT_VERSION)}
+    assert len(cm.read_answers(adj / cm.ANSWERS_FILE)) == 2
+    assert "identified a trial                         1" in cm.record_round(units, adj)

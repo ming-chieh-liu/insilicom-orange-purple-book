@@ -261,8 +261,8 @@ def test_a_match_inside_a_longer_match_is_dropped(tmp_path: Path) -> None:
     )
     index = indications.build_index(MeshVocabulary(descriptors=path))
     assert indications.code("indicated for alzheimer disease", index) == {"D000544"}
-    # The generic term still codes when it is the only thing said.
-    assert indications.code("in disease of any kind", index) == {"D004194"}
+    # "Disease" is never an indication, so it codes nothing even alone.
+    assert indications.code("in disease of any kind", index) == set()
 
 
 def test_coding_is_case_insensitive(vocabulary: MeshVocabulary) -> None:
@@ -400,3 +400,60 @@ def test_a_generic_carries_its_ingredient(
     report = indications.build(corpus, vocabulary)
     row = next(r for r in report.rows if r.application == "ANDA000003")
     assert (row.drug, row.unii) == ("ALBUTEROL", "QF8SVZ843E")
+
+
+# --- D34: non-indications, generic roots, terms from outside MeSH ------------
+
+
+def test_registry_aliases_need_enough_single_condition_studies() -> None:
+    uc = (("Urothelial Carcinoma",), ("MESH:D002295",))
+    assert indications.registry_aliases([uc] * 3) == {"urothelial carcinoma": "D002295"}
+    assert indications.registry_aliases([uc] * 2) == {}
+    split = [(("Healthy",), ("MESH:D1",)), (("Healthy",), ("MESH:D2",)),
+             (("Healthy",), ("MESH:D3",))]
+    assert indications.registry_aliases(split) == {}
+    assert indications.registry_aliases([(("",), ("MESH:D1",))] * 5) == {}
+    assert indications.registry_aliases([(("X y",), ())] * 5) == {}
+
+
+def test_extra_terms_widen_the_sweep_but_never_overrule_mesh(vocabulary: MeshVocabulary) -> None:
+    base = indications.build_index(vocabulary)
+    some_term, some_ui = next(iter(base.by_term.items()))
+    extra = [
+        ("Brand New Disease Name", some_ui),        # taken
+        (some_term + " x", "D999999"),              # not a disease descriptor
+        ("single", some_ui),                        # one word
+        ("Disease Words Here", "D004194"),          # a non-indication
+        (some_term, "MESH:D000001"),                # MeSH already has it
+    ]
+    index = indications.build_index(vocabulary, extra=extra)
+    assert index.added_terms == 1
+    assert index.by_term["brand new disease name"] == some_ui
+    assert index.by_term[some_term] == base.by_term[some_term]
+    assert indications.code("treating brand new disease name today", index) == {some_ui}
+
+
+def test_branch_roots_are_generic(vocabulary: MeshVocabulary) -> None:
+    index = indications.build_index(vocabulary)
+    assert "D002277" in index.generic
+
+
+def test_a_root_gives_way_to_a_specific_disease(tmp_path: Path) -> None:
+    def record(ui: str, name: str, tree: str) -> str:
+        return (f"<DescriptorRecord><DescriptorUI>{ui}</DescriptorUI>"
+                f"<DescriptorName><String>{name}</String></DescriptorName>"
+                f"<TreeNumberList><TreeNumber>{tree}</TreeNumber></TreeNumberList>"
+                f"<ConceptList><Concept><TermList><Term><String>{name}</String></Term>"
+                f"</TermList></Concept></ConceptList></DescriptorRecord>")
+    path = tmp_path / "desc.xml"
+    path.write_text(
+        '<?xml version="1.0"?><DescriptorRecordSet>'
+        + record("D009369", "Neoplasms", "C04")
+        + record("D008545", "Melanoma", "C04.557.465.625.650.510")
+        + "</DescriptorRecordSet>",
+        encoding="utf-8",
+    )
+    index = indications.build_index(MeshVocabulary(descriptors=path))
+    assert "D009369" in index.generic and "D008545" not in index.generic
+    assert indications.code("neoplasms including melanoma", index) == {"D008545"}
+    assert indications.code("neoplasms", index) == {"D009369"}

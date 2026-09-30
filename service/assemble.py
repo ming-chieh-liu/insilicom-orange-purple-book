@@ -40,7 +40,14 @@ from collections.abc import Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from service import graph_judging, identification, judging, label_role, review_role
+from service import (
+    candidate_match,
+    graph_judging,
+    identification,
+    judging,
+    label_role,
+    review_role,
+)
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -52,10 +59,27 @@ _log = get_logger(__name__)
 #: the divergences were 33%, 61% and 92% out.
 COUNT_TOLERANCE: float = 0.15
 
-#: Evidence tiers. A is corroborated, B is judged, C is the graph's backstop.
+#: Evidence tiers (D35, ``docs/TIERS.md``): A an FDA document names the trial;
+#: B an agent matched a §14 description; C an agent picked from drug +
+#: indication with no §14 text; D the literature on the drug alone.
 TIER_STATED: str = "A"
 TIER_JUDGED: str = "B"
-TIER_GRAPH: str = "C"
+TIER_INDICATION: str = "C"
+TIER_GRAPH: str = "D"
+
+#: The oldest identification P5 accepts (D35). Earlier decisions — the
+#: pick-one run and the first D33 pilot — were made on shortlists built
+#: before the indication filter, the 10-tier cap and the literature
+#: candidates; a description not yet re-decided is reported
+#: ``not_yet_judged`` rather than linked on an answer to a different list.
+MIN_IDENTIFY_VERSION: int = candidate_match.IDENTIFY_VERSION
+
+#: Evidence sources of the two per-submission cases (D35).
+INDICATION_SOURCE: str = "indication_candidate"
+CASE_SOURCE: dict[str, tuple[str, str]] = {
+    "C": (TIER_INDICATION, INDICATION_SOURCE),
+    "D": (TIER_GRAPH, graph_judging.EVIDENCE_SOURCE),
+}
 
 #: Label-route evidence sources that identify a trial without the shortlist.
 DIRECT_SOURCES: frozenset[str] = frozenset({"label_nct", "review_name_match"})
@@ -113,7 +137,8 @@ class Link(NamedTuple):
     injected: str = ""
     #: Every route that named this trial for this submission (D29):
     #: ``label_nct`` · ``label_description`` · ``review_protocol`` ·
-    #: ``kg_abstract`` (a judged tier-C pick) · ``kg_literature`` (the D19
+    #: ``indication_candidate`` (a case-C pick, tier C) · ``kg_abstract`` (a case-D
+    #: pick from the drug's literature, tier D) · ``kg_literature`` (the D19
     #: cross-check: the graph's literature for this drug names the trial).
     sources: str = ""
     #: D29, ``;``-joined: ``attribution_moved`` (the routes' earliest
@@ -298,7 +323,11 @@ def _registry_counts(unit: dict[str, object]) -> dict[str, str]:
 
 __all__ = [
     "COUNT_TOLERANCE",
+    "MIN_IDENTIFY_VERSION",
     "TIER_GRAPH",
+    "TIER_INDICATION",
+    "INDICATION_SOURCE",
+    "CASE_SOURCE",
     "TIER_JUDGED",
     "TIER_STATED",
     "AssembleReport",
@@ -440,9 +469,13 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     """
     from collections import Counter
 
-    verdicts = identification.read_verdicts(
-        adjudication_dir / "identify_verdicts.jsonl"
-    )
+    verdicts = {
+        unit_id: verdict
+        for unit_id, verdict in identification.read_verdicts(
+            adjudication_dir / "identify_verdicts.jsonl"
+        ).items()
+        if verdict.prompt_version >= MIN_IDENTIFY_VERSION
+    }
     # Section-14 polarity: trials the label cites but does not present as
     # evidence. The fenofibrate label discusses ACCORD Lipid under a heading
     # reading "Lack of Efficacy in Cardiovascular Outcomes Trials"; a regex
@@ -491,7 +524,11 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     #: link, or the old polarity verdict -- so a review judging it evidence is a
     #: recorded disagreement.
     label_rejected: set[tuple[str, str]] = set()
-    units = list(read_jsonl(out_dir / "candidates.jsonl"))
+    all_units = list(read_jsonl(out_dir / "candidates.jsonl"))
+    # D35: case C and D units are per submission and never take part in D16
+    # across the label route; they are joined below, after every stronger link.
+    units = [u for u in all_units if str(u.get("case") or "B") not in CASE_SOURCE]
+    case_units = [u for u in all_units if str(u.get("case") or "B") in CASE_SOURCE]
     guard_led = _guard_led_units(units, guard)
 
     # D16, in two steps, and over **both** branches together. A trial can be
@@ -749,40 +786,61 @@ def build(out_dir: Path, adjudication_dir: Path, *,
         ))
         position[(nct, key)] = len(links) - 1
         linked_submissions.add(key)
-    # Tier C (D14, D31): a graph pick the judges agreed on. It never moves or
-    # replaces a stronger link: where another route already links the trial for
-    # this submission it only adds ``kg_abstract`` to that row's sources (the D19
-    # cross-check); where another route attributes the trial to another
-    # submission of the application, it adds nothing. Among tier-C picks
-    # themselves D16 still holds -- the earliest submission keeps it.
+    # Tiers C and D (D35): a case-C or case-D pick. It never moves or replaces a
+    # stronger link: where another route already links the trial for this
+    # submission it only adds its source to that row; where another route
+    # attributes the trial to another submission of the application, it adds
+    # nothing. Among C/D picks the higher tier wins, then the earliest
+    # submission (D16).
     linked_trials = {(link.application, link.nct_id) for link in links}
-    graph_first: dict[tuple[str, str], tuple[str, tuple[int, str], str]] = {}
-    for key, nct in graph_judging.read_picks(adjudication_dir / "graph_verdicts.jsonl"):
+    case_first: dict[tuple[str, str], tuple[str, str, tuple[int, str], str, str]] = {}
+    for unit in case_units:
+        key = f"{unit['application']}|{unit['submission_type']}|{unit['submission_no']}"
         if key not in spine:
             continue
+        submissions_with_units.add(key)
+        tier, source = CASE_SOURCE[str(unit.get("case"))]
+        verdict = verdicts.get(str(unit.get("unit_id") or ""))
+        label = "(indication only)" if tier == TIER_INDICATION else "(drug only)"
+        if verdict is None or not verdict.identified:
+            reason = (
+                "judged_none" if verdict is not None
+                else "not_yet_judged" if unit.get("candidates")
+                else "no_drug_resolved" if not unit.get("drug_mesh")
+                else "no_candidates"
+            )
+            unlinked.append(Unlinked(str(unit["application"]), str(unit["submission_type"]),
+                                     str(unit["submission_no"]),
+                                     str(unit.get("approval_date") or ""), label, reason))
+            continue
+        nct = verdict.final
         application, _, submission_no = key.split("|")
         if (nct, key) in position:
             held = links[position[(nct, key)]]
             links[position[(nct, key)]] = held._replace(sources=";".join(
-                dict.fromkeys([*held.sources.split(";"), graph_judging.EVIDENCE_SOURCE])))
+                dict.fromkeys([*held.sources.split(";"), source])))
             continue
         if (application, nct) in linked_trials:
             continue
-        rank_key = (spine[key].get("approval_date", ""), _submission_sort(submission_no))
-        held_first = graph_first.get((application, nct))
-        if held_first is None or rank_key < (held_first[0], held_first[1]):
-            graph_first[(application, nct)] = (rank_key[0], rank_key[1], key)
-    for (application, nct), (when, _, key) in sorted(graph_first.items()):
+        rank_key = (tier, spine[key].get("approval_date", ""), _submission_sort(submission_no))
+        held_first = case_first.get((application, nct))
+        if held_first is None or rank_key < held_first[:3]:
+            case_first[(application, nct)] = (*rank_key, key, str(unit.get("unit_id") or ""))
+    by_unit_id = {str(u.get("unit_id") or ""): u for u in case_units}
+    for (application, nct), (tier, when, _, key, unit_id) in sorted(case_first.items()):
         _, submission_type, submission_no = key.split("|")
+        unit = by_unit_id[unit_id]
+        source = INDICATION_SOURCE if tier == TIER_INDICATION else graph_judging.EVIDENCE_SOURCE
         links.append(Link(
             nct_id=nct, application=application, submission_type=submission_type,
             submission_no=submission_no, approval_date=when,
             action_type=spine[key].get("action_type", ""),
             indication_mesh=chosen.get(key, ("", ""))[0],
             indication_term=chosen.get(key, ("", ""))[1],
-            drug_mesh="", trial_name="", label_enrollment="", registry_enrollment="",
-            evidence_tier=TIER_GRAPH, evidence_source=graph_judging.EVIDENCE_SOURCE,
-            count_check="no_count", sources=graph_judging.EVIDENCE_SOURCE,
+            drug_mesh=str(unit.get("drug_mesh") or ""), trial_name="",
+            label_enrollment="", registry_enrollment=_registry_counts(unit).get(nct, ""),
+            evidence_tier=tier, evidence_source=source,
+            count_check="no_count", sources=source,
         ))
         linked_submissions.add(key)
 

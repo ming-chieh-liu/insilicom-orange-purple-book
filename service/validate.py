@@ -105,13 +105,31 @@ def shortlist_recall(units_path: Path, limit: int | None = None) -> Recall:
     """Of the units whose label states an NCT id, how many shortlist it?
 
     Costs nothing: the answer is in the unit, and so is the candidate list.
+
+    **Only each trial's earliest appearance in its application is scored**
+    (D16, corrected 2026-09-29). §14 is cumulative, so a trial recurs on every
+    later label, and 7,536 of 9,933 label-stated answers were such repeats —
+    units no judge ever sees, carrying a later submission's indication.
+    Counting them measured the wrong population.
     """
+    rows = [
+        unit for unit in identification.iter_json_lines(units_path)
+        if unit.get("stated_nct") and isinstance(unit.get("candidates"), list)
+        and unit.get("candidates")
+    ]
+    first: dict[tuple[str, str], str] = {}
+    for unit in rows:
+        pair = (str(unit.get("application") or ""), str(unit["stated_nct"]))
+        when = str(unit.get("approval_date") or "")
+        if pair not in first or when < first[pair]:
+            first[pair] = when
     checked = present = 0
     missing: list[str] = []
-    for unit in identification.iter_json_lines(units_path):
+    for unit in rows:
         truth = str(unit.get("stated_nct") or "")
         raw = unit.get("candidates")
-        if not truth or not isinstance(raw, list) or not raw:
+        pair = (str(unit.get("application") or ""), truth)
+        if not isinstance(raw, list) or str(unit.get("approval_date") or "") != first[pair]:
             continue
         checked += 1
         ids = {str(c.get("nct_id") or "") for c in raw if isinstance(c, dict)}
@@ -125,8 +143,18 @@ def shortlist_recall(units_path: Path, limit: int | None = None) -> Recall:
     return Recall(checked=checked, present=present, absent_examples=tuple(missing))
 
 
+#: Where P6's withheld-answer judging lives (D35): its own adjudication folder,
+#: so its units, tiers, answers and ``identify_verdicts.jsonl`` never mix with
+#: production. See ``docs/runbooks/validate-precision.md``.
+PRECISION_DIR: str = "precision_d35"
+
+
 def withhold(units_path: Path, out_path: Path, limit: int) -> dict[str, str]:
     """Write judging units from known-answer cases, with the answer removed.
+
+    Since D35 only each trial's earliest appearance is eligible, and the
+    units are judged by the per-candidate matcher (``match-*`` with
+    ``--units``) inside :data:`PRECISION_DIR`.
 
     What is withheld is the ``stated_nct`` field the pipeline would otherwise
     short-circuit on, so the unit reaches a judge at all.
@@ -152,10 +180,24 @@ def withhold(units_path: Path, out_path: Path, limit: int) -> dict[str, str]:
     is reproducible across runs without importing a seed.
     """
     eligible: list[dict[str, object]] = []
-    for unit in identification.iter_json_lines(units_path):
+    rows = list(identification.iter_json_lines(units_path))
+    # Only a trial's earliest appearance is a unit P4 would judge (D16), so
+    # only those measure the judge on the population it works on (D35).
+    first: dict[tuple[str, str], str] = {}
+    for unit in rows:
+        if unit.get("stated_nct"):
+            pair = (str(unit.get("application") or ""), str(unit["stated_nct"]))
+            when = str(unit.get("approval_date") or "")
+            if pair not in first or when < first[pair]:
+                first[pair] = when
+    for unit in rows:
         stated = str(unit.get("stated_nct") or "")
         raw = unit.get("candidates")
         if not stated or not isinstance(raw, list) or not raw:
+            continue
+        if str(unit.get("approval_date") or "") != first[
+            (str(unit.get("application") or ""), stated)
+        ]:
             continue
         ids = {str(c.get("nct_id") or "") for c in raw if isinstance(c, dict)}
         if stated not in ids:

@@ -25,7 +25,7 @@ Read-only by construction: no write path.
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from typing import Any, NamedTuple
 
 from config.settings import BiokdeConnection
@@ -111,6 +111,9 @@ class Mention(NamedTuple):
     pmid: str
     title: str
     publication_types: tuple[str, ...]
+    #: The sponsor protocol id the abstract printed, when the trial was reached
+    #: through it rather than through an NCT id (D35); empty otherwise.
+    protocol_id: str = ""
 
     @property
     def is_trial_report(self) -> bool:
@@ -189,8 +192,17 @@ class GraphEvidenceRepository:
             ))
         return sorted(out, key=lambda e: (-e.score, e.disease_biokdeid))
 
-    def mentions_in(self, pmids: Iterable[str]) -> list[Mention]:
+    def mentions_in(
+        self,
+        pmids: Iterable[str],
+        resolve: Callable[[str], list[tuple[str, str]]] | None = None,
+    ) -> list[Mention]:
         """Registry ids printed in these abstracts, in the order given.
+
+        ``resolve`` maps an abstract's text to ``(nct_id, protocol_id)`` pairs
+        for sponsor protocol ids that name exactly one registry study (D35,
+        :func:`service.review_trials.protocol_trials`). A trial the abstract
+        names both ways is reported once, as the NCT id.
 
         The collection stores ``pmid`` as a string in some rows and an int in
         others, so both forms are asked for. Asked in batches of
@@ -218,11 +230,22 @@ class GraphEvidenceRepository:
             kinds = tuple(
                 str(kind) for kind in (document.get("publicationType") or [])
             )
-            for nct in dict.fromkeys(NCT.findall(text)):
+            named = dict.fromkeys(NCT.findall(text))
+            for nct in named:
                 out.append(
                     Mention(
                         nct_id=nct, pmid=pmid, title=title[:200],
                         publication_types=kinds,
+                    )
+                )
+            for nct, protocol in (resolve(text) if resolve else []):
+                if nct in named:
+                    continue
+                named[nct] = None
+                out.append(
+                    Mention(
+                        nct_id=nct, pmid=pmid, title=title[:200],
+                        publication_types=kinds, protocol_id=protocol,
                     )
                 )
         return out

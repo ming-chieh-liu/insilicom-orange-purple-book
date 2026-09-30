@@ -109,3 +109,28 @@ def test_an_agent_located_letter_ranks_below_the_keyword_letter_above_the_label(
     keyword = _build(letters={"NDA000001|ORIG|1": "for the treatment of acne vulgaris"},
                      letters_located={"NDA000001|ORIG|1": "is indicated for gout"})
     assert [r.source for r in keyword.rows if r.chosen == "true"] == ["letter"]
+
+
+def test_a_full_heading_is_coded_but_the_first_line_stays_the_key() -> None:
+    """D34: the wrapped line carries the disease; the key is unchanged so P3's
+    lookup by heading still finds the row."""
+    report = _build(
+        headings={"NDA000001|ORIG|1": ["HER2-negative Locally Advanced"]},
+        heading_text={("NDA000001|ORIG|1", "HER2-negative Locally Advanced"):
+                      "HER2-negative Locally Advanced or Metastatic Melanoma"},
+    )
+    rows = [r for r in report.rows if r.source == inorm.SOURCE_HEADING]
+    assert [(r.source_key, r.mesh_id) for r in rows] == [
+        ("HER2-negative Locally Advanced", "MESH:D008545")
+    ]
+    assert rows[0].text.endswith("Metastatic Melanoma")
+
+
+def test_todays_label_text_is_coded_by_the_same_coder() -> None:
+    """D30/D35: the openFDA fallback is coded from text, not taken as ids."""
+    report = _build(openfda={"NDA000001": {"D004194"}},
+                    openfda_text={"NDA000001": "indicated for acne vulgaris"})
+    rows = [r for r in report.rows if r.source == inorm.SOURCE_OPENFDA]
+    assert [(r.mesh_id, r.chosen) for r in rows] == [("MESH:D000152", "true")]
+    none = _build(openfda={"NDA000001": {"D004194"}}, openfda_text={})
+    assert [r for r in none.rows if r.source == inorm.SOURCE_OPENFDA] == []

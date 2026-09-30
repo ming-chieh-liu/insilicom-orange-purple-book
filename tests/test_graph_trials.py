@@ -27,7 +27,7 @@ class _FakeGraph:
         self.pairs_asked.append((drug, disease))
         return self._pmids.get((drug, disease), [])
 
-    def mentions_in(self, pmids: list[str]) -> list[Mention]:
+    def mentions_in(self, pmids: list[str], resolve: object = None) -> list[Mention]:
         self.pmids_asked = list(pmids)
         out: list[Mention] = []
         for pmid in pmids:
@@ -214,3 +214,20 @@ def test_chosen_submission_indications_replace_todays_label(tmp_path: Path) -> N
         {"BLA1": frozenset({"PEMBROLIZUMAB"})},
     )
     assert [r.nct_id for r in report.rows] == ["NCT02578680"]
+
+
+def test_a_trial_reached_only_by_protocol_id_is_marked_so(tmp_path: Path) -> None:
+    """D35: literature candidates also come from full protocol ids."""
+    out = _workspace(tmp_path)
+    graph = _FakeGraph(
+        {("bk-drug", "bk-dis"): ["111", "222"]},
+        {"111": [_mention("NCT02578680", "111"),
+                 Mention("NCT00000009", "111", "t", (), protocol_id="MK-3475-189")],
+         "222": [Mention("NCT02578680", "222", "t", (), protocol_id="MK-3475-189")]},
+    )
+    report = graph_trials.build(
+        out, cast(GraphEvidenceRepository, graph), frozenset({"BLA1"}),
+        {"BLA1": frozenset({"PEMBROLIZUMAB"})}, resolve=lambda text: [],
+    )
+    assert [(r.nct_id, r.mentions, r.via) for r in report.rows] == [
+        ("NCT00000009", 1, "protocol"), ("NCT02578680", 2, "nct")]

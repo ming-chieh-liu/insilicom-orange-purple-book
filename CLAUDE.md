@@ -55,7 +55,7 @@ code says `not yet implemented` until it lands.
 - **D8 — enrollment count is the disambiguating key.** Across 5 drug+condition candidate sets,
   every candidate had a distinct enrollment — zero collisions.
 - **D9 — MeSH descriptor is the shared id space**; biokde `pubmedEntitiesFlat` is the dictionary.
-- **D10 — every row carries an evidence tier** (A/B/C).
+- **[CLARIFIED 2026-09-29 — four tiers since D35: A/B/C/D, defined in `docs/TIERS.md`]** **D10 — every row carries an evidence tier** (A/B/C).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
 - **D21 — the trial side normalises from ClinicalTrials.gov's own `derivedSection`, not from
@@ -69,19 +69,19 @@ code says `not yet implemented` until it lands.
   Matching on it would join a drug to everything sharing a benzene ring. Its legitimate use is the
   opposite — as a **specificity signal**, since a term with many ancestors sits deep in the tree and
   discriminates, while one with none is a root descriptor P3 should decline to rank on.
-- **D19 — the graph route is PARALLEL to the label route, and serves two purposes.** As a
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — the fallback is judged in the D33 format with one judge on the full run, not "2 calls per unit"; its links are tier D]** **D19 — the graph route is PARALLEL to the label route, and serves two purposes.** As a
   *fallback* it needs a judge (2 calls per unit) and runs only where the label route is exhausted.
   As a *cross-check* it needs no agent at all — it is a set-membership test against links that
   already exist, and it is the cheaper and more valuable of the two because it gives tier A an
   independent second source instead of resting on the label alone.
-- **D14 — the Insilicom KG is tier C, and it is NOT optional.** It was scoped as "not a required
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — literature trials found for a drug + indication become P3 candidates for tier B/C; the stand-alone literature route serves only submissions with no indication, and its links are tier D, not C]** **D14 — the Insilicom KG is tier C, and it is NOT optional.** It was scoped as "not a required
   path" and therefore skipped, which was wrong: **4,539 trial-relevant approvals — every one before
   2008, 57% of the set — have zero links from any other source.** Measured on 150 pre-2008
   submissions: 95% resolve a drug id, only **31%** a disease id (the bottleneck is indication
   coverage, not the graph), 29% have an edge and 16% yield a registry id, median 2 candidates.
   A tier-C link is never promoted above C however confident the judges are — the question they
   answer ("is this plausibly the evidence") is weaker than P4's.
-- **D18 — shortlist recall is the ceiling, and is measured separately from judge precision.**
+- **[CLARIFIED 2026-09-29 — recall is scored on each trial's earliest appearance only; the 54.1% below counted later appearances]** **D18 — shortlist recall is the ceiling, and is measured separately from judge precision.**
   Currently **54.1%**: 2,209 of 4,813 known answers are not in their own shortlist, so no judge can
   ever find them. A shortlist failure looks exactly like a judging failure in the output —
   CHECKMATE-648 hid as one for two commits — so they are scored apart. Matching the label's trial
@@ -121,7 +121,8 @@ code says `not yet implemented` until it lands.
   label. **Not a trial source** — their study mentions are postmarketing requirements. The
   extractor must handle other wordings and not stop at decimals ("Gel, 1.2%").
 - **D26 — FDA reviews are a trial source, parallel to the label route** (2026-09-24, **implemented
-  in code 2026-09-25; review download running, role run pending**). Summary Review (21), Review (3, via its table of contents) and pediatric reviews;
+  in code 2026-09-25; as of 2026-09-29 the review download is ~99% — 131 files never fetched, retry
+  step never run — and roles are judged for 966 of 4,825 units**). Summary Review (21), Review (3, via its table of contents) and pediatric reviews;
   never Pediatric Written Requests. Protocol id after `Study/Trial/Protocol` (letters + digits, any
   length, **no abbreviation expansion**) → exactly one registry study by `orgStudyId` **or**
   secondary id → guards (start ≤ approval · sponsor = applicant or trial names the drug · package
@@ -142,7 +143,7 @@ code says `not yet implemented` until it lands.
   `docs/runbooks/label-trial-role.md`; a non-linking role leaves the link out as
   `label_role_<role>`; where no role exists yet the old polarity verdict still filters, and P5
   counts those links — D28 is complete when that count is 0.
-- **D29 — how the sources combine** (2026-09-24, **implemented in code 2026-09-25; `output/` not yet rebuilt**). Direct sources first
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — "the graph route (tier C) serves what has no usable document" becomes: a submission with an indication but no judgeable §14 description is case C; one with no indication is case D]** **D29 — how the sources combine** (2026-09-24, **implemented in code 2026-09-25; `output/` not yet rebuilt**). Direct sources first
   (label-stated NCT, review protocol id). A §14 description whose trial name matches a protocol id or
   acronym the same submission's review matched skips the shortlist. The shortlist serves only
   descriptions no FDA document identifies; the graph route (tier C) serves what has no usable
@@ -158,7 +159,7 @@ code says `not yet implemented` until it lands.
   P3 reads per-trial heading indications from it; the graph route reads chosen submission
   indications instead of application-level `indications.tsv`. Replaces three separate coding paths;
   `submission_indication_text.tsv` had no reader.
-- **D31 — no indication: search the drug's treatment edges** (2026-09-25, **implemented in
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — its links are tier D, judged in the D33 per-candidate format, not pick-one]** **D31 — no indication: search the drug's treatment edges** (2026-09-25, **implemented in
   code 2026-09-25; not yet run**). The graph route (D14, tier C) keeps walking drug ↔ *this
   submission's indication*, unchanged, and that stays one of P3/P4's candidate sources. Only where a
   submission has **no indication at all** does it fall back to the drug alone: every
@@ -173,7 +174,7 @@ code says `not yet implemented` until it lands.
   the unit's own candidates), then a pick becomes a tier-C `kg_abstract` link only where no other
   route links that trial for the application; where one does for the same submission, it only adds
   `kg_abstract` to `sources`.
-- **D32 — the tier says how the trial's identity was established** (2026-09-25, **implemented in
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — four tiers: C is now an agent pick from drug + indication with no §14 text; literature on the drug alone is D]** **D32 — the tier says how the trial's identity was established** (2026-09-25, **implemented in
   code 2026-09-25; `output/` not yet rebuilt**). **A**: an FDA document names the trial by an
   identifier — label-stated NCT, review protocol id (D27), or a label trial name matching an id the
   same submission's review named (D29). **B**: an agent inferred which registry trial the §14 prose
@@ -183,7 +184,7 @@ code says `not yet implemented` until it lands.
   the P4 prompt tells the judge the count is its strongest signal, so D17 rewarded the evidence
   the judge chose on; and a ±15% match was unique in only 45 of 2,363 known cases. On the rebuilt
   scope 366 judged links move A → B; submissions with a tier-A link 1,709 → 1,448.
-- **D33 — P4 judges each candidate Yes/No, in ranked tiers of 10, with one judge** (2026-09-28,
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — the drug pool is indication-filtered and capped at 10 tiers (100); literature candidates are added beyond the cap; the format also judges cases C and D]** **D33 — P4 judges each candidate Yes/No, in ranked tiers of 10, with one judge** (2026-09-28,
   **implemented in code 2026-09-28; pilot not yet run**). P3 returns every shortlist in rank order,
   with no cap for literature-injected candidates (commit 308887d); P4 works down it in tiers of 10
   (ranks 1–10, 11–20, …) and a description stops at the first tier holding a Yes, taking its
@@ -195,6 +196,46 @@ code says `not yet implemented` until it lands.
   `prompt_version 2`, superseding the pick-one answer (the pick-one prompt, runbook and
   `identify-*` modes stay for reuse). Why: manager's request; measured on 11,792 known answers
   the true trial sits at median rank 2 and 74% of shortlisted answers are in tier 1.
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — "condition still ranks, never filters": condition now filters, by MeSH tree match keeping trials where either side has no id]** **D34 — each §14 description is ranked on every disease it names, coded from the heading as
+  printed** (2026-09-29, **implemented in code 2026-09-29; P2 → P2i → P3 rebuilt 2026-09-29;
+  P4+ not yet re-run on it**). Wrapped headings are joined (`label_trials.tsv` `heading_full`; `heading`
+  unchanged, unit ids depend on it). The coder drops never-an-indication descriptors (`Disease`,
+  `Disease Progression`, `Recurrence`, `Death`, biomarkers…), lets `Neoplasms`/`Infections`/`Carcinoma`
+  give way to a specific disease, and also sweeps registry condition strings NLM codes consistently
+  (≥3 single-condition studies, ≥60% one id — "Urothelial Carcinoma" → D002295) plus P1's
+  biokde-resolved names, never overruling MeSH. P3 ranks on `indication_ids`: all heading ids, else
+  every id of the submission's own letter + label §1, instead of refusing on two. Condition still
+  ranks, never filters. Why: 36% of judged descriptions had no id and an exact filter lost 51% of
+  answers; detail `docs/DESIGN.md` §3.
+- **D35 — route by what the FDA documents give; four tiers; indication filters before the cap**
+  (2026-09-29, **implemented in code 2026-09-29; not yet run**). Tiers are defined in `docs/TIERS.md`.
+  **A**: an FDA document names the trial (label NCT, review protocol id, label name = review id) →
+  role judge (P4r, P4b) keeps pivotal/supporting. **B**: a §14 description with no id → drug + date
+  pool → **indication filter** (MeSH tree: same, ancestor or descendant; kept when either side has
+  no id; no siblings) → rank → **top 100 (10 tiers)** → **plus literature candidates** for drug ×
+  indication, unfiltered, beyond the 100 → P4 per-candidate with excerpt. A B description judged
+  NONE stays `judged_none`. **C**: an indication but no judgeable §14 description → one unit per
+  submission, same candidates, per-candidate judge on drug + indication sentence + date (new
+  prompt). **D** (formerly C): no indication → drug's treats edges (D31) → literature candidates →
+  same no-label prompt. **Literature candidates** (new P2g, no agents): NCT ids in the evidence
+  abstracts plus full protocol ids matching exactly one registry study; `graph-trials` rebuilt on
+  the D34 indications. Pilots 2 judges + third, full runs 1. Never promoted; highest tier wins.
+  Why: the user's routing — the tier-C trigger was a missing label, the real gap a missing
+  indication. Measured: the filter nets −28 of 2,412 label-stated answers (115 dropped, 87
+  recovered from below the cap) and cuts judge calls 17,662 → 13,983 (−21%).
+
+## Current status and to-do
+
+Full detail, evidence and commands: **`docs/STATUS.md`** (audited 2026-09-29) — read it at the
+start of a session and update it when a stage finishes or pauses. As of 2026-09-29:
+
+1. **P2c review download is ~99%, not done** — 131 files never fetched and the retry step never
+   run; **P4r review roles 966 / 4,825**.
+2. **D34 implemented and rebuilt through P3; D35 implemented in code (Phase 1 done); both uncommitted.**
+3. Next (Phase 2): finish the review download → rebuild P2g (`graph-trials`, `graph-links`) → P3 → pilots B and C/D (two
+   judges) → full runs (one judge) with P4r alongside → P5 → D28 → P5 → P6.
+4. The D33 pilot so far is obsolete (built on the pre-D34 order); `trial_submission_map.tsv` is
+   still the 2026-09-23 pre-D23 map.
 
 ## Hard constraints
 
@@ -206,56 +247,54 @@ code says `not yet implemented` until it lands.
 - Combination regimens are legitimately many-to-many: KEYNOTE-189 approved pembrolizumab *with*
   chemo owned by other applications.
 
-## Pipeline — six phases, four sources
+## Pipeline — six phases, four sources, four cases (D35)
 
 ```
 P0 spine      Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
               -> D23: 5,766 ORIG + 4,009 SUPPL + 1,520 D24-guard SUPPL = 11,295 trial-relevant
-              (was D4: 5,879 ORIG + 2,042 core SUPPL = 7,921)
                               |
-P1 normalize  FDA side  : ingredient -> MeSH via biokde synonyms (+ moiety fold)
-              TRIAL side: derivedSection.*BrowseModule.meshes (NLM's curation)
-              both carry the biokdeid the graph route needs
+P1 normalize  FDA side  : ingredient -> MeSH/PubChem via biokde synonyms (+ moiety fold)
+              TRIAL side: derivedSection.*BrowseModule.meshes (NLM) + biokde name matches
                               |
-      +-----------------------+-----------------------+-----------------------+
-      | LABEL ROUTE           | LETTERS (D25)         | REVIEW ROUTE (D26)    | GRAPH ROUTE (D14)
-      |                       | indications only,     | trials by protocol id | no document needed
-P2    | ApplicationDocs 2     | ApplicationDocs 1     | ApplicationDocs 21, 3 |
-read  | -> label PDF, §14     | -> "provides for …"   |  (TOC), pediatric     |
-      | NCT|acronym|COUNT     | keyword sentence, or  | -> Study/Trial/Proto- |
-      | + §1, §14 headings    | agent locate+verify   |    col <id>           |
-      |                       | (letter-indication)   | -> exactly 1 registry |
-      |                       |          |            |    orgStudyId|second. |
-      |                       |          v            | -> guards: date,      |
-P2i   |      +------> INDICATION TABLE (D30) <-----+  |    sponsor|drug, pkg  |
-index |      |  letter > letter_located > label §1 >   |          |            |
-      |      |  openfda_current, coded once to MeSH    |          |            |
-      |      |  + biokdeid: submission_indications.tsv |          |            |
-      |      |        (read by P3, P3c, P5)            |          |            |
-      v                                                |          v            |
-  label states NCT? --yes--> TIER A (label_nct)        |  P4r role judge:      |
-      | no                                             |  2 judges + 3rd,      |
-P3  CT.gov (600,762) by drug + start < approval,       |  six roles; PIVOTAL|  |
-    ranked by condition + stated count -> <=40         |  SUPPORTING link      |
-    D29: a name the same submission's review matched   |  -> TIER A            |
-     skips this -> TIER A (review_name_match)          |  (review_protocol,D27)|
-      |                                                |          |       P3c pubmedRelations
-P4  "which candidate is this description?"             |          |       -> PMIDs -> NCT
-    two judges, third on disagreement                  |          |       P4c "plausibly
-    -> TIER B whatever the counts (D32)              |          |       evidence?" 2 judges
-P4b D28 role judges on each label link, own label   |          |       -> TIER C, never
-    §14, six roles, 2 judges + 3rd; only PIVOTAL|      |          |          promoted
-    SUPPORTING link (old polarity = fallback)          |          |            |
-      +------------------------------------------------+----------+------------+
+P2 read       P2a LABELS  (ApplicationDocs 2)  §14: NCT | trial name | count | heading (+wrap, D34); §1
+              P2b LETTERS (ApplicationDocs 1)  "provides for …" -> indication only, never trials
+              P2c REVIEWS (ApplicationDocs 21, 3 TOC, pediatric) -> protocol id -> exactly 1 registry
+                          study (orgStudyId | secondary id) + guards (date, sponsor|drug, package)
+              P2i INDICATION TABLE (D30, D34): letter > letter_located > label §1 > openfda_current,
+                          coded once to MeSH + biokdeid -> submission_indications.tsv
+              P2g LITERATURE (no agents, D35): graph edges drug x indication -> abstracts ->
+                          NCT ids + full protocol ids (exactly 1 registry study) -> graph_trials.tsv;
+                          no indication: drug's treats edges (D31) -> drug_only_trials.tsv
                               |
-P5 assemble   D16 earliest-wins across label AND review -> trial_submission_map.tsv
-              columns sources, conflict (D29: attribution_moved · role_disagrees
-              -> tier B · judged_contradicts_direct · indication_mismatch);
-              review-only links take the submission's chosen indication (D30)
-              + review_trial_context.tsv (non-linking roles) + unlinked_submissions.tsv
+P3 route      every trial-relevant submission / §14 description -> submission_routes.tsv
+      +-----------------------+---------------------------+-------------------------+-------------+
+      | CASE A                | CASE B                    | CASE C                  | CASE D      |
+      | an FDA document names | a §14 description, no id  | indication known, no    | no          |
+      | the trial: label NCT, |                           | §14 description of its  | indication  |
+      | review protocol id,   |                           | own (no label, pre-PLR, |             |
+      | label name = review id|                           | §14 names no trial)     |             |
+      |                       | drug + start <= approval  | same candidate build as | drug-only   |
+      | no search             | -> indication filter      | B, on the submission's  | literature  |
+      |                       |    (MeSH tree; id-less    | chosen indication       | candidates, |
+      |                       |    trials kept)           |                         | start and   |
+      |                       | -> rank -> top 100        |                         | completion  |
+      |                       |    (10 tiers)             |                         | <= approval |
+      |                       | + literature candidates,  |                         |             |
+      |                       |   unfiltered, beyond 100  |                         |             |
+      v                       v                           v                         v             |
+P4    P4r review role (D26)   P4 identify (D33): per candidate Yes/No, tiers of 10, first Yes wins
+      P4b label role (D28)        B: excerpt prompt       C, D: no-label prompt (D35)
+      2 judges + 3rd; only        pilots 2 judges + 3rd, full runs 1 judge
+      PIVOTAL|SUPPORTING link
+      -> TIER A               -> TIER B                   -> TIER C                 -> TIER D
+      +-----------------------+---------------------------+-------------------------+-------------+
                               |
-P6 validate   shortlist recall · judge precision · route agreement by `sources`
-              · graph cross-check
+P5 assemble   D16 earliest-wins across label AND review (A, B); C and D never displace a stronger
+              link, only add to `sources`; highest tier wins -> trial_submission_map.tsv
+              columns sources, conflict; + review_trial_context.tsv + unlinked_submissions.tsv
+                              |
+P6 validate   shortlist recall · judge precision (docs/runbooks/validate-precision.md) · route
+              agreement by `sources` · graph cross-check
 ```
 
 **Letters give indications, never trials; reviews give trials by the sponsor's own protocol id**
@@ -264,7 +303,7 @@ this host's IP after an unthrottled run. A review link and a label link to the s
 P5's D16; a later mention moves nothing, an earlier one moves the link and sets
 `conflict = attribution_moved`.
 
-**The label and graph routes are parallel and independent, not sequential.** The graph route
+**[PARTIALLY SUPERSEDED by D35, 2026-09-29 — the fallback no longer reads `unlinked_submissions.tsv`: P3 routes a submission with no indication to case D directly, and literature trials for a drug + indication are case B/C candidates; the zero-cost cross-check (2) is unchanged]** **The label and graph routes are parallel and independent, not sequential.** The graph route
 branches at P1 and skips P2/P3 entirely, because the approvals it serves have no
 readable section 14 — that is the whole reason it exists. It does two jobs:
 
@@ -280,7 +319,7 @@ readable section 14 — that is the whole reason it exists. It does two jobs:
    stronger than either alone; silence is worth flagging. Populates `conflict`.
 
 **Why it works:** §14 rarely names an NCT but always describes the trial — design, population, and
-the patient count. Structured filters cut 600,762 studies to 10–40 candidates; enrollment count
+the patient count. Structured filters cut 600,762 studies to at most 100 candidates (10 tiers); enrollment count
 then separates them. The agent compares against ~15 fully-specified candidates, it does not search.
 
 ## Outputs
@@ -362,7 +401,7 @@ KG schema: `pubmedEntitiesFlat` = nodes (`biokdeid`, `id` like `MESH:D002289`, s
 - `placebo` → `MESH:D010919`; exclude from intervention matching.
 - **Label PDFs: use `https://` and follow redirects.** The `http://` URLs in `ApplicationDocs.txt`
   return nothing.
-- **The registry's condition and the label's indication disagree, so condition must RANK and never
+- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — condition now filters by MeSH tree match, keeping trials where either side has no id; the CHECKMATE-648 lesson is why id-less trials are kept]** **The registry's condition and the label's indication disagree, so condition must RANK and never
   FILTER.** CHECKMATE-648 is `NCT03143153`, enrollment 970 — exactly what the Opdivo label states —
   and it registers its condition as *Various Advanced Cancer*, which maps to no indication at all.
   Drug and date left a pool of 1,055 containing it; intersecting on Esophageal Neoplasms left 2 and

@@ -32,6 +32,7 @@ from __future__ import annotations
 import csv
 import time
 from collections import defaultdict
+from collections.abc import Callable
 from pathlib import Path
 from typing import NamedTuple
 
@@ -62,6 +63,9 @@ class GraphTrial(NamedTuple):
     #: How many of the edge's abstracts named it. Better attestation, not
     #: evidence of being pivotal — that stays the judge's call.
     mentions: int
+    #: ``nct`` when an abstract printed the registry id, ``protocol`` when the
+    #: trial was reached only through a sponsor protocol id (D35).
+    via: str = "nct"
 
 
 class GraphTrialsReport(NamedTuple):
@@ -99,6 +103,7 @@ def build(
     applications: frozenset[str],
     ingredients: dict[str, frozenset[str]],
     budget: int = ABSTRACT_BUDGET,
+    resolve: Callable[[str], list[tuple[str, str]]] | None = None,
 ) -> GraphTrialsReport:
     """One row per ``(application, nct_id)`` the literature connects.
 
@@ -106,6 +111,10 @@ def build(
     trial cited by several papers is not thereby the pivotal one, but it is
     better attested, and P3 can use that to break ties among graph-supported
     candidates.
+
+    ``resolve`` (D35) also reads full sponsor protocol ids in the abstracts,
+    each kept only when it names exactly one registry study; see
+    :func:`service.review_trials.protocol_trials`.
     """
     drug_of = {
         row["source_name"]: row["biokdeid"]
@@ -168,13 +177,16 @@ def build(
             continue
         with_edge += 1
         counts: dict[str, int] = defaultdict(int)
-        for mention in repository.mentions_in(sorted(pmids)[:budget]):
+        by_id: set[str] = set()
+        for mention in repository.mentions_in(sorted(pmids)[:budget], resolve):
             counts[mention.nct_id] += 1
+            if not mention.protocol_id:
+                by_id.add(mention.nct_id)
         if not counts:
             continue
         with_trials += 1
         rows.extend(
-            GraphTrial(application, nct, mentions)
+            GraphTrial(application, nct, mentions, "nct" if nct in by_id else "protocol")
             for nct, mentions in sorted(counts.items())
         )
     _log.info(

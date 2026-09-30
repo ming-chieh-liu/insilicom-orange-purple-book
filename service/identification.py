@@ -144,6 +144,10 @@ def read_units(
     for row in iter_json_lines(path):
         if row.get("stated_nct") or row.get("review_nct"):
             continue
+        # D35: case C and D units are per submission, not per trial, and are
+        # judged by their own prompt (``candidate_match.select_units``).
+        if row.get("case") not in (None, "", "B"):
+            continue
         candidates = row.get("candidates")
         if not isinstance(candidates, list) or not candidates:
             continue

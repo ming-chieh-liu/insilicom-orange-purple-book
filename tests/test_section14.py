@@ -597,3 +597,48 @@ def test_the_single_trial_case_is_unchanged() -> None:
     assert (got[0].nct_id, got[0].acronym, got[0].enrollment) == (
         "NCT02578680", "KEYNOTE-189", "616",
     )
+
+
+# --- wrapped headings (D34) -------------------------------------------------
+
+
+def test_a_wrapped_heading_is_joined_back() -> None:
+    block = ("14.1 Deleterious or Suspected Deleterious Germline BRCA-mutated "
+             "HER2-negative Locally Advanced\nor Metastatic Breast Cancer\n"
+             "EMBRACA (NCT01945775) was an open label study.")
+    first = ("Deleterious or Suspected Deleterious Germline BRCA-mutated "
+             "HER2-negative Locally Advanced")
+    assert section14.continued_heading(first, block).endswith(
+        "Locally Advanced or Metastatic Breast Cancer"
+    )
+
+
+def test_a_long_heading_takes_a_title_cased_line_but_never_prose() -> None:
+    first = "Clinical Trial Results in Adults with Chronic GT4 HCV Infection with Compensated"
+    assert section14.continued_heading(first, f"14.3 {first}\nCirrhosis\nPEARL-I was a trial") == (
+        first + " Cirrhosis"
+    )
+    prose = f"14.3 {first}\nThe efficacy of the drug was evaluated in a trial"
+    assert section14.continued_heading(first, prose) == first
+
+
+def test_a_short_heading_is_not_extended_and_ids_counts_and_numbers_stop_it() -> None:
+    assert section14.continued_heading("Melanoma", "14.1 Melanoma\nAdjuvant Treatment") == "Melanoma"
+    long = "A Heading Long Enough To Have Wrapped Onto The Next Line Of Text"
+    for stop in ("KEYNOTE-054 (NCT02362594)", "Patients (N = 120)", "14.2 Next Section",
+                 "A sentence that ends.", ""):
+        assert section14.continued_heading(long, f"14.1 {long}\n{stop}") == long
+    assert section14.continued_heading(long + ".", f"14.1 {long}.\nMore Words") == long + "."
+
+
+def test_descriptions_carry_the_full_heading() -> None:
+    body = ("14 CLINICAL STUDIES\n14.1 Deleterious or Suspected Deleterious Germline "
+            "BRCA-mutated HER2-negative Locally Advanced\nor Metastatic Breast Cancer\n"
+            "EMBRACA (NCT01945775) was an open label study in 431 patients.\n")
+    got = section14.describe_trials("NDA211651", "ORIG", "1", body)
+    assert got and got[0].heading.endswith("Locally Advanced")
+    assert got[0].heading_full.endswith("Metastatic Breast Cancer")
+
+
+def test_an_unheaded_block_has_no_heading_to_continue() -> None:
+    assert section14.continued_heading("", "14 CLINICAL STUDIES\nPreviously Untreated NSCLC") == ""

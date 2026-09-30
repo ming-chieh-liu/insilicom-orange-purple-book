@@ -1,5 +1,10 @@
 # Runbook — tier C: judge the graph's literature candidates
 
+> **[SUPERSEDED by D35, 2026-09-29]** Never run. Submissions with no indication are now case D:
+> `--mode graph-links` writes `output/drug_only_trials.tsv`, P3 builds per-submission units, and
+> they are judged per candidate by `docs/runbooks/trial-candidate-match.md` (`--case CD`). The
+> pick-one prompt `graph-trial-selection` v2 and `graph-prepare/-combine` stay in the repo unused.
+
 **For:** the main agent · **Prompt:** `docs/prompts/graph-trial-selection.md` (v2)
 **Written:** 2026-09-16
 

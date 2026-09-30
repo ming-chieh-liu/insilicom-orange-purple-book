@@ -322,3 +322,31 @@ def test_the_sample_is_reproducible(tmp_path: Path) -> None:
     first = validate.withhold(units, tmp_path / "a.jsonl", 10)
     second = validate.withhold(units, tmp_path / "b.jsonl", 10)
     assert first == second
+
+
+def test_shortlist_recall_scores_only_a_trials_earliest_appearance(tmp_path: Path) -> None:
+    """D16: a later label repeating the trial is not a unit anyone judges."""
+    path = tmp_path / "candidates.jsonl"
+    rows = [
+        {"unit_id": "A|ORIG|1|X", "application": "A", "approval_date": "2010-01-01",
+         "stated_nct": "NCT1", "candidates": [{"nct_id": "NCT1"}]},
+        {"unit_id": "A|SUPPL|2|X", "application": "A", "approval_date": "2012-01-01",
+         "stated_nct": "NCT1", "candidates": [{"nct_id": "NCT9"}]},
+    ]
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    recall = validate.shortlist_recall(path)
+    assert (recall.checked, recall.present) == (1, 1)
+
+
+def test_withheld_units_are_earliest_appearances_only(tmp_path: Path) -> None:
+    path = tmp_path / "candidates.jsonl"
+    rows = [
+        {"unit_id": "A|ORIG|1|X", "application": "A", "approval_date": "2010-01-01",
+         "stated_nct": "NCT00000001", "excerpt": "a trial", "candidates": [{"nct_id": "NCT00000001"}]},
+        {"unit_id": "A|SUPPL|2|X", "application": "A", "approval_date": "2012-01-01",
+         "stated_nct": "NCT00000001", "excerpt": "a trial", "candidates": [{"nct_id": "NCT00000001"}]},
+    ]
+    path.write_text("".join(json.dumps(r) + "\n" for r in rows), encoding="utf-8")
+    truth = validate.withhold(path, tmp_path / "units.jsonl", 10)
+    assert truth == {"A|ORIG|1|X": "NCT00000001"}
+    assert validate.PRECISION_DIR == "precision_d35"

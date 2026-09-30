@@ -48,6 +48,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from pathlib import Path
+from collections.abc import Iterable
 from typing import NamedTuple
 
 from config.settings import MeshVocabulary, RawData
@@ -149,6 +150,40 @@ class IndicationReport(NamedTuple):
     top_diseases: tuple[tuple[str, int], ...]
 
 
+#: Descriptors that are never what an approval is *for*. The sweep finds them
+#: in almost every indication text — "disease progression", "recurrence",
+#: "death", "susceptible strains", "microsatellite instability-high" — and they
+#: were the most-coded ids in ``submission_indications.tsv``: ``Disease`` on
+#: 1,207 rows, ``Disease Progression`` 497, ``Recurrence`` 287, ``Death`` 272.
+#: A description coded to one of them joins no trial's condition and, where it
+#: was the only code, stood in for a real indication that was never found.
+#: Always dropped.
+NON_INDICATION: frozenset[str] = frozenset({
+    "D004194",  # Disease
+    "D018450",  # Disease Progression
+    "D012008",  # Recurrence
+    "D003643",  # Death
+    "D012816",  # Signs and Symptoms
+    "D013577",  # Syndrome
+    "D002908",  # Chronic Disease
+    "D000208",  # Acute Disease
+    "D020969",  # Disease Attributes
+    "D009362",  # Neoplasm Metastasis ("metastatic" qualifies a disease)
+    "D009364",  # Neoplasm Recurrence, Local
+    "D018365",  # Neoplasm, Residual
+    "D053842",  # Microsatellite Instability (a biomarker)
+    "D010677",  # Philadelphia Chromosome (a biomarker)
+    "D013180",  # Sprains and Strains ("susceptible strains" of bacteria)
+})
+
+#: Descriptors below this many tree levels are branch roots — ``Neoplasms``
+#: (C04), ``Infections`` (C01) — and are kept only when the text names nothing
+#: more specific. ``Carcinoma`` is not a root but behaves like one: "urothelial
+#: carcinoma" swept to it for want of the full term.
+GENERIC_DEPTH: int = 1
+GENERIC_EXTRA: frozenset[str] = frozenset({"D002277"})  # Carcinoma
+
+
 class TermIndex(NamedTuple):
     """MeSH entry terms, ready to sweep text against."""
 
@@ -161,16 +196,87 @@ class TermIndex(NamedTuple):
     #: Longest entry term in words, which bounds the sweep.
     max_words: int
     collisions: int
+    #: Branch roots and root-like descriptors: kept only when nothing more
+    #: specific is named (:data:`GENERIC_DEPTH`, :data:`GENERIC_EXTRA`).
+    generic: frozenset[str] = frozenset()
+    #: Terms added from outside MeSH (:func:`registry_aliases`, the registry
+    #: condition names P1 resolved) that no MeSH entry term already covered.
+    added_terms: int = 0
 
 
-def build_index(vocabulary: MeshVocabulary) -> TermIndex:
-    """Index every disease descriptor's entry terms for matching."""
+def registry_aliases(
+    conditions: Iterable[tuple[tuple[str, ...], tuple[str, ...]]],
+    min_studies: int = 3,
+    min_share: float = 0.6,
+) -> dict[str, str]:
+    """Registry condition strings NLM consistently codes to one descriptor.
+
+    ``conditions`` is ``(condition strings, derived condition MeSH)`` per
+    study. Only single-condition studies are read, so a derived id can belong
+    to nothing but that one string; a string becomes an alias when at least
+    ``min_studies`` such studies carry it and one descriptor is on at least
+    ``min_share`` of them.
+
+    This is how "Urothelial Carcinoma" reaches ``Carcinoma, Transitional
+    Cell``: MeSH has no such entry term, so the sweep coded it to the bare
+    ``Carcinoma``, while NLM coded all 117 single-condition studies naming it to
+    D002295. Labels and registries write diseases the same way far more often
+    than either writes them the way MeSH does.
+
+    >>> studies = [(("Urothelial Carcinoma",), ("MESH:D002295", "MESH:D001749"))]
+    >>> studies += [(("Urothelial Carcinoma",), ("MESH:D002295",))] * 2
+    >>> registry_aliases(studies)
+    {'urothelial carcinoma': 'D002295'}
+    >>> registry_aliases(studies[:2])
+    {}
+    >>> registry_aliases([(("A", "B"), ("MESH:D1",))] * 5)
+    {}
+    """
+    seen: Counter[str] = Counter()
+    coded: dict[str, Counter[str]] = {}
+    for names, meshes in conditions:
+        if len(names) != 1 or not meshes:
+            continue
+        term = normalise(names[0])
+        if not term:
+            continue
+        seen[term] += 1
+        tally = coded.setdefault(term, Counter())
+        for mesh in set(meshes):
+            tally[mesh.removeprefix("MESH:")] += 1
+    out: dict[str, str] = {}
+    for term, studies in seen.items():
+        if studies < min_studies:
+            continue
+        # Most studies first, then the lower id, so a tie is deterministic.
+        ui, count = min(coded[term].items(), key=lambda item: (-item[1], item[0]))
+        if count / studies >= min_share:
+            out[term] = ui
+    return out
+
+
+def build_index(
+    vocabulary: MeshVocabulary, extra: Iterable[tuple[str, str]] = ()
+) -> TermIndex:
+    """Index every disease descriptor's entry terms for matching.
+
+    ``extra`` adds ``(text, descriptor ui)`` terms from outside MeSH, in
+    precedence order. One is taken only when it has two or more words, names a
+    disease descriptor, is not :data:`NON_INDICATION`, and no MeSH entry term
+    (or earlier extra term) already claims it — so it can widen the sweep but
+    never overrule MeSH.
+    """
     by_term: dict[str, str] = {}
     names: dict[str, str] = {}
+    generic: set[str] = set(GENERIC_EXTRA)
     max_words = 1
     collisions = 0
     for descriptor in diseases(vocabulary):
         names[descriptor.ui] = descriptor.name
+        if descriptor.tree_numbers and all(
+            number.count(".") + 1 <= GENERIC_DEPTH for number in descriptor.tree_numbers
+        ):
+            generic.add(descriptor.ui)
         for raw in descriptor.terms:
             # Normalised exactly as the text is, or a term carrying punctuation
             # ("alzheimer's diseases", "alzheimer-type dementia (atd)") could
@@ -183,14 +289,26 @@ def build_index(vocabulary: MeshVocabulary) -> TermIndex:
                 continue
             by_term[term] = descriptor.ui
             max_words = max(max_words, len(term.split()))
+    added = 0
+    for raw, raw_ui in extra:
+        term = normalise(raw)
+        ui = raw_ui.removeprefix("MESH:")
+        if (len(term.split()) < 2 or term in by_term or ui not in names
+                or ui in NON_INDICATION):
+            continue
+        by_term[term] = ui
+        max_words = max(max_words, len(term.split()))
+        added += 1
     _log.info(
-        "%d disease descriptors, %d entry terms, %d collisions",
+        "%d disease descriptors, %d entry terms (%d from outside MeSH), %d collisions",
         len(names),
         len(by_term),
+        added,
         collisions,
     )
     return TermIndex(by_term=by_term, names=names, max_words=max_words,
-                     collisions=collisions)
+                     collisions=collisions, generic=frozenset(generic),
+                     added_terms=added)
 
 
 def code(text: str, index: TermIndex) -> set[str]:
@@ -218,7 +336,17 @@ def code(text: str, index: TermIndex) -> set[str]:
     >>> sorted(code("treatment of graves disease", index))
     ['D006111']
     >>> sorted(code("in disease of any kind", index))
-    ['D004194']
+    []
+
+    **A descriptor that is never an indication is dropped** (``Disease`` is
+    one, see :data:`NON_INDICATION`), and **a generic one gives way to a
+    specific one** named in the same text:
+
+    >>> g = TermIndex({"neoplasms": "D009369", "melanoma": "D008545"},
+    ...               {"D009369": "Neoplasms", "D008545": "Melanoma"}, 1, 0,
+    ...               frozenset({"D009369"}))
+    >>> sorted(code("neoplasms such as melanoma", g)), sorted(code("neoplasms", g))
+    (['D008545'], ['D009369'])
     >>> code("", index)
     set()
 
@@ -249,7 +377,7 @@ def code(text: str, index: TermIndex) -> set[str]:
             ui = index.by_term.get(" ".join(words[start:start + length]))
             if ui is not None:
                 spans.append((start, start + length, ui))
-    return {
+    found = {
         ui
         for start, end, ui in spans
         if not any(
@@ -257,7 +385,9 @@ def code(text: str, index: TermIndex) -> set[str]:
             and (other_end - other_start) > (end - start)
             for other_start, other_end, _ in spans
         )
-    }
+    } - NON_INDICATION
+    specific = found - index.generic
+    return specific or found
 
 
 def _section_1(record: dict[str, object]) -> str:
@@ -422,6 +552,10 @@ __all__ = [
     "IndicationRow",
     "IndicationTextRow",
     "TermIndex",
+    "NON_INDICATION",
+    "GENERIC_DEPTH",
+    "GENERIC_EXTRA",
+    "registry_aliases",
     "build",
     "build_index",
     "code",

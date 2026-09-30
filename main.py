@@ -98,10 +98,10 @@ MODES: dict[str, str] = {
     "verdict (see docs/runbooks/label-trial-role.md)",
     "label-role-combine": "pair the label-role judges' answers, batch tiebreaks, "
     "record decided units",
-    "graph-prepare": "batch the tier-C units without a current-prompt verdict "
-    "(see docs/runbooks/select-graph-trial.md)",
-    "graph-combine": "pair the tier-C judges' answers, batch tiebreaks, record "
-    "decided units in adjudication/graph_verdicts.jsonl",
+    "graph-prepare": "SUPERSEDED by D35 (never run): batch the old pick-one "
+    "graph units (docs/runbooks/select-graph-trial.md)",
+    "graph-combine": "SUPERSEDED by D35 (never run): pair the old pick-one graph "
+    "judges' answers into adjudication/graph_verdicts.jsonl",
     "precision-prepare": "sample withheld-answer P4 units per evidence group into "
     "adjudication/precision_p4_v1/ (--limit = units per group, default 40)",
     "precision-combine": "pair the precision experiment's judge answers, batch "
@@ -115,7 +115,10 @@ MODES: dict[str, str] = {
     "labels": "fetch each trial-relevant submission's archived label and read "
     "its section 14 into trial descriptions",
     "candidates": "narrow the trial registry to a judgeable shortlist per "
-    "section-14 description (needs --mode labels and --mode normalize first)",
+    "section-14 description, filtered on the indication (D35), route every "
+    "submission to case A-D and add the case C/D units; writes candidates.jsonl "
+    "and submission_routes.tsv (needs labels, normalize, indication-normalize, "
+    "graph-trials and graph-links first)",
     "identify-prepare": "write adjudication/identify_units.jsonl, the trial "
     "descriptions and their shortlists (see docs/runbooks/identify-trial.md)",
     "identify-combine": "pair the judges' answer files in "
@@ -133,8 +136,8 @@ MODES: dict[str, str] = {
     "shortlist recall now, judge precision with --limit",
     "graph-trials": "precompute the trials the literature connects to each "
     "application, as a ranking input for P3 (Mongo only, no agent calls)",
-    "graph-links": "tier C: gather literature candidates from the Insilicom "
-    "graph for approvals the label route could not serve",
+    "graph-links": "case D (D35): literature candidates from the drug's treats "
+    "edges for submissions with no indication -> output/drug_only_trials.tsv",
 }
 
 
@@ -148,7 +151,10 @@ def build_parser() -> argparse.ArgumentParser:
         "--mode",
         required=True,
         choices=sorted(MODES),
-        help="; ".join(f"{name}: {help_}" for name, help_ in sorted(MODES.items())),
+        help="; ".join(
+            f"{name}: {'[DEPRECATED] ' if name in DEPRECATED else ''}{help_}"
+            for name, help_ in sorted(MODES.items())
+        ),
     )
     parser.add_argument(
         "--fda-raw",
@@ -182,6 +188,19 @@ def build_parser() -> argparse.ArgumentParser:
         choices=(1, 2),
         default=1,
         help="match-combine: judges per candidate (2 for the pilot, 1 for the full run)",
+    )
+    parser.add_argument(
+        "--units",
+        default=None,
+        help="match-prepare/-record: judge the units in this file instead of "
+        "output/candidates.jsonl (P6: adjudication/precision_d35/units.jsonl)",
+    )
+    parser.add_argument(
+        "--case",
+        choices=("B", "C", "D", "CD"),
+        default="B",
+        help="match-prepare/-record: which D35 case to judge — B (section-14 "
+        "descriptions) or C/D (per-submission units with no excerpt)",
     )
     parser.add_argument(
         "--from",
@@ -244,10 +263,40 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+#: Modes kept for reference or reuse that no longer feed the pipeline. Running
+#: one prints a warning every time (the user's rule, 2026-09-29).
+DEPRECATED: dict[str, str] = {
+    "map": "the application-grain trial -> approval map (Week 1); the deliverable is "
+    "P5's submission-grain trial_submission_map.tsv (D2)",
+    "attribute": "dates the Week-1 application-grain map; superseded by P5 (D2, D16)",
+    "adjudicate-prepare": "the old section-14 polarity task on today's labels; "
+    "superseded by the D28 label-role task (label-role-*)",
+    "adjudicate-combine": "the old section-14 polarity task; superseded by D28",
+    "adjudicate-record": "the old section-14 polarity task; superseded by D28",
+    "identify-prepare": "pick-one P4; superseded by per-candidate matching (match-*, D33/D35)",
+    "identify-combine": "pick-one P4; superseded by match-* (D33/D35)",
+    "identify-record": "pick-one P4; superseded by match-* (D33/D35); P5 ignores its "
+    "verdicts (version < 3)",
+    "graph-prepare": "the pick-one tier-C graph judging, never run; superseded by case D "
+    "(graph-links -> candidates -> match-* --case CD, D35)",
+    "graph-combine": "the pick-one tier-C graph judging; superseded by case D (D35)",
+    "precision-prepare": "pick-one precision experiment; P6 precision is "
+    "docs/runbooks/validate-precision.md (D35)",
+    "precision-combine": "pick-one precision experiment; superseded by "
+    "docs/runbooks/validate-precision.md (D35)",
+}
+
+
 def main(argv: list[str] | None = None) -> int:
     """Dispatch one mode and return its exit status."""
     args = build_parser().parse_args(argv)
     configure(logging.DEBUG if args.verbose else logging.INFO)
+    if args.mode in DEPRECATED:
+        print(
+            f"WARNING: --mode {args.mode} is DEPRECATED — {DEPRECATED[args.mode]}. "
+            "Its output does not feed the current pipeline.",
+            file=sys.stderr,
+        )
 
     if args.mode == "census":
         data = RawData(root=Path(args.fda_raw))
@@ -353,6 +402,14 @@ def main(argv: list[str] | None = None) -> int:
             row.application for row in gt_spine.rows if row.trial_relevant == "true"
         )
         gt_ingredients = normalize.ingredients_of(data, gt_apps)
+        # D35: full sponsor protocol ids in the abstracts, resolved to exactly
+        # one registry study through the same index the review route uses.
+        gt_archive = TrialArchive(root=Path(args.trial_archive))
+        gt_protocols = review_trials.build_index(trial_studies.read_study_facts(gt_archive))
+
+        def gt_resolve(text: str) -> list[tuple[str, str]]:
+            return review_trials.protocol_trials(text, gt_protocols)
+
         import pymongo
 
         gt_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
@@ -365,12 +422,13 @@ def main(argv: list[str] | None = None) -> int:
                 GraphEvidenceRepository(gt_client, connection),
                 gt_apps,
                 gt_ingredients,
+                resolve=gt_resolve,
             )
         finally:
             gt_client.close()
         repository_gt = TsvRepository(out_dir)
         repository_gt.save(
-            "graph_trials", ("application", "nct_id", "mentions"), gt_report.rows
+            "graph_trials", ("application", "nct_id", "mentions", "via"), gt_report.rows
         )
         print(graph_trials.render(gt_report))
         return 0
@@ -381,27 +439,32 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{data.root} not found — tier C needs the bulk data tree")
             return 1
         out_dir = Path(args.out)
-        unlinked_path = out_dir / "unlinked_submissions.tsv"
-        if not unlinked_path.is_file():
-            print(f"{unlinked_path} not found — run --mode assemble first")
-            return 1
         connection = BiokdeConnection(credentials=Path(args.creds))
         if not connection.has_credentials:
             print(f"{connection.credentials} not found — pass --creds")
             return 1
-        # Exactly what the label route EXHAUSTED, read rather than recomputed.
-        # not_yet_judged is excluded: that means P4 has not looked, not that it
-        # failed, and a tier-C link is never promoted to the tier P4 might reach.
-        with unlinked_path.open(encoding="utf-8") as handle:
-            unserved = graph_links.exhausted_only(
-                list(csv.DictReader(handle, delimiter="\t"))
+        # D35: case D's scope — every in-scope, non-guard submission with no
+        # indication. P3 keeps a D unit only where the label route has nothing
+        # of the submission's own, so this is deliberately the wider set.
+        events_path = out_dir / "approval_events.tsv"
+        with events_path.open(encoding="utf-8") as handle:
+            unserved = graph_links.no_indication_scope(
+                list(csv.DictReader(handle, delimiter="\t")),
+                indication_normalize.read_chosen(out_dir / "submission_indications.tsv"),
             )
         archive = TrialArchive(root=Path(args.trial_archive))
+        facts_all = list(trial_studies.read_study_facts(archive))
         studies = {
             facts.nct_id: (facts.start_date, facts.enrollment, ";".join(facts.phases),
                            facts.primary_completion)
-            for facts in trial_studies.read_study_facts(archive)
+            for facts in facts_all
         }
+        gl_protocols = review_trials.build_index(facts_all)
+        del facts_all
+
+        def gl_resolve(text: str) -> list[tuple[str, str]]:
+            return review_trials.protocol_trials(text, gl_protocols)
+
         spine_rows = approval_events.build(data)
         ingredients = normalize.ingredients_of(
             data,
@@ -425,9 +488,16 @@ def main(argv: list[str] | None = None) -> int:
                 unserved,
                 ingredients,
                 limit=args.limit,
+                resolve=gl_resolve,
             )
         finally:
             graph_client.close()
+        TsvRepository(args.out).save(
+            "drug_only_trials",
+            ("application", "submission_type", "submission_no", "nct_id", "mentions",
+             "diseases", "protocol_id"),
+            graph_links.drug_only_rows(graph_report.units),
+        )
         units_path = Path(args.adjudication) / "graph_units.jsonl"
         units_path.parent.mkdir(parents=True, exist_ok=True)
         with units_path.open("w", encoding="utf-8") as handle:
@@ -462,14 +532,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"    {sources or '(none recorded)':<38}{count:>9,}")
         print(f"    attribution moved between routes       {moved:>9,}")
         if args.limit:
-            adjudication_dir = Path(args.adjudication)
-            truth = validate.withhold(
-                units_path,
-                adjudication_dir / "validate_units.jsonl",
-                args.limit,
-            )
-            truth_path = adjudication_dir / "validate_truth.json"
-            truth_path.write_text(json.dumps(truth, indent=2), encoding="utf-8")
+            # P6 judge precision (D35): withheld-answer units in their own folder,
+            # judged by match-* --units, never mixed with production verdicts.
+            adjudication_dir = Path(args.adjudication) / validate.PRECISION_DIR
+            adjudication_dir.mkdir(parents=True, exist_ok=True)
+            truth_path = adjudication_dir / "truth.json"
+            if truth_path.is_file():
+                truth = json.loads(truth_path.read_text(encoding="utf-8"))
+            else:
+                truth = validate.withhold(
+                    units_path, adjudication_dir / "units.jsonl", args.limit
+                )
+                truth_path.write_text(json.dumps(truth, indent=2), encoding="utf-8")
             precision, _ = validate.score(
                 truth, adjudication_dir / "identify_verdicts.jsonl"
             )
@@ -525,12 +599,20 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.mode in ("match-prepare", "match-record"):
         out_dir = Path(args.out)
-        match_units = candidate_match.select_units(
-            out_dir / "candidates.jsonl",
-            out_dir / "approval_events.tsv",
-            out_dir / "drug_map.tsv",
-            args.limit,
-        )
+        if args.units:
+            # P6: withheld-answer units, taken as written (validate already
+            # chose them); judged in the folder --adjudication names.
+            match_units = candidate_match.sample_order(
+                list(identification.iter_json_lines(Path(args.units))), args.limit
+            )
+        else:
+            match_units = candidate_match.select_units(
+                out_dir / "candidates.jsonl",
+                out_dir / "approval_events.tsv",
+                out_dir / "drug_map.tsv",
+                args.limit,
+                case=args.case,
+            )
         if args.mode == "match-prepare":
             print(candidate_match.prepare_round(match_units, Path(args.adjudication)))
         else:
@@ -636,7 +718,18 @@ def main(argv: list[str] | None = None) -> int:
             if not (out_dir / needed).is_file():
                 print(f"{out_dir / needed} not found — run labels and normalize first")
                 return 1
-        candidates_report = candidates.build(data, archive, out_dir)
+        cand_vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
+        if not cand_vocabulary.exists:
+            print(f"{cand_vocabulary.descriptors} not found — pass --mesh")
+            return 1
+        candidates_report = candidates.build(
+            data, archive, out_dir,
+            ancestors=mesh_descriptors.ancestors(mesh_descriptors.read(cand_vocabulary)),
+        )
+        TsvRepository(args.out).save(
+            "submission_routes", ("submission", "route"),
+            [candidates.SubmissionRoute(*row) for row in candidates_report.routes],
+        )
         units_path = out_dir / "candidates.jsonl"
         with units_path.open("w", encoding="utf-8") as handle:
             for unit in candidates_report.units:
@@ -933,17 +1026,34 @@ def main(argv: list[str] | None = None) -> int:
             Path(args.adjudication) / "letter_indication_verdicts.jsonl"
         )
         headings: dict[str, list[str]] = {}
+        heading_text: dict[tuple[str, str], str] = {}
         for r in _tsv("label_trials.tsv"):
             heading = (r.get("heading") or "").strip()
             if heading and heading not in headings.setdefault(_key(r), []):
                 headings[_key(r)].append(heading)
+            full = (r.get("heading_full") or "").strip()
+            if heading and full:
+                heading_text[(_key(r), heading)] = full
         openfda: dict[str, set[str]] = {}
         for r in _tsv("indications.tsv"):
             if r.get("mesh_id"):
                 openfda.setdefault(r["application"], set()).add(r["mesh_id"])
+        # One coder for every source (D30): today's label §1 text is coded here
+        # rather than taking --mode indications' ids, coded by the bare sweep.
+        openfda_text = {r["application"]: r.get("text") or ""
+                        for r in _tsv("indication_text.tsv")} or None
         condition_rows = _tsv("trial_condition_map.tsv")
         exact = {r["source_name"].casefold(): r["mesh_id"] for r in condition_rows}
         known = {r["mesh_id"]: r["biokdeid"] for r in condition_rows if r.get("biokdeid")}
+        # D34: terms outside MeSH widen the sweep — first the registry condition
+        # strings NLM consistently codes to one descriptor, then the ones P1
+        # resolved through biokde. Neither overrules a MeSH entry term.
+        in_archive = TrialArchive(root=Path(args.trial_archive))
+        aliases = indications.registry_aliases(
+            (facts.conditions, facts.derived_condition_mesh)
+            for facts in trial_studies.read_study_facts(in_archive)
+        ) if in_archive.study_shards else {}
+        extra_terms = list(aliases.items()) + list(exact.items())
         import pymongo
 
         in_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
@@ -960,8 +1070,10 @@ def main(argv: list[str] | None = None) -> int:
                 openfda=openfda,
                 exact=exact,
                 known_biokdeids=known,
-                index=indications.build_index(vocabulary),
+                index=indications.build_index(vocabulary, extra=extra_terms),
                 internal_ids=BiokdeRepository(in_client, connection).internal_ids,
+                heading_text=heading_text,
+                openfda_text=openfda_text,
             )
         finally:
             in_client.close()
@@ -993,7 +1105,7 @@ def main(argv: list[str] | None = None) -> int:
             "label_trials",
             ("application", "submission_type", "submission_no", "section",
              "heading", "nct_id", "acronym", "enrollment", "design", "excerpt",
-             "label_sha"),
+             "label_sha", "heading_full"),
             labels_report.descriptions,
         )
         repository.save(

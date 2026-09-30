@@ -137,6 +137,8 @@ def build(
     known_biokdeids: dict[str, str],
     index: indications.TermIndex,
     internal_ids: Callable[[Iterable[str]], dict[str, str]],
+    heading_text: dict[tuple[str, str], str] | None = None,
+    openfda_text: dict[str, str] | None = None,
 ) -> IndicationReport:
     """Code every source of every in-scope submission into one table.
 
@@ -160,12 +162,17 @@ def build(
             ids = code_text(text, exact, index)
             pending.append((sub, source, "", text, ids))
             coded_submission = coded_submission or bool(ids)
-        if not coded_submission and openfda.get(application):
+        current = (openfda_text or {}).get(application, "")
+        if not coded_submission and current:
+            pending.append((sub, SOURCE_OPENFDA, "", current,
+                            code_text(current, exact, index)))
+        elif not coded_submission and openfda_text is None and openfda.get(application):
             ids = sorted(_prefixed(ui) for ui in openfda[application])
             pending.append((sub, SOURCE_OPENFDA, "", "", ids))
         for heading in headings.get(key, []):
-            pending.append((sub, SOURCE_HEADING, heading, heading,
-                            code_text(heading, exact, index)))
+            full = (heading_text or {}).get((key, heading)) or heading
+            pending.append((sub, SOURCE_HEADING, heading, full,
+                            code_text(full, exact, index)))
 
     all_ids = {i for *_, ids in pending for i in ids}
     biokde = dict(known_biokdeids)

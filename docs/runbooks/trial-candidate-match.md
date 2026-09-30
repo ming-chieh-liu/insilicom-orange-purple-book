@@ -1,7 +1,21 @@
 # Runbook — P4 per-candidate matching (D33)
 
-**For:** the main agent · **Prompt:** `docs/prompts/trial-candidate-match.md` (v1)
-**Code:** `service/candidate_match.py` · **Written:** 2026-09-28
+**For:** the main agent · **Prompts:** `docs/prompts/trial-candidate-match.md` (v1, case B) and
+`docs/prompts/trial-candidate-match-nolabel.md` (v1, cases C and D)
+**Code:** `service/candidate_match.py` · **Written:** 2026-09-28 · **Updated:** 2026-09-29 (D35)
+
+> **D35 (2026-09-29).** Three kinds of unit, one tier mechanism:
+> - **Case B** — a §14 description with no identifier (`--case B`, the default). Its shortlist is
+>   the drug pool **filtered on the indication** (MeSH tree, keeping id-less trials), top 100 by
+>   rank = **at most 10 tiers**, plus the literature's candidates beyond the 100, unfiltered.
+> - **Case C** — a submission with an indication but no §14 description of its own; **case D** — a
+>   submission with no indication (`--case CD`, or `C` / `D`). One unit per submission, judged with
+>   the **no-label prompt**; results are tiers C and D (`docs/TIERS.md`).
+>
+> `match-prepare` writes one prompt per batch file: `batch-NNN.ids` (excerpt prompt) and
+> `nolabel-NNN.ids` (no-label prompt); judges write `batch-NNN-{A,B}.txt` / `nolabel-NNN-{A,B}.txt`.
+> Answers are stamped with the prompt's name and version. Pilots: two judges + third, 50 units per
+> case family; full runs: one judge.
 
 Replaces `docs/runbooks/identify-trial.md` (pick one of the whole shortlist, two judges plus a
 third) for P4. That runbook, its prompt and `identify-prepare/combine/record` stay in the repo for

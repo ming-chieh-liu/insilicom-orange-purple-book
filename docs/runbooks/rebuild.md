@@ -2,6 +2,11 @@
 
 **Written:** 2026-09-25 · **For:** the main agent, with the user present for the pilots.
 
+> **[PARTIALLY SUPERSEDED 2026-09-29 by D35]** The stage order below predates D34/D35. The current
+> run order and what is actually done are in `docs/STATUS.md` (audited 2026-09-29). Step 1.1 below
+> was never run — the review download is ~99%, with 131 files missing. Step 2.1 (pick-one P4) is
+> replaced by D33/D35, and step 2.6 (tier C) becomes cases C and D.
+
 Rebuilds `output/` under D23–D31. Every step is resumable; a step that fails is
 re-run, not worked around. **Only one process may talk to FDA at a time** — the
 steps marked **FDA** are sequential and polite (1 request/s, breaker after 5

@@ -32,7 +32,7 @@ a 313 MB document and nothing here needs more than one record at a time.
 from __future__ import annotations
 
 import xml.etree.ElementTree as ElementTree
-from collections.abc import Iterator
+from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
@@ -192,8 +192,37 @@ def diseases(vocabulary: MeshVocabulary) -> list[Descriptor]:
     return found
 
 
+def ancestors(descriptors: Iterable[Descriptor]) -> dict[str, frozenset[str]]:
+    """``MESH:D…`` → every descriptor above it in the tree, at any depth.
+
+    A descriptor sits in several places, so all of its tree numbers are walked;
+    each proper prefix that is itself a descriptor's tree number is an
+    ancestor. P3's indication filter (D35) asks "same, ancestor or descendant".
+
+    >>> ds = [Descriptor("D1", "Neoplasms", (), ("C04",)),
+    ...       Descriptor("D2", "Carcinoma", (), ("C04.557",)),
+    ...       Descriptor("D3", "Carcinoma, Transitional Cell", (), ("C04.557.470",))]
+    >>> sorted(ancestors(ds)["MESH:D3"]), sorted(ancestors(ds)["MESH:D1"])
+    (['MESH:D1', 'MESH:D2'], [])
+    """
+    listed = list(descriptors)
+    at = {number: f"MESH:{d.ui}" for d in listed for number in d.tree_numbers}
+    out: dict[str, frozenset[str]] = {}
+    for descriptor in listed:
+        found: set[str] = set()
+        for number in descriptor.tree_numbers:
+            parts = number.split(".")
+            for depth in range(1, len(parts)):
+                above = at.get(".".join(parts[:depth]))
+                if above:
+                    found.add(above)
+        out[f"MESH:{descriptor.ui}"] = frozenset(found)
+    return out
+
+
 __all__ = [
     "DISEASE_BRANCHES",
+    "ancestors",
     "MIN_TERM_LENGTH",
     "TERM_PATH",
     "Descriptor",

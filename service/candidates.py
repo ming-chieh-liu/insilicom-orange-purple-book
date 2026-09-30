@@ -42,7 +42,7 @@ from __future__ import annotations
 import csv
 import re
 from collections import Counter
-from collections.abc import Iterable, Iterator
+from collections.abc import Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import NamedTuple
 
@@ -77,6 +77,16 @@ _log = get_logger(__name__)
 #: Raising this without re-running that pilot was a deliberate call, not an
 #: oversight.
 CANDIDATE_CAP: int = 100
+
+#: D35 cases: a §14 description (B), an indication with no judgeable §14
+#: description (C), no indication at all (D). Case A needs no unit of its own:
+#: it is a B-shaped description whose label or review states the trial.
+CASE_B: str = "B"
+CASE_C: str = "C"
+CASE_D: str = "D"
+
+#: Case D's literature candidates, written by ``--mode graph-links`` (D35).
+DRUG_ONLY_FILE: str = "drug_only_trials.tsv"
 
 #: Where :func:`collapse` records the name it keyed on, so ``build`` and the
 #: P4 reader use the same one rather than each deriving it again.
@@ -117,6 +127,10 @@ class Candidate(NamedTuple):
     #: per-candidate judge (P4 v2, D33) alongside the fields above.
     lead_sponsor: str = ""
     primary_completion: str = ""
+    #: Case D (D35): the diseases whose treatment literature named this trial,
+    #: so a judge sees what it is about when the approval's indication is not
+    #: recorded.
+    found_under: str = ""
 
 
 class Unit(NamedTuple):
@@ -142,6 +156,17 @@ class Unit(NamedTuple):
     #: when the label's trial name matches that id or the registry acronym
     #: (D29). Set only where :attr:`stated_nct` is empty.
     review_nct: str = ""
+    #: Every disease this description is ranked on (D34): all its §14
+    #: heading's ids, else every id the submission's own letter and label §1
+    #: name. :attr:`indication_mesh` stays the single id P5 reports.
+    indication_ids: tuple[str, ...] = ()
+    #: D35 case: ``B`` (a §14 description), ``C`` (indication, no judgeable
+    #: §14 description) or ``D`` (no indication). A and B share one shape.
+    case: str = CASE_B
+    #: Cases C and D: what the judge reads instead of an excerpt — the
+    #: submission's chosen indication text, and the approved ingredient names.
+    indication_text: str = ""
+    drug: str = ""
 
     @property
     def needs_judgement(self) -> bool:
@@ -168,6 +193,10 @@ class CandidatesReport(NamedTuple):
     median_candidates: int
     #: Descriptions resolved by a same-submission review's protocol id (D29).
     review_identified: int = 0
+    #: D35 routing of every trial-relevant submission: ``(key, route)``.
+    routes: tuple[tuple[str, str], ...] = ()
+    case_c_with_candidates: int = 0
+    case_d_with_candidates: int = 0
 
     @property
     def to_judge(self) -> int:
@@ -350,6 +379,148 @@ def pick_indication(heading_ids: list[str], chosen_ids: list[str]) -> str:
     if heading_ids:
         return heading_ids[0] if len(heading_ids) == 1 else ""
     return chosen_ids[0] if len(chosen_ids) == 1 else ""
+
+
+#: :func:`route` values besides the cases.
+ROUTE_LABEL = "label"          # the submission holds a §14 description of its own (A/B)
+ROUTE_GUARD = "guard"          # D24: read for D16, never judged
+ROUTE_BIOSIMILAR = "biosimilar_copied_label"
+
+
+class SubmissionRoute(NamedTuple):
+    """One row of ``submission_routes.tsv``: which D35 case a submission is."""
+
+    submission: str
+    route: str
+
+
+def owned_submissions(units: Iterable[Unit]) -> set[str]:
+    """Submissions that hold the **earliest** appearance of some §14 trial.
+
+    The same grouping P4 and P5 use (D16): a stated or review-resolved id
+    groups by the id, anything else by the trial key at the end of the unit
+    id. A submission whose every description is a later appearance of an
+    earlier approval's trial owns none — its own evidence is not on the label,
+    so it is routed to case C or D.
+
+    >>> u = lambda key, name, date, nct="": Unit(f"{key}|{name}", key.split("|")[0],
+    ...     key.split("|")[1], key.split("|")[2], date, "", "", "", nct, "", "", "", ())
+    >>> sorted(owned_submissions([u("NDA1|ORIG|1", "X", "2010"), u("NDA1|SUPPL|2", "X", "2012"),
+    ...                           u("NDA1|SUPPL|3", "Y", "2013")]))
+    ['NDA1|ORIG|1', 'NDA1|SUPPL|3']
+    """
+    listed = list(units)
+    first: dict[tuple[str, str], str] = {}
+    keyed: list[tuple[tuple[str, str], str, str]] = []
+    for unit in listed:
+        if unit.case != CASE_B:
+            continue
+        trial = unit.stated_nct or unit.review_nct or unit.unit_id.rsplit("|", 1)[-1]
+        group = (unit.application, trial)
+        key = f"{unit.application}|{unit.submission_type}|{unit.submission_no}"
+        keyed.append((group, unit.approval_date, key))
+        if group not in first or unit.approval_date < first[group]:
+            first[group] = unit.approval_date
+    return {key for group, when, key in keyed if first[group] == when}
+
+
+def route(
+    submissions: Iterable[tuple[str, str]],
+    owned: set[str],
+    chosen_ids: Mapping[str, list[str]],
+    drug_of_app: Mapping[str, set[str]],
+    borrowed: set[str],
+) -> list[tuple[str, str]]:
+    """D35: which case each trial-relevant submission ``(key, trial_scope)`` is.
+
+    ``label`` when it owns a §14 description (cases A/B, handled per
+    description); ``guard`` for a D24 submission; ``biosimilar_copied_label``
+    for a 351(k) whose drug resolved only through its reference product's
+    stem, whose trials legally cannot be its evidence; otherwise ``C`` when it
+    has a chosen indication and ``D`` when it has none.
+
+    >>> route([("A|ORIG|1", "full"), ("B|ORIG|1", "guard"), ("C|ORIG|1", "full"),
+    ...        ("D|ORIG|1", "full"), ("E|ORIG|1", "full")],
+    ...       {"A|ORIG|1"}, {"C|ORIG|1": ["MESH:D1"]}, {"E": {"MESH:REF"}}, {"MESH:REF"})
+    [('A|ORIG|1', 'label'), ('B|ORIG|1', 'guard'), ('C|ORIG|1', 'C'), ('D|ORIG|1', 'D'), ('E|ORIG|1', 'biosimilar_copied_label')]
+    """
+    out: list[tuple[str, str]] = []
+    for key, scope in submissions:
+        application = key.split("|", 1)[0]
+        if key in owned:
+            case = ROUTE_LABEL
+        elif scope == "guard":
+            case = ROUTE_GUARD
+        elif drug_of_app.get(application, set()) & borrowed:
+            case = ROUTE_BIOSIMILAR
+        elif chosen_ids.get(key):
+            case = CASE_C
+        else:
+            case = CASE_D
+        out.append((key, case))
+    return out
+
+
+def read_chosen_text(out_dir: Path) -> dict[str, str]:
+    """The text of each submission's chosen indication, for a case-C judge."""
+    out: dict[str, str] = {}
+    for row in _read_tsv(out_dir / "submission_indications.tsv"):
+        if row.get("chosen") == "true" and row.get("text"):
+            key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+            out.setdefault(key, row["text"])
+    return out
+
+
+def read_drug_only(out_dir: Path) -> dict[str, list[tuple[str, str]]]:
+    """Case D's literature candidates per submission, best first (D35)."""
+    out: dict[str, list[tuple[str, str]]] = {}
+    for row in _read_tsv(out_dir / DRUG_ONLY_FILE):
+        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        out.setdefault(key, []).append((row["nct_id"], row.get("diseases") or ""))
+    return out
+
+
+def pick_indications(
+    heading_ids: list[str], submission_ids: list[str]
+) -> tuple[str, ...]:
+    """Every disease a trial description is ranked on (D34).
+
+    Its own §14 heading's ids when the heading names any — *all* of them,
+    because a heading naming two diseases is about both; otherwise every id the
+    submission's own documents name. Unlike :func:`pick_indication` this never
+    refuses: a candidate matching any of them ranks as a condition match. The
+    refusal cost 36% of judged descriptions their indication, and a ranking
+    key that is merely broad does far less harm than one that is absent.
+
+    >>> pick_indications(["MESH:D2", "MESH:D1"], ["MESH:D9"])
+    ('MESH:D1', 'MESH:D2')
+    >>> pick_indications([], ["MESH:D9", "MESH:D8", "MESH:D9"])
+    ('MESH:D8', 'MESH:D9')
+    >>> pick_indications([], [])
+    ()
+    """
+    return tuple(sorted(set(heading_ids or submission_ids)))
+
+
+def read_submission_ids(out_dir: Path) -> dict[str, list[str]]:
+    """Every coded id a submission's own documents name, by submission key.
+
+    Letter, agent-located letter and the submission's label §1 — not today's
+    openFDA label, which is not the submission's. §1 is cumulative, so on a
+    supplement it also names the older indications; that is why it is here:
+    a trial carried forward from an earlier approval is about one of them, and
+    the letter names only what this submission added (D34).
+    """
+    own = {"letter", "letter_located", "label_section_1"}
+    ids: dict[str, list[str]] = {}
+    for row in _read_tsv(out_dir / "submission_indications.tsv"):
+        mesh_id = row.get("mesh_id") or ""
+        if row.get("source") in own and mesh_id:
+            key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+            held = ids.setdefault(key, [])
+            if mesh_id not in held:
+                held.append(mesh_id)
+    return ids
 
 
 def read_indications(
@@ -640,9 +811,45 @@ def index_studies(
     return studies, by_drug, by_condition
 
 
+def indication_allows(
+    indication_ids: Iterable[str],
+    trial_ids: Iterable[str],
+    ancestors: Mapping[str, frozenset[str]],
+) -> bool:
+    """Whether the D35 indication filter keeps a trial.
+
+    Kept when the trial's condition id and one of the description's
+    indication ids are the same descriptor, or one sits anywhere above the
+    other in the MeSH tree — and **whenever either side has no id at all**:
+    CHECKMATE-648 registers "Various Advanced Cancer", which codes to nothing,
+    and a filter that dropped id-less trials lost it. Siblings do not count:
+    they recover almost nothing and match NSCLC to SCLC.
+
+    >>> tree = {"MESH:D3": frozenset({"MESH:D1", "MESH:D2"}), "MESH:D2": frozenset({"MESH:D1"})}
+    >>> indication_allows(["MESH:D2"], ["MESH:D3"], tree)   # descendant
+    True
+    >>> indication_allows(["MESH:D3"], ["MESH:D1"], tree)   # ancestor
+    True
+    >>> indication_allows(["MESH:D3"], ["MESH:D9"], tree)   # unrelated
+    False
+    >>> indication_allows([], ["MESH:D9"], tree), indication_allows(["MESH:D3"], [], tree)
+    (True, True)
+    """
+    wanted = {i for i in indication_ids if i}
+    have = {t for t in trial_ids if t}
+    if not wanted or not have or wanted & have:
+        return True
+    empty: frozenset[str] = frozenset()
+    return any(
+        w in ancestors.get(t, empty) or t in ancestors.get(w, empty)
+        for w in wanted
+        for t in have
+    )
+
+
 def shortlist(
     drug_mesh: set[str],
-    indication_mesh: str,
+    indication_mesh: str | Iterable[str],
     approval_date: str,
     studies: dict[str, Candidate],
     by_drug: dict[str, set[str]],
@@ -651,8 +858,19 @@ def shortlist(
     prefer_biosimilar: bool = False,
     label_name: str = "",
     from_graph: frozenset[str] = frozenset(),
+    condition_ids: Mapping[str, frozenset[str]] | None = None,
+    ancestors: Mapping[str, frozenset[str]] | None = None,
 ) -> tuple[Candidate, ...]:
     """The studies that could have supported this approval.
+
+    **D35 filters the drug pool on the indication before the cap** when
+    ``condition_ids`` (NCT → condition ids) and ``ancestors`` are given: see
+    :func:`indication_allows`. Filtering first lets a correct trial that the
+    ranking had put below the cap move into it — measured on 2,412
+    label-stated answers, 115 are dropped and 87 recovered, net −28. The
+    literature's candidates (``from_graph``) are **not** filtered: they were
+    found through this drug and its indication already. The earlier text below
+    predates D35 and is kept for its measurements.
 
     Two hard filters and then a ranking. Drug is hard: the approval is for that
     molecule. Date is hard: a trial cannot have supported an approval granted
@@ -738,7 +956,19 @@ def shortlist(
         }
         pool &= started_before
         injected &= started_before
-    matching = by_condition.get(indication_mesh, set()) if indication_mesh else set()
+    # One id or several (D34): a candidate matching any of them is a match.
+    wanted = (
+        {indication_mesh} if isinstance(indication_mesh, str) else set(indication_mesh)
+    ) - {""}
+    if wanted and condition_ids is not None and ancestors is not None:
+        empty: frozenset[str] = frozenset()
+        pool = {
+            nct for nct in pool
+            if indication_allows(wanted, condition_ids.get(nct, empty), ancestors)
+        }
+    matching: set[str] = set()
+    for mesh in wanted:
+        matching |= by_condition.get(mesh, set())
     target = int(stated_enrollment) if stated_enrollment.isdigit() else None
 
     def rank(nct: str) -> tuple[int, int, int, int, int, int, int, str]:
@@ -780,6 +1010,19 @@ def shortlist(
 
 __all__ = [
     "CANDIDATE_CAP",
+    "CASE_B",
+    "CASE_C",
+    "CASE_D",
+    "DRUG_ONLY_FILE",
+    "ROUTE_BIOSIMILAR",
+    "ROUTE_GUARD",
+    "ROUTE_LABEL",
+    "indication_allows",
+    "owned_submissions",
+    "read_chosen_text",
+    "read_drug_only",
+    "route",
+    "SubmissionRoute",
     "TRIAL_KEY",
     "PHASES_KEPT",
     "Candidate",
@@ -789,7 +1032,9 @@ __all__ = [
     "BIOSIMILAR_TRIAL",
     "MIN_NAME_LENGTH",
     "pick_indication",
+    "pick_indications",
     "read_indications",
+    "read_submission_ids",
     "collapse",
     "paired_name",
     "split_pairings",
@@ -808,8 +1053,17 @@ def build(
     data: RawData,
     archive: TrialArchive,
     out_dir: Path,
+    ancestors: Mapping[str, frozenset[str]] | None = None,
 ) -> CandidatesReport:
-    """Collapse the descriptions, index the registry, and shortlist each unit."""
+    """Collapse the descriptions, index the registry, and shortlist each unit.
+
+    D35: with ``ancestors`` (the MeSH tree, :func:`source.mesh_descriptors.ancestors`)
+    the drug pool is filtered on the indication before the cap. After the §14
+    units, every trial-relevant submission is routed (:func:`route`), and one
+    unit is added per case-C submission (indication, no judgeable §14
+    description) and per case-D submission (no indication; candidates from
+    ``drug_only_trials.tsv``).
+    """
     descriptions = list(_read_tsv(out_dir / "label_trials.tsv"))
     collapsed = collapse(descriptions)
     _log.info("%d descriptions collapsed to %d units", len(descriptions), len(collapsed))
@@ -850,11 +1104,19 @@ def build(
         ),
     )
     heading_ids, chosen_ids = read_indications(out_dir)
+    document_ids = read_submission_ids(out_dir)
     if not heading_ids and not chosen_ids:
         _log.warning("submission_indications.tsv is empty or missing — run "
                      "--mode indication-normalize first; units get no indication")
     studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of)
     reviewed = review_names(out_dir)
+    condition_ids: dict[str, frozenset[str]] | None = None
+    if ancestors is not None:
+        inverted: dict[str, set[str]] = {}
+        for mesh, ncts in by_condition.items():
+            for nct in ncts:
+                inverted.setdefault(nct, set()).add(mesh)
+        condition_ids = {nct: frozenset(ids) for nct, ids in inverted.items()}
 
     units: list[Unit] = []
     no_drug = no_candidates = over_cap = already = from_review = 0
@@ -870,6 +1132,10 @@ def build(
         indication_mesh = pick_indication(
             heading_ids.get((key, heading), []), chosen_ids.get(key, [])
         )
+        indication_ids = pick_indications(
+            heading_ids.get((key, heading), []),
+            chosen_ids.get(key, []) + document_ids.get(key, []),
+        )
         stated = row.get("nct_id", "")
         # D29: a direct FDA identification skips the shortlist entirely.
         resolved = "" if stated else review_match(row.get("acronym", ""),
@@ -883,7 +1149,7 @@ def build(
         else:
             shortlisted = shortlist(
                 drug_mesh,
-                indication_mesh,
+                indication_ids,
                 approval_of.get(key, ""),
                 studies,
                 by_drug,
@@ -899,6 +1165,8 @@ def build(
                 # the key instead of the acronym cost 4.2 points of recall.
                 label_name=row.get("acronym", ""),
                 from_graph=from_graph_by_app.get(row["application"], frozenset()),
+                condition_ids=condition_ids,
+                ancestors=ancestors,
             )
         if stated:
             already += 1
@@ -928,6 +1196,76 @@ def build(
                 candidates=shortlisted,
                 label_sha=row.get("label_sha", ""),
                 review_nct=resolved,
+                indication_ids=indication_ids,
+            )
+        )
+    # D35: route every trial-relevant submission, then add the C and D units.
+    borrowed = {fda_drug[name] for name in via_stem if name in fda_drug}
+    drug_of_app = {
+        application: {fda_drug[n] for n in names if n in fda_drug}
+        for application, names in ingredients.items()
+    }
+    routes = route(
+        [(f"{r.application}|{r.submission_type}|{r.submission_no}", r.trial_scope)
+         for r in spine.rows if r.trial_relevant == "true"],
+        owned_submissions(units), chosen_ids, drug_of_app, borrowed,
+    )
+    chosen_text = read_chosen_text(out_dir)
+    drug_only = read_drug_only(out_dir)
+    for needed, mode in ((DRUG_ONLY_FILE, "graph-links"), ("graph_trials.tsv", "graph-trials")):
+        if not (out_dir / needed).is_file():
+            _log.warning("%s is missing — run --mode %s first; its literature "
+                         "candidates are absent from this pass", needed, mode)
+    events = {
+        f"{r.application}|{r.submission_type}|{r.submission_no}": r for r in spine.rows
+    }
+    with_c = with_d = 0
+    for key, case in routes:
+        if case not in (CASE_C, CASE_D):
+            continue
+        event = events[key]
+        drugs = drug_of_app.get(event.application, set())
+        names = "; ".join(sorted(ingredients.get(event.application, ())))
+        if case == CASE_C:
+            ids = pick_indications([], chosen_ids.get(key, []) + document_ids.get(key, []))
+            listed = shortlist(
+                drugs, ids, event.approval_date, studies, by_drug, by_condition,
+                prefer_biosimilar=False,
+                from_graph=from_graph_by_app.get(event.application, frozenset()),
+                condition_ids=condition_ids, ancestors=ancestors,
+            ) if drugs else ()
+            with_c += bool(listed)
+            text = chosen_text.get(key, "")
+            suffix = "indication"
+        else:
+            ids = ()
+            listed = tuple(
+                studies[nct]._replace(injected=True, found_under=diseases)
+                for nct, diseases in drug_only.get(key, [])
+                if nct in studies
+            )[:CANDIDATE_CAP]
+            with_d += bool(listed)
+            text = ""
+            suffix = "drug_only"
+        units.append(
+            Unit(
+                unit_id=f"{key}|{suffix}",
+                application=event.application,
+                submission_type=event.submission_type,
+                submission_no=event.submission_no,
+                approval_date=event.approval_date,
+                heading="",
+                indication_mesh=ids[0] if len(ids) == 1 else "",
+                drug_mesh=";".join(sorted(drugs)),
+                stated_nct="",
+                acronym="",
+                enrollment="",
+                excerpt="",
+                candidates=listed,
+                indication_ids=ids,
+                case=case,
+                indication_text=text,
+                drug=names,
             )
         )
     sizes.sort()
@@ -942,6 +1280,9 @@ def build(
         no_candidates=no_candidates,
         over_cap=over_cap,
         median_candidates=median,
+        routes=tuple(routes),
+        case_c_with_candidates=with_c,
+        case_d_with_candidates=with_d,
     )
 
 
@@ -967,5 +1308,11 @@ def render(report: CandidatesReport) -> str:
             "",
             f"  MEDIAN CANDIDATES PER UNIT               "
             f"{report.median_candidates:>9,}",
+            "",
+            "  D35 routing of trial-relevant submissions:",
+            *(f"    {route_name:<38}{count:>9,}"
+              for route_name, count in sorted(Counter(r for _, r in report.routes).items())),
+            f"  case C units with candidates             {report.case_c_with_candidates:>9,}",
+            f"  case D units with candidates             {report.case_d_with_candidates:>9,}",
         ]
     )

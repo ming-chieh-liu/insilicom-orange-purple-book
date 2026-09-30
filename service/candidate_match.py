@@ -41,10 +41,25 @@ _log = get_logger(__name__)
 #: on every row this module writes.
 PROMPT_VERSION: int = 1
 
+#: The no-label prompt (D35) — cases C and D, where there is no §14 excerpt —
+#: ``docs/prompts/trial-candidate-match-nolabel.md``, with its own version.
+NOLABEL_PROMPT: str = "trial-candidate-match-nolabel"
+NOLABEL_PROMPT_VERSION: int = 1
+#: The excerpt prompt's name, stamped beside its version.
+EXCERPT_PROMPT: str = "trial-candidate-match"
+
+#: The (prompt, version) pairs whose answers are current.
+CURRENT_PROMPTS: frozenset[tuple[str, int]] = frozenset(
+    {(EXCERPT_PROMPT, PROMPT_VERSION), (NOLABEL_PROMPT, NOLABEL_PROMPT_VERSION)}
+)
+
 #: What a decided description is stamped with in ``identify_verdicts.jsonl``,
 #: which P5 reads. Above the pick-one prompt's version 1, so a D33 decision
-#: supersedes an older answer for the same unit (last row wins).
-IDENTIFY_VERSION: int = 2
+#: supersedes an older answer for the same unit (last row wins). **3 since
+#: D35**: version 2 was the first D33 pilot, judged on the pre-D35 shortlists,
+#: and P5 reads only decisions of this version or later
+#: (``assemble.MIN_IDENTIFY_VERSION``).
+IDENTIFY_VERSION: int = 3
 
 #: Candidates per tier.
 TIER_SIZE: int = 10
@@ -68,6 +83,13 @@ class TierUnit(NamedTuple):
     enrollment: str
     candidate_ids: tuple[str, ...]
     candidates: str
+    #: Which prompt the tier is judged with (D35): :data:`EXCERPT_PROMPT` for a
+    #: §14 description, :data:`NOLABEL_PROMPT` for cases C and D, which read
+    #: ``drug``, ``indication`` and ``approval_date`` instead of an excerpt.
+    prompt: str = EXCERPT_PROMPT
+    drug: str = ""
+    indication: str = ""
+    approval_date: str = ""
 
 
 class CandidateAnswer(NamedTuple):
@@ -131,6 +153,11 @@ def render_candidate(index: int, candidate: dict[str, object]) -> str:
             f"   Start date: {field('start_date')}",
             f"   Primary completion: {field('primary_completion')}",
         ]
+        + (
+            [f"   Named in literature on: {field('found_under')}"]
+            if candidate.get("found_under")
+            else []
+        )
     )
 
 
@@ -156,7 +183,13 @@ def build_tier(unit: dict[str, object], tier: int) -> TierUnit:
     start = (tier - 1) * TIER_SIZE
     chosen = candidates[start : start + TIER_SIZE]
     unit_id = str(unit.get("unit_id") or "")
+    no_label = str(unit.get("case") or "B") in ("C", "D")
     return TierUnit(
+        prompt=NOLABEL_PROMPT if no_label else EXCERPT_PROMPT,
+        drug=str(unit.get("drug") or "") if no_label else "",
+        indication=(str(unit.get("indication_text") or "not recorded")
+                    if no_label else ""),
+        approval_date=str(unit.get("approval_date") or "unknown") if no_label else "",
         tier_id=tier_id_for(unit_id, tier),
         unit_id=unit_id,
         tier=tier,
@@ -191,7 +224,8 @@ def read_answers(path: Path) -> list[CandidateAnswer]:
     """Every candidate answer recorded so far, last row per (tier, nct) winning."""
     out: dict[tuple[str, str], CandidateAnswer] = {}
     for row in identification.iter_json_lines(path):
-        if row.get("prompt_version") != PROMPT_VERSION:
+        prompt = str(row.get("prompt") or EXCERPT_PROMPT)
+        if (prompt, row.get("prompt_version")) not in CURRENT_PROMPTS:
             continue
         answer = CandidateAnswer(
             tier_id=str(row.get("tier_id") or ""),
@@ -288,6 +322,10 @@ def read_tiers(path: Path) -> dict[str, TierUnit]:
             enrollment=str(row.get("enrollment") or ""),
             candidate_ids=tuple(str(v) for v in raw_ids) if isinstance(raw_ids, list) else (),
             candidates=str(row.get("candidates") or ""),
+            prompt=str(row.get("prompt") or EXCERPT_PROMPT),
+            drug=str(row.get("drug") or ""),
+            indication=str(row.get("indication") or ""),
+            approval_date=str(row.get("approval_date") or ""),
         )
     return out
 
@@ -376,14 +414,23 @@ def combine(
     return CombineResult(recorded, tiebreak_needed, incomplete, (agree, compared))
 
 
-def append_answers(answers: Iterable[CandidateAnswer], path: Path) -> int:
-    """Append candidate answers, stamped with the prompt version."""
+def append_answers(
+    answers: Iterable[CandidateAnswer], path: Path, prompts: dict[str, str] | None = None
+) -> int:
+    """Append candidate answers, stamped with the prompt and its version.
+
+    ``prompts`` maps a tier id to the prompt it was judged with; a tier absent
+    from it was judged with the excerpt prompt.
+    """
     path.parent.mkdir(parents=True, exist_ok=True)
+    versions = {EXCERPT_PROMPT: PROMPT_VERSION, NOLABEL_PROMPT: NOLABEL_PROMPT_VERSION}
     written = 0
     with path.open("a", encoding="utf-8") as handle:
         for answer in answers:
+            prompt = (prompts or {}).get(answer.tier_id, EXCERPT_PROMPT)
             handle.write(
-                json.dumps({**answer._asdict(), "prompt_version": PROMPT_VERSION}) + "\n"
+                json.dumps({**answer._asdict(), "prompt": prompt,
+                            "prompt_version": versions[prompt]}) + "\n"
             )
             written += 1
     return written
@@ -448,6 +495,7 @@ def select_units(
     approval_events: Path,
     drug_map: Path,
     limit: int | None,
+    case: str = "B",
 ) -> list[dict[str, object]]:
     """The descriptions P4 judges: the pick-one route's set, in sample order.
 
@@ -456,6 +504,14 @@ def select_units(
     both routes judge the same descriptions. ``limit`` takes a deterministic
     sample, so a pilot and the full run that follows it agree on membership.
     """
+    if case != "B":
+        # D35 cases C and D: one unit per submission, already routed by P3.
+        wanted = set(case)
+        units = [
+            row for row in identification.iter_json_lines(candidates_path)
+            if str(row.get("case") or "B") in wanted and row.get("candidates")
+        ]
+        return sample_order(units, limit)
     units = identification.read_units(
         candidates_path,
         identification.borrowed_ids(drug_map),
@@ -491,11 +547,15 @@ def prepare_round(units: list[dict[str, object]], adjudication: Path) -> str:
     written = 0
     if pending_ids:
         round_dir.mkdir(parents=True, exist_ok=True)
-        for number, chunk in enumerate(batches(pending_ids, BATCH_TIERS), 1):
-            (round_dir / f"batch-{number:03d}.ids").write_text(
-                "\n".join(chunk) + "\n", encoding="utf-8"
-            )
-            written += 1
+        # One prompt per batch file, so each judge is given exactly one prompt:
+        # ``batch-NNN`` for §14 descriptions, ``nolabel-NNN`` for cases C/D.
+        for prefix, prompt in (("batch", EXCERPT_PROMPT), ("nolabel", NOLABEL_PROMPT)):
+            ids = [t for t in pending_ids if known[t].prompt == prompt]
+            for number, chunk in enumerate(batches(ids, BATCH_TIERS), 1):
+                (round_dir / f"{prefix}-{number:03d}.ids").write_text(
+                    "\n".join(chunk) + "\n", encoding="utf-8"
+                )
+                written += 1
     return (
         "P4 per-candidate matching (D33) — prepare\n\n"
         f"  descriptions in scope                  {len(units):>9,}\n"
@@ -535,7 +595,8 @@ def combine_round(adjudication: Path, judges: int) -> str:
         if not all((tier_id, nct) in done for nct in tier.candidate_ids)
     }
     result = combine(open_tiers, judge_a, judge_b, third)
-    written = append_answers(result.recorded, adjudication / ANSWERS_FILE)
+    written = append_answers(result.recorded, adjudication / ANSWERS_FILE,
+                             {tier_id: tier.prompt for tier_id, tier in tiers.items()})
     (adjudication / TIEBREAK_FILE).write_text(
         "".join(line + "\n" for line in result.tiebreak_needed), encoding="utf-8"
     )
@@ -601,7 +662,11 @@ __all__ = [
     "CandidateAnswer",
     "CombineResult",
     "Decision",
+    "CURRENT_PROMPTS",
+    "EXCERPT_PROMPT",
     "IDENTIFY_VERSION",
+    "NOLABEL_PROMPT",
+    "NOLABEL_PROMPT_VERSION",
     "NO",
     "PROMPT_VERSION",
     "TIER_SIZE",

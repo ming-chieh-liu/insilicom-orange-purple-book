@@ -173,6 +173,32 @@ def build_index(facts: Iterable[StudyFacts]) -> dict[str, list[ProtocolStudy]]:
     return dict(index)
 
 
+def protocol_trials(
+    text: str, index: dict[str, list[ProtocolStudy]]
+) -> list[tuple[str, str]]:
+    """``(nct_id, protocol_id)`` for every full protocol id in ``text`` that
+    names **exactly one** registry study (D35).
+
+    The literature counterpart of the review route's matching: the same token
+    rule as :func:`candidate_tokens` (after Study/Trial/Protocol, letters and
+    digits, at least four characters, no abbreviation expansion) and the same
+    one-study rule. Bare numbers and ids several studies share are dropped.
+    Whether the trial supported an approval is left to the judge.
+
+    >>> ix = {"DR103301": [ProtocolStudy("NCT1", "Teva", "2009-10", "t", "i")],
+    ...       "AB1234": [ProtocolStudy("NCT2", "", "", "", ""),
+    ...                  ProtocolStudy("NCT3", "", "", "", "")]}
+    >>> protocol_trials("In Study DR-103-301 and Study AB-1234 and Study 301", ix)
+    [('NCT1', 'DR-103-301')]
+    """
+    out: dict[str, str] = {}
+    for token, _ in candidate_tokens(text):
+        hits = {study.nct_id for study in index.get(normalise_id(token), [])}
+        if len(hits) == 1:
+            out.setdefault(next(iter(hits)), token)
+    return list(out.items())
+
+
 def sponsor_words(name: str) -> set[str]:
     """Distinctive words of a company name.
 
@@ -427,6 +453,7 @@ __all__ = [
     "heading_before",
     "judge_mention",
     "normalise_id",
+    "protocol_trials",
     "render",
     "repair",
     "sponsor_words",

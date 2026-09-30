@@ -169,6 +169,12 @@ class TrialDescription(NamedTuple):
     #: three times" from "three genuinely different labels that happen to
     #: share a date". See D16.
     label_sha: str = ""
+    #: The heading as printed, continuation lines joined (D34). A long heading
+    #: wraps in the PDF — "14.1 … HER2-negative Locally Advanced" / "or
+    #: Metastatic Breast Cancer" — and :attr:`heading`, one line, loses the
+    #: disease. ``heading`` is kept as it was because unit ids are built from
+    #: it; this is what the indication coder reads.
+    heading_full: str = ""
 
 
 class LabelReading(NamedTuple):
@@ -238,6 +244,90 @@ def split_subsections(body: str) -> tuple[tuple[str, str, str], ...]:
         stop = matches[index + 1].start() if index + 1 < len(matches) else len(body)
         out.append((match.group(1), match.group(2).strip(), body[match.start() : stop]))
     return tuple(out)
+
+
+#: Words that may sit lower-case inside a title-cased heading.
+_TITLE_SMALL: frozenset[str] = frozenset({
+    "a", "an", "and", "or", "of", "the", "with", "in", "for", "to", "on", "at",
+    "by", "after", "from", "without", "who", "not", "as", "into", "versus", "vs",
+    "than", "due", "under", "over", "per", "via", "plus", "previously", "prior",
+    "receiving", "treated", "including", "following", "either", "both", "least",
+    "one", "two", "have", "has", "had", "are", "is", "whose", "that",
+})
+
+#: A continuation line may open with one of these even when the heading line
+#: before it is short — "or Metastatic Breast Cancer".
+_CONTINUING: frozenset[str] = frozenset({
+    "or", "and", "with", "of", "in", "for", "to", "after", "who", "without",
+    "including", "previously", "receiving", "following", "not", "due", "at",
+    "on", "by", "from", "versus", "plus", "treated",
+})
+
+#: A heading line this long has probably wrapped.
+_WRAP_LENGTH: int = 55
+
+
+def _title_like(line: str) -> bool:
+    """Whether a line reads as heading words rather than prose.
+
+    >>> _title_like("or Metastatic Breast Cancer")
+    True
+    >>> _title_like("EMBRACA (NCT01945775) was an open label study in which")
+    False
+    """
+    words = line.split()
+    if not words or len(words) > 14:
+        return False
+    capitalised = 0
+    for word in words:
+        bare = word.strip("()[],:;-–—/'\"")
+        if not bare:
+            continue
+        if bare[0].isupper() or bare[0].isdigit():
+            capitalised += 1
+        elif bare.lower() not in _TITLE_SMALL and not re.match(r"^[a-z]+[A-Z]", bare):
+            return False
+    return capitalised >= 1
+
+
+def continued_heading(heading: str, block: str, max_lines: int = 2) -> str:
+    """``heading`` with the lines the PDF wrapped it onto joined back (D34).
+
+    ``block`` is the subsection as :func:`split_subsections` returns it, so its
+    first line is the heading line. A following line is taken when it is short,
+    reads as heading words (:func:`_title_like`), holds no registry id and is
+    not a sentence — and either opens with a joining word or follows a line
+    long enough to have wrapped.
+
+    >>> block = ("14.1 Deleterious or Suspected Deleterious Germline BRCA-mutated "
+    ...          "HER2-negative Locally Advanced\\nor Metastatic Breast Cancer\\n"
+    ...          "EMBRACA (NCT01945775) was an open label study in which patients")
+    >>> continued_heading("Deleterious or Suspected Deleterious Germline BRCA-mutated "
+    ...                   "HER2-negative Locally Advanced", block)[-36:]
+    'Advanced or Metastatic Breast Cancer'
+    >>> continued_heading("HRR Gene-mutated mCRPC",
+    ...                   "14.2 HRR Gene-mutated mCRPC\\nThe efficacy of TALZENNA was")
+    'HRR Gene-mutated mCRPC'
+    """
+    if not heading:
+        # An unheaded "14" block starts at "14 CLINICAL STUDIES"; there is no
+        # subsection heading to continue.
+        return ""
+    full = heading
+    for raw in block.split("\n")[1 : 1 + max_lines]:
+        line = raw.strip()
+        if (not line or len(line) > 90 or full.rstrip().endswith((".", ":", ";"))
+                or "NCT" in line or re.search(r"\(N\s*=", line)
+                or line.endswith(".") or re.match(r"^\d+(\.\d+)*\s", line)):
+            break
+        words = line.split()
+        opens = words[0].lower() in _CONTINUING and (
+            len(words) == 1 or _title_like(" ".join(words[1:]))
+        )
+        if not (opens or (len(full) >= _WRAP_LENGTH and _title_like(line))):
+            break
+        full = f"{full} {line}"
+    return full
 
 
 def _sentences(block: str) -> list[str]:
@@ -347,6 +437,7 @@ def describe_trials(
                         ),
                         design=design,
                         excerpt=sentence[:600],
+                        heading_full=continued_heading(heading, block),
                     )
                 )
     return tuple(out)
@@ -473,6 +564,7 @@ __all__ = [
     "render",
     "section",
     "split_subsections",
+    "continued_heading",
 ]
 
 
