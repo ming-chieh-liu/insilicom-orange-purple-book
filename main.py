@@ -64,6 +64,7 @@ from service import (
     section14,
     validate,
 )
+from utility import freshness
 from utility.logging import configure
 
 #: Every mode this script dispatches, with the one-line help argparse shows.
@@ -245,6 +246,11 @@ def build_parser() -> argparse.ArgumentParser:
         help="letters, labels, reviews: read only cached files; send no request to FDA",
     )
     parser.add_argument(
+        "--allow-stale",
+        action="store_true",
+        help="run even when the Makefile says an input is stale (see `make status`)",
+    )
+    parser.add_argument(
         "--parsers",
         type=int,
         default=16,
@@ -265,6 +271,21 @@ def build_parser() -> argparse.ArgumentParser:
 
 #: Modes kept for reference or reuse that no longer feed the pipeline. Running
 #: one prints a warning every time (the user's rule, 2026-09-29).
+#: Modes checked against the Makefile before they run: the make target that
+#: stands for the mode, and the mode's own name (None for a step that only
+#: consumes the target, whose inputs must then need no rebuild at all).
+FRESHNESS: dict[str, tuple[str, str | None]] = {
+    "normalize": ("normalize", "normalize"),
+    "indication-normalize": ("indication-normalize", "indication-normalize"),
+    "graph-trials": ("graph-trials", "graph-trials"),
+    "graph-links": ("graph-links", "graph-links"),
+    "candidates": ("candidates", "candidates"),
+    "assemble": ("assemble", "assemble"),
+    "match-prepare": ("candidates", None),
+    "match-record": ("candidates", None),
+    "review-role-prepare": ("reviews", None),
+}
+
 DEPRECATED: dict[str, str] = {
     "map": "the application-grain trial -> approval map (Week 1); the deliverable is "
     "P5's submission-grain trial_submission_map.tsv (D2)",
@@ -297,6 +318,15 @@ def main(argv: list[str] | None = None) -> int:
             "Its output does not feed the current pipeline.",
             file=sys.stderr,
         )
+
+    # The Makefile declares the default output/ and adjudication/ trees only.
+    if (args.mode in FRESHNESS and not args.allow_stale and args.out == "output"
+            and args.adjudication == "adjudication"):
+        make_target, own_mode = FRESHNESS[args.mode]
+        stale = freshness.check(make_target, own_mode)
+        if stale:
+            print(freshness.message(args.mode, stale, make_target), file=sys.stderr)
+            return 1
 
     if args.mode == "census":
         data = RawData(root=Path(args.fda_raw))

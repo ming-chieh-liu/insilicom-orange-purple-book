@@ -32,6 +32,20 @@ row says what was checked.
 and listed no review step. The review download was never finished (131 files missing, retry step
 never run) and review roles are 20% judged; both are now listed.
 
+## Stale-input rebuild (2026-09-30)
+
+`submission_indications.tsv` (P2i) was written 09-29 16:02, before its code changed at 23:50, and
+P2g and P3 were then re-run on it: every `openfda_current` row had ids but no text, so case-C
+judges were told "not recorded", and the ids were the old coder's. `trial_condition_map.tsv` (P1)
+was stale the same way (its coder in `indications.py` changed 09-29). **Fix:** a `Makefile` now
+declares every step's inputs and code (code dependencies generated from imports,
+`utility/code_deps.py`); `make status` lists stale outputs, and `main.py` refuses to run a guarded
+mode on stale inputs (`utility/freshness.py`, `--allow-stale` overrides). Rebuilt in order:
+`indications` → `normalize` → `indication-normalize` → `graph-trials` → `graph-links` →
+`candidates`. Routing now C 3,130 · D 3,072 (was 3,034 · 3,168); units with candidates C 2,369 ·
+D 125; shortlist recall 78.2%. Pilot units whose judged candidate tiers changed: B 5 of 50, C 9 of
+48; and every C unit whose indication text changed is stale regardless (see below).
+
 ## D35 pilots (2026-09-30) — two judges + third, `--limit 50` each
 
 Answers `adjudication/candidate_match_answers.jsonl`; decisions `identify_verdicts.jsonl`
