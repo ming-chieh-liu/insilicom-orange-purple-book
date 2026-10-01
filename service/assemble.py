@@ -865,6 +865,7 @@ def build(out_dir: Path, adjudication_dir: Path, *,
                 "judged_none" if verdict is not None
                 else "not_yet_judged" if unit.get("candidates") or unit.get("literature")
                 else "no_drug_resolved" if not unit.get("drug_mesh")
+                else "candidates_already_linked" if unit.get("already_linked")
                 else "no_candidates"
             )
             unlinked.append(Unlinked(str(unit["application"]), str(unit["submission_type"]),
@@ -1056,6 +1057,9 @@ def _why(unit: dict[str, object]) -> str:
     """Why a unit never reached a judge."""
     if not unit.get("drug_mesh"):
         return "no_drug_resolved"
+    # D41: every candidate was a trial an FDA document already names.
+    if unit.get("already_linked"):
+        return "candidates_already_linked"
     return "no_candidates"
 
 

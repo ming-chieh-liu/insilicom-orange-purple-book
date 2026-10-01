@@ -1028,3 +1028,10 @@ def test_d16_runs_across_applications_of_the_same_moiety(
     # Without the shared moiety each application keeps its own link.
     (out / "drug_names.tsv").unlink()
     assert len(assemble.build(out, adj).links) == 2
+
+
+def test_a_unit_emptied_by_d41_says_why() -> None:
+    from service import assemble as asm
+    assert asm._why({"drug_mesh": "MESH:D1", "already_linked": ["NCT1"]}) == "candidates_already_linked"
+    assert asm._why({"drug_mesh": "MESH:D1"}) == "no_candidates"
+    assert asm._why({}) == "no_drug_resolved"

@@ -231,6 +231,9 @@ class Unit(NamedTuple):
     #: ``Name [MeSH …]; PubChem:CID…`` — shown to the judge beside the names.
     drug_codes: str = ""
     indication_codes: str = ""
+    #: D41: candidates removed because an FDA document already names them for
+    #: this submission or an earlier one of the same moiety (tier A).
+    already_linked: tuple[str, ...] = ()
 
     @property
     def needs_judgement(self) -> bool:
@@ -261,6 +264,9 @@ class CandidatesReport(NamedTuple):
     routes: tuple[tuple[str, str], ...] = ()
     case_c_with_candidates: int = 0
     case_d_with_candidates: int = 0
+    #: D41: candidate slots removed as already identified, and units left with none.
+    already_linked_removed: int = 0
+    emptied_by_already_linked: int = 0
 
     @property
     def to_judge(self) -> int:
@@ -1289,6 +1295,7 @@ def shortlist(
 __all__ = [
     "CANDIDATE_CAP",
     "CASE_B",
+    "Identified",
     "CASE_C",
     "CASE_D",
     "DRUG_ONLY_FILE",
@@ -1308,6 +1315,9 @@ __all__ = [
     "PHASE_SETS_KEPT",
     "PHASE1_MIN_ENROLLED",
     "coded",
+    "already_linked",
+    "drop_already_linked",
+    "identified_trials",
     "phase_kept",
     "Candidate",
     "CandidatesReport",
@@ -1333,6 +1343,106 @@ __all__ = [
 ]
 
 
+class Identified(NamedTuple):
+    """Where an FDA document names a trial (D41)."""
+
+    group: str           # moiety group (:func:`service.drug_names.moiety_key`)
+    approval_date: str
+    submission: str      # ``application|type|number``
+
+
+def identified_trials(
+    units: Iterable[Unit],
+    review_trials: Iterable[tuple[str, str]],
+    approval_of: Mapping[str, str],
+    group_of: Mapping[str, str],
+) -> dict[str, list[Identified]]:
+    """NCT id → every submission whose FDA documents name it (D41).
+
+    A label that states the NCT, a §14 name the same review resolved (D29),
+    and a review protocol id judged PIVOTAL or SUPPORTING (``review_trials``,
+    ``(submission key, nct)``). Identity, not role: whether a label-named
+    trial supports the approval is D28's question, never the identify judge's.
+
+    >>> u = Unit("A|ORIG|1|X", "A", "ORIG", "1", "2010-01-01", "", "", "", "NCT1", "", "", "", ())
+    >>> identified_trials([u], [("A|SUPPL|2", "NCT2")], {"A|SUPPL|2": "2012-01-01"}, {})
+    {'NCT1': [Identified(group='A', approval_date='2010-01-01', submission='A|ORIG|1')], 'NCT2': [Identified(group='A', approval_date='2012-01-01', submission='A|SUPPL|2')]}
+    """
+    out: dict[str, list[Identified]] = {}
+    for unit in units:
+        nct = unit.stated_nct or unit.review_nct
+        if nct:
+            key = f"{unit.application}|{unit.submission_type}|{unit.submission_no}"
+            out.setdefault(nct, []).append(Identified(
+                group_of.get(unit.application, unit.application), unit.approval_date, key))
+    for key, nct in review_trials:
+        application = key.split("|", 1)[0]
+        out.setdefault(nct, []).append(Identified(
+            group_of.get(application, application), approval_of.get(key, ""), key))
+    return out
+
+
+def already_linked(unit: Unit, nct: str, identified: Mapping[str, list[Identified]],
+                   group_of: Mapping[str, str]) -> bool:
+    """Whether judging ``nct`` for ``unit`` could add nothing (D41).
+
+    True when an FDA document names the trial on this same submission, or on
+    an **earlier** submission of the same moiety — D16 attributes the trial
+    there, so a Yes here would be a later appearance. A naming on a later or
+    same-day other submission does not count: a Yes here could move the
+    attribution earlier, which is information.
+
+    >>> u = Unit("A|SUPPL|5|X", "A", "SUPPL", "5", "2015-01-01", "", "", "", "", "", "", "", ())
+    >>> ids = {"NCT1": [Identified("A", "2012-01-01", "A|ORIG|1")],
+    ...        "NCT2": [Identified("A", "2018-01-01", "A|SUPPL|9")],
+    ...        "NCT3": [Identified("A", "2015-01-01", "A|SUPPL|5")],
+    ...        "NCT4": [Identified("B", "2010-01-01", "B|ORIG|1")]}
+    >>> [already_linked(u, n, ids, {}) for n in ("NCT1", "NCT2", "NCT3", "NCT4", "NCT5")]
+    [True, False, True, False, False]
+    """
+    group = group_of.get(unit.application, unit.application)
+    key = f"{unit.application}|{unit.submission_type}|{unit.submission_no}"
+    for seen in identified.get(nct, ()):
+        if seen.group != group:
+            continue
+        if seen.submission == key or (
+                seen.approval_date and unit.approval_date
+                and seen.approval_date < unit.approval_date):
+            return True
+    return False
+
+
+def drop_already_linked(
+    units: Iterable[Unit], identified: Mapping[str, list[Identified]],
+    group_of: Mapping[str, str],
+) -> tuple[list[Unit], int, int]:
+    """Every judged unit without the candidates FDA documents already name (D41).
+
+    Returns the units, the candidate slots removed, and the units left with
+    none (they are not judged; S10 records ``candidates_already_linked``).
+    Units that need no judgement are returned unchanged.
+    """
+    out: list[Unit] = []
+    removed = emptied = 0
+    for unit in units:
+        if not unit.needs_judgement:
+            out.append(unit)
+            continue
+        gone = tuple(dict.fromkeys(
+            c.nct_id for c in (*unit.literature, *unit.candidates)
+            if already_linked(unit, c.nct_id, identified, group_of)))
+        if not gone:
+            out.append(unit)
+            continue
+        drop = set(gone)
+        literature = tuple(c for c in unit.literature if c.nct_id not in drop)
+        listed = tuple(c for c in unit.candidates if c.nct_id not in drop)
+        removed += len(unit.literature) + len(unit.candidates) - len(literature) - len(listed)
+        emptied += not (literature or listed)
+        out.append(unit._replace(literature=literature, candidates=listed, already_linked=gone))
+    return out, removed, emptied
+
+
 def build(
     data: RawData,
     archive: TrialArchive,
@@ -1340,6 +1450,7 @@ def build(
     ancestors: Mapping[str, frozenset[str]] | None = None,
     review_linked: frozenset[str] = frozenset(),
     mesh_names: Mapping[str, str] | None = None,
+    review_trials: Iterable[tuple[str, str]] = (),
 ) -> CandidatesReport:
     """Collapse the descriptions, index the registry, and shortlist each unit.
 
@@ -1623,8 +1734,16 @@ def build(
         )
     sizes.sort()
     median = sizes[len(sizes) // 2] if sizes else 0
+    # D41: a trial an FDA document already names for this submission (or an
+    # earlier one of the same moiety) is linked at tier A; judging it again
+    # could only re-identify it, so it is taken out of every judged unit.
+    group_of = drug_names.moiety_groups(out_dir / "drug_names.tsv")
+    units, removed, emptied = drop_already_linked(
+        units, identified_trials(units, review_trials, approval_of, group_of), group_of)
     return CandidatesReport(
         units=tuple(units),
+        already_linked_removed=removed,
+        emptied_by_already_linked=emptied,
         descriptions=len(descriptions),
         collapsed=len(collapsed),
         already_identified=already,
@@ -1667,5 +1786,9 @@ def render(report: CandidatesReport) -> str:
               for route_name, count in sorted(Counter(r for _, r in report.routes).items())),
             f"  case C units with candidates             {report.case_c_with_candidates:>9,}",
             f"  case D units with candidates             {report.case_d_with_candidates:>9,}",
+            "",
+            "  D41: candidates an FDA document already names (tier A), not judged",
+            f"    candidate slots removed                {report.already_linked_removed:>9,}",
+            f"    units left with no candidate           {report.emptied_by_already_linked:>9,}",
         ]
     )

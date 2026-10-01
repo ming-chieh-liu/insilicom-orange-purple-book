@@ -815,17 +815,20 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         # D35 (2026-09-30): a submission whose review names a PIVOTAL or
         # SUPPORTING trial is served at tier A and gets no case C/D unit.
-        review_linked = frozenset(
-            key for key, _nct, role, _protocol
+        linking_reviews = [
+            (key, nct) for key, nct, role, _protocol
             in assemble.review_judgements(Path(args.adjudication))
             if role in review_role.LINKING
-        )
+        ]
+        review_linked = frozenset(key for key, _nct in linking_reviews)
         candidates_report = candidates.build(
             data, archive, out_dir,
             ancestors=mesh_descriptors.ancestors(mesh_descriptors.read(cand_vocabulary)),
             review_linked=review_linked,
             # D39: MeSH names for the codes shown beside each raw text.
             mesh_names=unii_bridge.mesh_names([Path(args.mesh), data.mesh_supplementary]),
+            # D41: trials a review names PIVOTAL/SUPPORTING are not judged again.
+            review_trials=linking_reviews,
         )
         TsvRepository(args.out).save(
             "submission_routes", ("submission", "route"),

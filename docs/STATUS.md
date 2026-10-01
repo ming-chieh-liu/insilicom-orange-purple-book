@@ -38,6 +38,12 @@ indication or cap.
 complete prompt (`<batch>.requests.jsonl`); APPROVAL line no longer repeats the §14 heading;
 no-label prompt v4 (dead case-D rule removed). The pool client that sends them is not built.
 
+**D41 rebuilt 2026-10-01** (S8 + S10): 30,574 candidate slots removed over all units (most on
+later appearances no judge sees); on the units S9 judges — B 3,660 units (1,644 lose 5,491
+trials), C 2,234 (392 lose 1,746, all named on an earlier same-moiety submission), D 153 (5 lose
+7). 73 units left with no candidate; S10 `candidates_already_linked` 108 rows. Shortlist recall
+unchanged at 81.6%. Map: 4,110 links on 2,039 submissions (no judging yet under v3/v4).
+
 Next: commit D39 → `make candidates` → pilots per route (two
 judges + third) → full runs (two judges + third, D40) → S10 → D28 label roles → S10 → S11.
 

@@ -465,6 +465,7 @@ def _run_pass(
     files: dict[str, str] | None = None,
     ancestors: dict[str, frozenset[str]] | None = None,
     facts: tuple[trial_studies.StudyFacts, ...] = (),
+    review_trials: tuple[tuple[str, str], ...] = (),
 ) -> "candidates.CandidatesReport":
     out = tmp_path / "output"
     out.mkdir()
@@ -522,7 +523,8 @@ def _run_pass(
     for name, text in (files or {}).items():
         (out / name).write_text(text, encoding="utf-8")
     return candidates.build(
-        object(), object(), out, ancestors=ancestors  # type: ignore[arg-type]
+        object(), object(), out, ancestors=ancestors,  # type: ignore[arg-type]
+        review_trials=review_trials,
     )
 
 
@@ -1267,3 +1269,50 @@ def test_without_the_bridge_the_pubchem_drug_finds_nothing(
     })
     judged = next(u for u in report.units if u.needs_judgement)
     assert judged.candidates == ()
+
+
+# ---------------------------------------------------------------------------
+# D41: candidates an FDA document already names are not judged again
+# ---------------------------------------------------------------------------
+
+
+def test_a_trial_the_review_already_names_is_not_judged_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The review names KEYNOTE-189 PIVOTAL on SUPPL 35, so its §14 unit has
+    nothing left to judge and is recorded as such."""
+    report = _run_pass(tmp_path, monkeypatch,
+                       review_trials=(("BLA125514|SUPPL|35", "NCT02578680"),))
+    unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
+    assert unit.candidates == () and unit.already_linked == ("NCT02578680",)
+    assert (report.already_linked_removed, report.emptied_by_already_linked) == (1, 1)
+    assert "units left with no candidate" in candidates.render(report)
+
+
+def test_a_naming_on_a_later_submission_keeps_the_candidate(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """A Yes on the earlier submission could move the attribution; keep it."""
+    report = _run_pass(tmp_path, monkeypatch,
+                       review_trials=(("BLA125514|SUPPL|99", "NCT02578680"),))
+    unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
+    assert [c.nct_id for c in unit.candidates] == ["NCT02578680"]
+    assert report.already_linked_removed == 0
+
+
+def test_only_the_named_trial_leaves_a_unit() -> None:
+    def unit(*ncts: str) -> candidates.Unit:
+        return candidates.Unit("A|SUPPL|5|X", "A", "SUPPL", "5", "2015-01-01", "", "", "",
+                               "", "", "", "", tuple(_candidate(n) for n in ncts),
+                               literature=(_candidate("NCT9"),))
+    named = {"NCT1": [candidates.Identified("A", "2015-01-01", "A|SUPPL|5")],
+             "NCT9": [candidates.Identified("A", "2012-01-01", "A|ORIG|1")]}
+    [kept], removed, emptied = candidates.drop_already_linked([unit("NCT1", "NCT2")], named, {})
+    assert [c.nct_id for c in kept.candidates] == ["NCT2"] and kept.literature == ()
+    assert kept.already_linked == ("NCT9", "NCT1") and (removed, emptied) == (2, 0)
+    stated = unit("NCT1")._replace(stated_nct="NCT1")
+    assert candidates.drop_already_linked([stated], named, {})[0] == [stated]
+    same_moiety = {"A": "m", "B": "m"}
+    other = {"NCT2": [candidates.Identified("m", "2010-01-01", "B|ORIG|1")]}
+    [moved], removed, emptied = candidates.drop_already_linked([unit("NCT2")], other, same_moiety)
+    assert moved.candidates == () and (removed, emptied) == (1, 0)  # NCT9 literature stays

@@ -287,6 +287,20 @@ code says `not yet implemented` until it lands.
   Applies to B±, C±, D (S9) and to the S11 precision sample; S6 and D28 already worked this way.
   Why: the user's decision — the project's two-judge convention, not one sampled answer. Cost:
   judge calls roughly double, plus a third judge on ~1% of candidates (pilot agreement 99.2%).
+- **D41 — a trial an FDA document already names is not judged again** (2026-10-01, **implemented
+  in code 2026-10-01**). Before S9, every judged unit (B±, C±, D) loses the candidates an FDA
+  document names on the same submission or on an **earlier** submission of the same moiety: a
+  label-stated NCT, a §14 name the review resolved (D29), or a review protocol id judged PIVOTAL or
+  SUPPORTING (`candidates.drop_already_linked`). Identity, not role — whether a label-named trial
+  supports the approval stays D28's question. A naming on a later or same-day other submission does
+  not count, since a Yes here could move the attribution. A unit left with no candidate is not
+  judged; S10 records `candidates_already_linked`. **Units are not skipped wholesale**: 46% of
+  submissions with a tier-A link have two or more A trials, and tier B had found 65 further trials
+  on 40 of them, so the other candidates are still judged. Why: the user's rule — a link case A
+  already has needs no second judgement. Measured before: 2,140 candidate slots on 1,357 of 3,699
+  B units were this submission's own A trial; C units never overlap on the same submission (D36).
+  **Rebuilt 2026-10-01:** judged units B 3,660 (1,644 lose 5,491 trials), C 2,234 (392 lose 1,746,
+  named on an earlier same-moiety submission), D 153; recall unchanged at 81.6%.
 
 ## Current status and to-do
 
