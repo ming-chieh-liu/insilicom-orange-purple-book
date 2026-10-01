@@ -501,7 +501,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             # D42: edges and PMIDs from iKraph2, abstracts from iKraph1.
             gt_repository = Ikraph2Literature(
-                Ikraph2Api(Ikraph2Connection(credentials=Path(args.creds))),
+                Ikraph2Api(Ikraph2Connection(credentials=Path(args.creds)),
+                           cache_dir=out_dir),
                 GraphEvidenceRepository(gt_client, connection))
             gt_report = graph_trials.build(
                 out_dir,
@@ -578,7 +579,8 @@ def main(argv: list[str] | None = None) -> int:
         try:
             # D42: edges and PMIDs from iKraph2, abstracts from iKraph1.
             gl_repository = Ikraph2Literature(
-                Ikraph2Api(Ikraph2Connection(credentials=Path(args.creds))),
+                Ikraph2Api(Ikraph2Connection(credentials=Path(args.creds)),
+                           cache_dir=out_dir),
                 GraphEvidenceRepository(graph_client, connection))
             graph_report = graph_links.build(
                 out_dir,

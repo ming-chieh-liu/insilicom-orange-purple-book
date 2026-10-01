@@ -281,3 +281,23 @@ def test_a_failed_prefetch_is_logged_and_left_cold(caplog: pytest.LogCaptureFixt
     api, _ = _api(lambda e, b: _http(400))
     Ikraph2Literature(api, _Docs()).prefetch([("27", "1")])
     assert "prefetch, drug 27" in caplog.text
+
+
+def test_answers_persist_across_runs_and_a_torn_line_is_skipped(
+        tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    opener = _Opener(_graph)
+    first = Ikraph2Api(Ikraph2Connection(), opener=opener, sleep=lambda s: None,
+                       cache_dir=tmp_path)
+    edges = first.disease_edges("27")
+    assert first.edge_pmids("27.2.9.0", 2) == ["21", "22"]
+    assert first.edge_pmids("27.2.9.0", 10) == ["21", "22", "23", "24"]
+    cache = tmp_path / "ikraph2_cache_v1_2"
+    with (cache / "evidence.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write('{"edge": "torn')
+    again = _Opener(lambda e, b: pytest.fail("the cache should have answered"))
+    second = Ikraph2Api(Ikraph2Connection(), opener=again, sleep=lambda s: None,
+                        cache_dir=tmp_path)
+    assert second.disease_edges("27") == edges
+    assert second.edge_pmids("27.2.9.0", 50) == ["21", "22", "23", "24"]
+    assert again.calls == []
+    assert "unreadable cache line" in caplog.text

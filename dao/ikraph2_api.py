@@ -32,6 +32,7 @@ import urllib.request
 from collections import defaultdict
 from collections.abc import Callable, Iterable
 from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, NamedTuple, Protocol
 
 from config.ikraph2 import Ikraph2Connection
@@ -74,12 +75,41 @@ class Ikraph2Api:
 
     def __init__(self, connection: Ikraph2Connection,
                  opener: Opener = urllib.request.urlopen,
-                 sleep: Callable[[float], None] = time.sleep) -> None:
+                 sleep: Callable[[float], None] = time.sleep,
+                 cache_dir: Path | None = None) -> None:
+        """``cache_dir`` keeps every answer on disk, append-only, so a re-run
+        (or a resumed one) asks the API only for what it has not seen. A
+        release's data never changes, so the directory is named for it and
+        only answers carrying that release are ever written to it."""
         self._connection = connection
         self._open = opener
         self._sleep = sleep
         self._edges: dict[str, list[Edge]] = {}
         self._pmids: dict[str, tuple[int, list[str], bool]] = {}
+        self._lock = threading.Lock()
+        self._cache = cache_dir / f"ikraph2_cache_{connection.release}" if cache_dir else None
+        if self._cache is not None:
+            self._load()
+
+    def _load(self) -> None:
+        assert self._cache is not None
+        edges_file, evidence_file = self._cache / "edges.jsonl", self._cache / "evidence.jsonl"
+        for line in _lines(edges_file):
+            self._edges[line["drug"]] = [Edge(*row) for row in line["edges"]]
+        for line in _lines(evidence_file):
+            held = self._pmids.get(line["edge"])
+            if held is None or line["limit"] >= held[0] or line["exhausted"]:
+                self._pmids[line["edge"]] = (line["limit"], line["pmids"], line["exhausted"])
+        _log.info("iKraph2 cache %s: %d drugs, %d edges' evidence", self._cache,
+                  len(self._edges), len(self._pmids))
+
+    def _keep(self, name: str, record: dict[str, Any]) -> None:
+        if self._cache is None:
+            return
+        with self._lock:
+            self._cache.mkdir(parents=True, exist_ok=True)
+            with (self._cache / name).open("a", encoding="utf-8") as handle:
+                handle.write(json.dumps(record) + "\n")
 
     def _post(self, endpoint: str, body: dict[str, Any]) -> dict[str, Any]:
         """One call, retried with backoff on 429, 5xx and network errors."""
@@ -136,6 +166,7 @@ class Ikraph2Api:
                 break
         edges.sort(key=lambda e: (-e.score, e.edge_id))
         self._edges[drug] = edges
+        self._keep("edges.jsonl", {"drug": drug, "edges": [list(e) for e in edges]})
         return edges
 
     def edge_pmids(self, edge_id: str, limit: int) -> list[str]:
@@ -163,7 +194,22 @@ class Ikraph2Api:
                 break
         found = list(pmids)
         self._pmids[edge_id] = (limit, found, exhausted)
+        self._keep("evidence.jsonl", {"edge": edge_id, "limit": limit, "pmids": found,
+                                      "exhausted": exhausted})
         return found[:limit]
+
+
+def _lines(path: Path) -> list[dict[str, Any]]:
+    """The JSON lines of a cache file; a torn last line (an interrupted write) is skipped."""
+    if not path.is_file():
+        return []
+    out: list[dict[str, Any]] = []
+    for text in path.read_text(encoding="utf-8").splitlines():
+        try:
+            out.append(json.loads(text))
+        except ValueError:
+            _log.warning("%s: skipped an unreadable cache line", path)
+    return out
 
 
 class Documents(Protocol):
