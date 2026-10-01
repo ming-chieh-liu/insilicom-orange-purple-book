@@ -176,14 +176,27 @@ class _Collection:
 
     def find(self, query: dict[str, Any], projection: dict[str, int]) -> _Cursor:
         self.queries.append(query)
+        if "biokdeid" in query:
+            wanted = set(query["biokdeid"]["$in"])
+            return _Cursor(r for r in self.rows if r["biokdeid"] in wanted)
         ids = set(query["db_id"]["$in"])
-        types = set(query["type"]["$in"])
-        return _Cursor(r for r in self.rows if r["db_id"] in ids and r["type"] in types)
+        types = set(query["type"]["$in"]) if "type" in query else None
+        return _Cursor(r for r in self.rows
+                       if r["db_id"] in ids and (types is None or r["type"] in types))
+
+
+_NAMES = [
+    {"biokdeid": 2700000295, "term_key": "pembrolizumab",
+     "variants": [{"term": "pembrolizumab"}, {"term": "PEMBROLIZUMAB"}]},
+    {"biokdeid": 2700000295, "term_key": "lambrolizumab", "variants": []},
+    {"biokdeid": 55633, "term_key": "", "variants": [{"term": "NSCLC"}, {"term": ""}]},
+]
 
 
 def _client(rows: list[dict[str, Any]]) -> tuple[dict[str, dict[str, _Collection]], _Collection]:
     collection = _Collection(rows)
-    return {"biokde": {"ikraph2_entities_v1_2": collection}}, collection
+    return {"biokde": {"ikraph2_entities_v1_2": collection,
+                       "ikraph2_entity_names_v1_2": _Collection(_NAMES)}}, collection
 
 
 _ROWS = [
@@ -245,24 +258,17 @@ def test_identity_prefers_the_drug_node_and_falls_back_to_chemical() -> None:
     assert "Chemical (fallback)" in drug_identity.render(report)
 
 
-def test_drug_rows_take_the_registry_mesh_and_ikraph2_nodes() -> None:
-    old = {
-        "A": normalize.Mapping("A", "MESH:D1", "11", "a", "Chemical", "exact"),
-        "B": normalize.Mapping("B", "PubChem:CID1", "12", "b", "Chemical", "moiety"),
-        "C": normalize.Mapping("C", "MESH:D3", "13", "c", "Chemical", "stem"),
-    }
+def test_drug_rows_come_from_exact_ids_only() -> None:
     ids = {
-        "A": drug_identity.DrugIdentity("A", "UA", "MESH:D9", "Nine", "", "", "unii_registry"),
+        "A": drug_identity.DrugIdentity("A", "UA", "MESH:D9", "Nine", "27", "TherapyPreventions",
+                                        "unii_registry"),
         "B": drug_identity.DrugIdentity("B", "UB", "", "", "28", "Chemical", "unii_no_mesh"),
         "D": drug_identity.DrugIdentity("D", "", "", "", "", "", "no_unii"),
     }
-    out = normalize.with_identities(old, ids)
-    assert out["A"] == normalize.Mapping("A", "MESH:D9", "", "Nine", "Chemical",
+    out = normalize.with_identities(ids)
+    assert out["A"] == normalize.Mapping("A", "MESH:D9", "27", "Nine", "TherapyPreventions",
                                          "unii_registry")
-    assert (out["B"].mesh_id, out["B"].biokdeid, out["B"].basis) == (
-        "PubChem:CID1", "28", "moiety")
-    # Not asked about: keeps iKraph1's id, but no iKraph1 node id survives.
-    assert (out["C"].mesh_id, out["C"].biokdeid) == ("MESH:D3", "")
+    assert (out["B"].mesh_id, out["B"].biokdeid) == ("UNII:UB", "28")
     assert "D" not in out
 
 
@@ -301,3 +307,34 @@ def test_answers_persist_across_runs_and_a_torn_line_is_skipped(
     assert second.edge_pmids("27.2.9.0", 50) == ["21", "22", "23", "24"]
     assert again.calls == []
     assert "unreadable cache line" in caplog.text
+
+
+def test_names_and_internal_ids_come_from_ikraph2() -> None:
+    rows = _ROWS + [{"biokdeid": 55633, "type": "Disease", "official_name": "nsclc",
+                     "db_id": "MESH:D002289", "mention_count": 5},
+                    {"biokdeid": 77, "type": "Chemical", "official_name": "x",
+                     "db_id": "MESH:D002289", "mention_count": 50}]
+    client, _ = _client(rows)
+    entities = Ikraph2Entities(client, Ikraph2Connection())
+    names = entities.names_of(["2700000295", "55633", "not-a-number"])
+    assert names == {"2700000295": {"pembrolizumab", "PEMBROLIZUMAB", "lambrolizumab"},
+                     "55633": {"NSCLC"}}
+    # A Disease entity wins over a more-mentioned Chemical holding the same id.
+    assert entities.internal_ids(["MESH:D002289", "MESH:C582435", ""]) == {
+        "MESH:D002289": "55633", "MESH:C582435": "6308113"}
+
+
+def test_entry_terms_are_read_as_printed_for_wanted_ids_only(tmp_path: Path) -> None:
+    from source import unii_mesh
+    desc = tmp_path / "desc.xml"
+    desc.write_text("""<?xml version="1.0"?><DescriptorRecordSet>
+      <DescriptorRecord><DescriptorUI>D1</DescriptorUI>
+        <DescriptorName><String>Esomeprazole</String></DescriptorName>
+        <ConceptList><Concept><TermList><Term><String>Esomeprazole</String></Term>
+          <Term><String>Nexium</String></Term></TermList></Concept></ConceptList>
+      </DescriptorRecord>
+      <DescriptorRecord><DescriptorUI>D2</DescriptorUI>
+        <DescriptorName><String>Other</String></DescriptorName></DescriptorRecord>
+      </DescriptorRecordSet>""", encoding="utf-8")
+    assert unii_mesh.entry_terms([desc, tmp_path / "absent.xml"], ["MESH:D1"]) == {
+        "MESH:D1": {"Esomeprazole", "Nexium"}}

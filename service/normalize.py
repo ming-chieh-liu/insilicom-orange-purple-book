@@ -1,38 +1,28 @@
-"""Put both sides of the edge in one id space: the MeSH descriptor.
+"""Put both sides of the edge in one id space: MeSH, keyed from exact ids (D42).
 
 The FDA names a drug ``PEMBROLIZUMAB`` in ``Products.txt``; a trial names it
 ``Keytruda``, ``MK3475`` or ``SCH 900475``. Neither file carries the other's
-identifier, so nothing joins until both are normalised. The Insilicom graph is
-the dictionary that does it — one row per (name, entity) over 12,857 distinct
-drugs and 33,346 diseases — and this module is the policy layer on top of it.
+identifier, so nothing joins until both are normalised.
 
-Three traps, each measured against the real graph, each handled here:
+**FDA side — exact ids only.** Since D42 an ingredient is never resolved by
+name. :mod:`service.drug_identity` gives it its UNII, the MeSH record that
+lists that UNII (NLM's own ``RegistryNumber``), and the iKraph2 entity whose
+``db_id`` is that UNII; :func:`with_identities` turns those into the drug rows.
+An ingredient no exact id identifies has no row.
 
-**Concept ids and descriptor ids are different ids for the same thing.** The
-graph answers ``Stomach Neoplasms`` with ``MESH:D013274`` but ``Gastric
-Cancer`` with ``MESH:M0333444``. MeSH numbers a *concept* separately from the
-*descriptor* that heads it. Left alone, one disease arrives under two ids and
-the join silently fails on exactly the rows a human would call obvious.
-:func:`source.mesh_descriptors.concept_to_descriptor` supplies the rollup and
-:data:`PREFER_DESCRIPTOR` applies it.
+**Trial side — NLM first, then spellings.** ClinicalTrials.gov's own MeSH
+coding (D21) is read by P3 directly; this module matches the strings NLM did
+not code, through :func:`synonym_index`: every spelling of each FDA-side id —
+iKraph2's names of its entity, the FDA's UNII names (brand and code names
+included), MeSH entry terms. A spelling two ids claim is dropped.
 
-**Not every drug has a MeSH record.** ``semaglutide`` and ``Ozempic`` resolve
-only to ``PubChem:CID56843331``. Dropping them would lose whole modern drug
-classes, so a non-MeSH id is kept as the key, prefix and all — the prefix is
-part of the identifier, not decoration, and two PubChem ids still join to each
-other.
+**Concept ids and descriptor ids are different ids for the same thing.**
+``Gastric Cancer`` is ``MESH:M0333444`` where ``Stomach Neoplasms`` is
+``MESH:D013274``; :func:`roll_up` replaces a concept id with its descriptor.
 
-**A name can resolve to several entities.** ``KEYTRUDA`` reaches both
-``MESH:C582435`` and ``PubChem:SID187051801``. :func:`preferred` ranks them:
-MeSH before other vocabularies, a typed ``Drug`` before an untyped chemical,
-then the id itself so the choice is deterministic rather than whatever Mongo
-returned first.
-
-**Short synonyms are not usable.** ``MESH:C582435`` carries ``PB``, ``PEM``,
-``PBZ`` and ``PBL`` alongside ``Pembrolizumab``. Matching a trial arm called
-"PB" to pembrolizumab would be an accident, not a match, so synonyms shorter
-than :data:`MIN_SYNONYM_LENGTH` are dropped — the same rule, for the same
-reason, that :mod:`source.mesh_descriptors` applies to disease entry terms.
+**Short synonyms are not usable.** ``PB`` and ``PEM`` are spellings of
+pembrolizumab; matching an arm called "PB" would be an accident, so synonyms
+shorter than :data:`MIN_SYNONYM_LENGTH` are dropped.
 """
 
 from __future__ import annotations
@@ -40,13 +30,13 @@ from __future__ import annotations
 import re
 from collections import Counter
 from collections.abc import Iterable
-from typing import TYPE_CHECKING, NamedTuple
+from collections.abc import Mapping as ReadOnlyMap
+from typing import TYPE_CHECKING, NamedTuple, Protocol
 
 from config.settings import RawData, TrialArchive
-from dao.biokde import BiokdeRepository, Entity
 from service import approval_events, identity_census
 from source import trial_studies
-from source.moiety import BIOSIMILAR_SUFFIX, Moiety
+from source.moiety import is_biosimilar
 from source.raw_table import read_rows
 from utility import application_number as appno
 from utility.logging import get_logger
@@ -88,17 +78,6 @@ BASIS_DOSE_STRIPPED: str = "synonym_dose_stripped"
 #: collide with arm labels, units and initials.
 MIN_SYNONYM_LENGTH: int = 4
 
-#: Vocabulary preference. A MeSH id is preferred because the FDA indication
-#: side is already coded to MeSH; anything else is kept rather than discarded.
-SOURCE_RANK: tuple[str, ...] = ("MESH:", "PubChem:")
-
-#: Entity subtype preferred when a name reaches several. A row typed ``Drug``
-#: has been curated as one; ``NA`` is merely untyped.
-PREFERRED_SUBTYPE: str = "Drug"
-
-#: MeSH ids that head a descriptor, once rolled up, sort first.
-PREFER_DESCRIPTOR: str = "MESH:D"
-
 #: Ids that are not identifiers. The graph writes ``NA`` where an entity has no
 #: external id, so 90 FDA ingredients — acoltremon, acoramidis hydrochloride,
 #: anacaulase-bcdb, arimoclomol citrate — all "resolved" to the same string.
@@ -106,80 +85,6 @@ PREFER_DESCRIPTOR: str = "MESH:D"
 #: candidate generation in P3 would match all of them to each other. Newer
 #: drugs are exactly the ones that lack an id, so this is not a rare corner.
 PLACEHOLDER_IDS: frozenset[str] = frozenset({"NA", "", "-", "None", "null"})
-
-
-def stem_of(name: str) -> str:
-    """The name without its four-letter biologic suffix, or ``""``.
-
-    FDA has given **every** new biologic a hyphenated four-letter suffix since
-    the 2017 naming guidance, not only biosimilars, so this fires on two quite
-    different populations and the caller must keep them apart:
-
-    * ``ADUCANUMAB-AVWA`` — a novel biologic. The suffix is a naming
-      convention and the stem is the same molecule; no other product shares it.
-    * ``ADALIMUMAB-AACF`` — a biosimilar. The stem names a **different**,
-      earlier product, so folding the two together is a retrieval convenience
-      and never an identity claim. See D11 and :data:`Mapping.basis`.
-
-    Measured on ``Products.txt``: 219 of 2,897 distinct ingredients carry the
-    suffix and 159 of those resolve to nothing at all. Resolving the stem
-    instead recovers 134 of the 159 — 57 novel biologics and 77 biosimilars.
-    The remaining 25 are combinations (``DARATUMUMAB AND HYALURONIDASE-FIHJ``)
-    whose stem is not a single substance either.
-
-    >>> stem_of("ADALIMUMAB-AACF")
-    'ADALIMUMAB'
-    >>> stem_of("ADUCANUMAB-AVWA")
-    'ADUCANUMAB'
-    >>> stem_of("PEMBROLIZUMAB")
-    ''
-    >>> stem_of("ABIRATERONE ACETATE")
-    ''
-    """
-    return name[: -len(match.group())] if (match := BIOSIMILAR_SUFFIX.search(name.upper())) else ""
-
-
-#: A synonym row this much weaker than the best one offered for the same drug
-#: is an artefact, not an alternative. Measured on the failures it fixes:
-#: ``Lenacapavir Sodium`` reaches ``Sodium`` at ``cnt=3`` while ``Lenacapavir``
-#: reaches its PubChem id at ``cnt=1700`` — a ratio of 0.2%. Legitimate
-#: alternatives for one drug do not differ by three orders of magnitude.
-#:
-#: **Why a rejection and not a ranking key.** Sorting by ``cnt`` would reorder
-#: every drug that resolves to more than one entity, which is a large blast
-#: radius for a defect affecting eight. This only removes rows the graph itself
-#: barely attests, and leaves the existing preference to choose among what is
-#: left.
-WEAK_SYNONYM_RATIO: float = 0.01
-
-
-def drop_weak(entities: tuple[Entity, ...]) -> tuple[Entity, ...]:
-    """Discard synonym rows the graph barely attests.
-
-    ``pubmedEntitiesFlat`` is a (name, entity) table and ``cnt`` is its
-    confidence in that pairing, not the entity's overall frequency. A single
-    node is reached by ``Sodium`` at 349,700 and by ``Lenacapavir Sodium`` at 3;
-    the second is a bad row claiming a 2022 antiretroviral *is* sodium, and
-    without ``cnt`` it is indistinguishable from a real synonym.
-
-    That matters because the loser is systematically the *newer* drug: the
-    counter-ion has a clean MeSH descriptor and lenacapavir has only a PubChem
-    id, so :func:`preferred` picks the artefact on vocabulary alone.
-
-    Everything is kept when nothing has a count, so a graph without the field
-    behaves exactly as before.
-
-    >>> a = Entity("MESH:D012964", "1", "Sodium", "Chemical", "Drug", 3)
-    >>> b = Entity("PubChem:CID1", "2", "Lenacapavir", "Chemical", "Drug", 1700)
-    >>> [e.official_name for e in drop_weak((a, b))]
-    ['Lenacapavir']
-    >>> [e.official_name for e in drop_weak((a,))]
-    ['Sodium']
-    """
-    best = max((e.cnt for e in entities), default=0)
-    if best <= 0:
-        return entities
-    return tuple(e for e in entities if e.cnt >= best * WEAK_SYNONYM_RATIO)
 
 
 def is_identifier(mesh_id: str) -> bool:
@@ -244,22 +149,6 @@ class Coverage(NamedTuple):
         return self.resolved / self.asked if self.asked else 0.0
 
 
-def source_of(mesh_id: str) -> str:
-    """The vocabulary an id belongs to.
-
-    >>> source_of("MESH:D016190")
-    'MESH:'
-    >>> source_of("PubChem:CID56843331")
-    'PubChem:'
-    >>> source_of("weird")
-    ''
-    """
-    for prefix in SOURCE_RANK:
-        if mesh_id.startswith(prefix):
-            return prefix
-    return ""
-
-
 def as_graph_id(mesh_id: str) -> str:
     """Prefix a bare MeSH id, because the graph stores them prefixed.
 
@@ -305,147 +194,6 @@ def roll_up(mesh_id: str, concepts: dict[str, str]) -> str:
     bare = mesh_id.removeprefix("MESH:")
     descriptor = concepts.get(bare)
     return f"MESH:{descriptor}" if descriptor else mesh_id
-
-
-def _rank(entity: Entity, concepts: dict[str, str]) -> tuple[int, int, int, str]:
-    """Sort key for choosing between entities one name reached."""
-    rolled = roll_up(entity.id, concepts)
-    source = source_of(rolled)
-    return (
-        SOURCE_RANK.index(source) if source in SOURCE_RANK else len(SOURCE_RANK),
-        0 if rolled.startswith(PREFER_DESCRIPTOR) else 1,
-        0 if entity.subtype == PREFERRED_SUBTYPE else 1,
-        rolled,
-    )
-
-
-def preferred(
-    entities: tuple[Entity, ...], concepts: dict[str, str]
-) -> Entity | None:
-    """The one entity to keep when a name reached several.
-
-    MeSH first, descriptor before supplementary record, curated ``Drug`` before
-    untyped, then the id — so the answer does not depend on result order.
-    """
-    return min(entities, key=lambda e: _rank(e, concepts)) if entities else None
-
-
-def normalise(
-    names: list[str],
-    repository: BiokdeRepository,
-    concepts: dict[str, str],
-    label: str,
-    entity_type: str = "",
-    moieties: dict[str, Moiety] | None = None,
-    stems: bool = False,
-) -> tuple[dict[str, Mapping], Coverage]:
-    """Resolve ``names`` to one entity each, rolling MeSH concepts up.
-
-    ``entity_type`` restricts which kind of entity may answer — passing
-    ``Disease`` stops a condition matching a chemical of the same name, which
-    the graph is full of.
-
-    ``moieties`` adds the active moiety as a second thing to ask about. The FDA
-    writes the salt it formulates — ``ESOMEPRAZOLE MAGNESIUM`` — and a trial
-    writes ``esomeprazole``; where the graph gives those different ids, the
-    drug matches no trials at all, and does so silently. Both spellings are
-    asked for and :func:`preferred` picks between the answers, so the moiety
-    wins only when it is the better-vocabularied of the two.
-
-    ``stems`` does the same for the four-letter biologic suffix, and **only as
-    a last resort**: the stem is asked for only when the full name resolved to
-    nothing. A suffixed name that the graph knows keeps its own id, so the 60
-    that already resolve are untouched. Where the stem does answer, the row is
-    marked ``basis="stem"`` and every consumer downstream must treat it as a
-    retrieval key rather than an identity — for a biosimilar the stem names a
-    different product, and a 351(k) rests on its own trials (D11).
-    """
-    folded = moieties or {}
-    queries = list(names)
-    moiety_of: dict[str, str] = {}
-    stem_of_name: dict[str, str] = {}
-    for name in names:
-        record = folded.get(name.upper())
-        if record is not None:
-            moiety_of[name] = record.moiety
-            queries.append(record.moiety)
-        if stems:
-            stem = stem_of(name)
-            if stem:
-                stem_of_name[name] = stem
-                queries.append(stem)
-    resolved = repository.resolve(queries)
-    out: dict[str, Mapping] = {}
-    rolled_up = non_mesh = 0
-    for name in dict.fromkeys(names):
-        candidates = tuple(
-            e
-            for e in (
-                resolved.get(name, ())
-                + resolved.get(moiety_of.get(name, ""), ())
-            )
-            if is_identifier(e.id)
-        )
-        if entity_type:
-            candidates = tuple(e for e in candidates if e.type == entity_type)
-        # The stem is a fallback, never a competitor: a suffixed name the
-        # graph already knows keeps its own id, and only a name that resolved
-        # to nothing falls back to the molecule its suffix hangs off.
-        via_stem = False
-        if not candidates and name in stem_of_name:
-            candidates = tuple(
-                e
-                for e in resolved.get(stem_of_name[name], ())
-                if is_identifier(e.id)
-                and (not entity_type or e.type == entity_type)
-            )
-            via_stem = bool(candidates)
-        best = preferred(drop_weak(candidates), concepts)
-        if best is None:
-            continue
-        rolled = roll_up(best.id, concepts)
-        if rolled != best.id:
-            rolled_up += 1
-        if not rolled.startswith("MESH:"):
-            non_mesh += 1
-        via_moiety = best in resolved.get(moiety_of.get(name, ""), ())
-        out[name] = Mapping(
-            name=name,
-            mesh_id=rolled,
-            biokdeid=best.biokdeid,
-            official_name=best.official_name,
-            entity_type=best.type,
-            basis=(
-                "stem"
-                if via_stem
-                else "moiety"
-                if via_moiety
-                else "rolled-up"
-                if rolled != best.id
-                else "exact"
-            ),
-        )
-    asked = len(dict.fromkeys(names))
-    coverage = Coverage(
-        label=label,
-        asked=asked,
-        resolved=len(out),
-        rolled_up=rolled_up,
-        non_mesh=non_mesh,
-        unresolved=tuple(
-            sorted(name for name in dict.fromkeys(names) if name not in out)[:50]
-        ),
-    )
-    _log.info(
-        "%s: %d/%d resolved (%.1f%%), %d rolled up, %d non-MeSH",
-        label,
-        coverage.resolved,
-        coverage.asked,
-        100 * coverage.rate,
-        rolled_up,
-        non_mesh,
-    )
-    return out, coverage
 
 
 #: A dose, a strength or a frequency: a number with its unit ("0.5 mcg/kg",
@@ -577,46 +325,40 @@ def stripped_match_ok(stripped: str, mesh_id: str, nlm_mesh: set[str] | None) ->
 
 
 def synonym_index(
-    mesh_ids: list[str], repository: BiokdeRepository, concepts: dict[str, str],
-    alias: dict[str, str] | None = None,
+    expanded: ReadOnlyMap[str, Iterable[str]], concepts: dict[str, str]
 ) -> dict[str, str]:
-    """Case-folded synonym → MeSH id, for matching the trial side.
+    """Case-folded synonym → id, for matching the trial side.
 
-    The inverse of :func:`normalise`, and the cheaper direction: rather than
-    normalising 493,446 distinct trial intervention strings, expand the few
-    thousand ids the FDA side actually uses into every spelling the graph knows
-    and match against that.
+    ``expanded`` is each FDA-side id and every spelling known for it (D42:
+    iKraph2's names of its entity, FDA's UNII names, MeSH entry terms). The
+    cheaper direction: rather than normalising half a million trial strings,
+    expand the few thousand ids the FDA side uses and match against that.
 
     A synonym claimed by more than one id is dropped, not arbitrated — an
     ambiguous name is not evidence, and keeping the first one seen would make
     the result depend on query order.
 
-    ``alias`` (D42) maps an expanded id to the id its spellings should point
-    to: iKraph1's old id for a drug whose MeSH id now comes from its UNII, so
-    the trial spellings iKraph1 knew under the old id still reach the drug.
+    >>> synonym_index({"MESH:C1": ["Keytruda", "MK-3475", "PB", "placebo"],
+    ...                "MESH:C2": ["Opdivo", "MK-3475"]}, {})
+    {'keytruda': 'MESH:C1', 'opdivo': 'MESH:C2'}
     """
-    expanded = repository.synonyms(
-        [identifier for identifier in mesh_ids if is_identifier(identifier)]
-    )
     claims: dict[str, set[str]] = {}
     dropped_design = 0
     for mesh_id, names in expanded.items():
-        rolled = (alias or {}).get(mesh_id) or roll_up(mesh_id, concepts)
+        if not is_identifier(mesh_id):
+            continue
+        rolled = roll_up(mesh_id, concepts)
         for name in names:
-            folded = name.casefold()
+            folded = name.casefold().strip()
             if folded in DESIGN_WORDS:
                 dropped_design += 1
                 continue
-            if len(name) >= MIN_SYNONYM_LENGTH:
+            if len(folded) >= MIN_SYNONYM_LENGTH:
                 claims.setdefault(folded, set()).add(rolled)
     index = {name: next(iter(ids)) for name, ids in claims.items() if len(ids) == 1}
-    dropped = len(claims) - len(index)
     _log.info(
         "%d synonyms over %d ids (%d ambiguous, %d study-design words dropped)",
-        len(index),
-        len(expanded),
-        dropped,
-        dropped_design,
+        len(index), len(expanded), len(claims) - len(index), dropped_design,
     )
     return index
 
@@ -739,41 +481,50 @@ def _match_trial_strings(
 
 #: ``basis`` of a drug row whose MeSH id came from its UNII (D42).
 BASIS_UNII_REGISTRY = "unii_registry"
+#: ``basis`` of a suffixed biologic whose MeSH record is the molecule without
+#: the suffix: for a biosimilar that names a **different**, earlier product, so
+#: the id is a retrieval key, never an identity claim (D11). P3 orders such a
+#: pool with biosimilar-looking studies first.
+BASIS_STEM = "stem"
 
 
-def with_identities(
-    drugs: dict[str, Mapping], identities: dict[str, DrugIdentity]
-) -> dict[str, Mapping]:
-    """The FDA drug rows under D42: UNII registry MeSH first, iKraph2 nodes.
+class GraphNames(Protocol):
+    """What S2/S3 read from the graph (D42: :class:`dao.ikraph2_entities.Ikraph2Entities`)."""
 
-    * a UNII-mapped ingredient takes that MeSH id, whatever iKraph1 said;
-    * otherwise iKraph1's id stays, as the recorded fallback (its ``basis``);
-    * an ingredient with neither but with an iKraph2 node is kept under its
-      UNII, so the literature route can still walk it — no trial is coded
-      with a UNII, so it reaches no registry trial;
-    * every row's ``biokdeid`` is its iKraph2 node(s), ``;``-joined, or "".
+    def names_of(self, biokdeids: Iterable[str]) -> dict[str, frozenset[str]]: ...
+
+    def internal_ids(self, ids: Iterable[str]) -> dict[str, str]: ...
+
+
+def with_identities(identities: dict[str, DrugIdentity]) -> dict[str, Mapping]:
+    """The FDA drug rows under D42, from exact ids only — no name resolution.
+
+    * an ingredient whose UNII maps to MeSH takes that id (``unii_registry``,
+      or ``stem`` for a suffixed biologic filed under the bare molecule);
+    * one with no MeSH record but an iKraph2 node is kept under its UNII, so
+      the literature route can walk it and the trial side can match its names;
+    * one with neither has no row: nothing exact identifies it;
+    * ``biokdeid`` is the iKraph2 node(s), ``;``-joined, or "".
 
     >>> from service.drug_identity import DrugIdentity
-    >>> old = {"A": Mapping("A", "MESH:D1", "11", "a", "Chemical", "exact")}
     >>> ids = {"A": DrugIdentity("A", "U1", "MESH:D9", "Nine", "27", "TherapyPreventions",
     ...                          "unii_registry"),
-    ...        "B": DrugIdentity("B", "U2", "", "", "28", "TherapyPreventions", "unii_no_mesh")}
-    >>> [(m.mesh_id, m.biokdeid, m.basis) for m in with_identities(old, ids).values()]
-    [('MESH:D9', '27', 'unii_registry'), ('UNII:U2', '28', 'unii_no_mesh')]
+    ...        "B": DrugIdentity("B", "U2", "", "", "28", "TherapyPreventions", "unii_no_mesh"),
+    ...        "ADALIMUMAB-AACF": DrugIdentity("ADALIMUMAB-AACF", "U3", "MESH:D1", "Adalimumab",
+    ...                                        "", "", "unii_registry"),
+    ...        "C": DrugIdentity("C", "U4", "", "", "", "", "unii_no_mesh")}
+    >>> [(m.name, m.mesh_id, m.biokdeid, m.basis) for m in with_identities(ids).values()]
+    ... # doctest: +NORMALIZE_WHITESPACE
+    [('A', 'MESH:D9', '27', 'unii_registry'), ('B', 'UNII:U2', '28', 'unii_no_mesh'),
+     ('ADALIMUMAB-AACF', 'MESH:D1', '', 'stem')]
     """
     out: dict[str, Mapping] = {}
-    for name in dict.fromkeys([*drugs, *identities]):
-        identity = identities.get(name)
-        existing = drugs.get(name)
-        if identity is None:
-            if existing is not None:
-                out[name] = existing._replace(biokdeid="")
-            continue
+    for name, identity in identities.items():
         if identity.mesh_id:
+            stem = is_biosimilar(name) and name.casefold() != identity.mesh_name.casefold()
             out[name] = Mapping(name, identity.mesh_id, identity.nodes, identity.mesh_name,
-                                identity.node_type or "Chemical", BASIS_UNII_REGISTRY)
-        elif existing is not None:
-            out[name] = existing._replace(biokdeid=identity.nodes)
+                                identity.node_type or "Chemical",
+                                BASIS_STEM if stem else BASIS_UNII_REGISTRY)
         elif identity.nodes:
             first = identity.uniis.split(";")[0]
             out[name] = Mapping(name, f"UNII:{first}", identity.nodes, "",
@@ -781,48 +532,52 @@ def with_identities(
     return out
 
 
-def renamed_ids(before: dict[str, Mapping], after: dict[str, Mapping]) -> dict[str, str]:
-    """Old id → new id for drug rows whose id changed, where that is one-to-one.
+def expand(rows: Iterable[Mapping], graph: GraphNames,
+           extra: dict[str, set[str]]) -> dict[str, set[str]]:
+    """Each row's id → every spelling known for it (D42).
 
-    An old id that would point to two different new ids is left out: its
-    spellings cannot say which drug they mean.
+    The graph's names of the row's iKraph2 node(s), plus ``extra`` keyed by
+    the row's source name or by its id (FDA UNII names, MeSH entry terms), plus
+    the source name itself.
 
-    >>> m = lambda n, i: Mapping(n, i, "", "", "", "")
-    >>> renamed_ids({"A": m("A", "PubChem:CID1"), "B": m("B", "X:1"), "C": m("C", "X:1"),
-    ...              "D": m("D", "MESH:D4")},
-    ...             {"A": m("A", "MESH:D1"), "B": m("B", "MESH:D2"), "C": m("C", "MESH:D3"),
-    ...              "D": m("D", "MESH:D4")})
-    {'PubChem:CID1': 'MESH:D1'}
-    >>> renamed_ids({"A": m("A", "X:9"), "B": m("B", "X:9")},
-    ...             {"A": m("A", "MESH:D1"), "B": m("B", "X:9")})
-    {}
+    >>> class G:
+    ...     def names_of(self, ids): return {"27": frozenset({"lambrolizumab"})}
+    ...     def internal_ids(self, ids): return {}
+    >>> rows = [Mapping("PEMBROLIZUMAB", "MESH:C1", "27", "", "", "")]
+    >>> sorted(expand(rows, G(), {"PEMBROLIZUMAB": {"Keytruda"}, "MESH:C1": {"MK-3475"}})["MESH:C1"])
+    ['Keytruda', 'MK-3475', 'PEMBROLIZUMAB', 'lambrolizumab']
     """
-    targets: dict[str, set[str]] = {}
-    for name, old in before.items():
-        new = after.get(name)
-        if new is not None and old.mesh_id and new.mesh_id:
-            targets.setdefault(old.mesh_id, set()).add(new.mesh_id)
-    still_used = {m.mesh_id for m in after.values()}
-    return {old: next(iter(new)) for old, new in targets.items()
-            if len(new) == 1 and old not in still_used}
+    rows = list(rows)
+    names_of = graph.names_of({n for m in rows for n in m.biokdeid.split(";") if n})
+    out: dict[str, set[str]] = {}
+    for m in rows:
+        if not is_identifier(m.mesh_id):
+            continue
+        names = out.setdefault(m.mesh_id, set())
+        names.add(m.name)
+        names |= extra.get(m.name, set()) | extra.get(m.mesh_id, set())
+        for node in m.biokdeid.split(";"):
+            names |= names_of.get(node, frozenset())
+    return out
 
 
 def build(
     data: RawData,
     archive: TrialArchive,
-    repository: BiokdeRepository,
+    graph: GraphNames,
     concepts: dict[str, str],
     indication_ids: list[str],
-    moieties: dict[str, Moiety] | None = None,
+    identities: dict[str, DrugIdentity],
     descriptor_names: dict[str, str] | None = None,
-    identities: dict[str, DrugIdentity] | None = None,
+    extra_names: dict[str, set[str]] | None = None,
 ) -> NormalizeReport:
-    """Run all four normalisation passes and report what each covered.
+    """Run all four normalisation passes and report what each covered (D42).
 
-    ``identities`` (D42, :mod:`service.drug_identity`) overrides the FDA side
-    before the trial side is matched: an ingredient whose UNII maps to MeSH
-    takes that id, and every drug row's ``biokdeid`` becomes its iKraph2
-    node(s). The trial-side synonym index is then built on the new ids.
+    The FDA side comes from ``identities`` (:mod:`service.drug_identity`):
+    exact ids, no name lookup. Indications get their iKraph2 internal id by
+    exact ``db_id``. The trial side is matched on every spelling of each id —
+    iKraph2's names, plus ``extra_names`` (an ingredient's FDA UNII names, keyed
+    by ingredient; MeSH entry terms, keyed by MeSH id).
     """
     spine = approval_events.build(data)
     applications = frozenset(
@@ -830,27 +585,22 @@ def build(
     )
     by_application = ingredients_of(data, applications)
     names = sorted({name for names in by_application.values() for name in names})
-    drugs, drug_coverage = normalise(
-        names,
-        repository,
-        concepts,
-        "FDA drug (active ingredient)",
-        "Chemical",
-        moieties,
-        stems=True,
+    drugs = with_identities({n: identities[n] for n in names if n in identities})
+    drug_coverage = Coverage(
+        label="FDA drug (active ingredient, exact ids)",
+        asked=len(names),
+        resolved=len(drugs),
+        rolled_up=0,
+        non_mesh=sum(1 for m in drugs.values() if not m.mesh_id.startswith("MESH:")),
+        unresolved=tuple(n for n in names if n not in drugs)[:50],
     )
-    alias: dict[str, str] = {}
-    if identities is not None:
-        previous = drugs
-        drugs = with_identities(drugs, identities)
-        alias = renamed_ids(previous, drugs)
     unresolved_applications = sum(
         1
         for application in applications
         if not any(name in drugs for name in by_application.get(application, ()))
     )
 
-    indication_internal = repository.internal_ids(
+    indication_internal = graph.internal_ids(
         [roll_up(as_graph_id(i), concepts) for i in indication_ids]
     )
     # An indication arrives as an id, never as a name, so without the MeSH
@@ -884,12 +634,10 @@ def build(
         unresolved=(),
     )
 
-    drug_index = synonym_index(
-        sorted({m.mesh_id for m in drugs.values()} | set(alias)), repository, concepts, alias
-    )
+    extra = extra_names or {}
+    drug_index = synonym_index(expand(drugs.values(), graph, extra), concepts)
     condition_index = synonym_index(
-        sorted({m.mesh_id for m in rolled_indications.values()}), repository, concepts
-    )
+        expand(rolled_indications.values(), graph, extra), concepts)
     # One pass over the archive feeds both trial-side passes.
     interventions: list[tuple[str, ...]] = []
     #: Intervention string → the NLM intervention MeSH of every trial naming it
@@ -985,31 +733,26 @@ def counted(mappings: dict[str, Mapping]) -> tuple[tuple[str, int], ...]:
 
 
 __all__ = [
+    "BASIS_DOSE_STRIPPED",
+    "BASIS_STEM",
     "BASIS_UNII_REGISTRY",
     "DESIGN_WORDS",
     "MIN_SYNONYM_LENGTH",
-    "WEAK_SYNONYM_RATIO",
-    "drop_weak",
-    "stem_of",
     "PLACEHOLDER_IDS",
-    "PREFERRED_SUBTYPE",
-    "PREFER_DESCRIPTOR",
-    "SOURCE_RANK",
     "Coverage",
+    "GraphNames",
     "Mapping",
     "NormalizeReport",
     "as_graph_id",
     "build",
+    "counted",
+    "dose_stripped",
+    "expand",
     "ingredients_of",
     "is_identifier",
     "render",
-    "counted",
-    "normalise",
-    "preferred",
     "render_coverage",
-    "renamed_ids",
     "roll_up",
-    "source_of",
     "synonym_index",
     "with_identities",
 ]

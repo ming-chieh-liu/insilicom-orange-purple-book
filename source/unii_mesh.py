@@ -110,6 +110,27 @@ def mesh_records(paths: Iterable[Path]) -> Iterator[MeshRecord]:
             element.clear()
 
 
+def entry_terms(paths: Iterable[Path], wanted: Iterable[str]) -> dict[str, set[str]]:
+    """``MESH:<ui>`` → its preferred name and entry terms as printed, for the
+    ids in ``wanted`` only (D42: spellings for matching trial strings). Streamed."""
+    want = set(wanted)
+    out: dict[str, set[str]] = {}
+    for path in paths:
+        if not path.is_file():
+            continue
+        for _, element in ET.iterparse(path, events=("end",)):
+            if element.tag not in ("DescriptorRecord", "SupplementalRecord"):
+                continue
+            ui = element.findtext("DescriptorUI") or element.findtext("SupplementalRecordUI")
+            if ui and f"MESH:{ui}" in want:
+                out[f"MESH:{ui}"] = {
+                    term.text.strip()
+                    for term in element.findall("ConceptList/Concept/TermList/Term/String")
+                    if term.text and term.text.strip()}
+            element.clear()
+    return out
+
+
 def unii_names(rows: Iterable[dict[str, str]]) -> dict[str, set[str]]:
     """UNII → its folded names, from the FDA's UNII name list.
 
@@ -187,5 +208,5 @@ def render(report: MapReport) -> str:
     ])
 
 
-__all__ = ["BASIS_REGISTRY", "MapReport", "MeshRecord", "UniiMesh", "build", "fold",
+__all__ = ["BASIS_REGISTRY", "MapReport", "MeshRecord", "UniiMesh", "build", "entry_terms", "fold",
            "mesh_records", "read", "render", "unii_names"]

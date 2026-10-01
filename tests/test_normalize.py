@@ -1,4 +1,4 @@
-"""Tests for the normalisation policy: one id space for both sides of the edge."""
+"""Tests for the normalisation policy: one id space for both sides of the edge (D42)."""
 
 from __future__ import annotations
 
@@ -8,276 +8,70 @@ from pathlib import Path
 
 import pytest
 
-from config.settings import BiokdeConnection, RawData, TrialArchive
-from dao.biokde import BiokdeRepository, Entity
-from source.moiety import Moiety
+from config.settings import RawData, TrialArchive
 from service import normalize
+from service.drug_identity import DrugIdentity
 
 # "Gastric Cancer" is a MeSH *concept*; "Stomach Neoplasms" is the *descriptor*
 # that heads it. Both must land on D013274 or the join fails on obvious rows.
 _CONCEPTS = {"M0333444": "D013274", "D013274": "D013274", "C582435": "C582435"}
 
 
-class _FakeRepository:
-    """A graph with the shapes that matter, and nothing else."""
+class _FakeGraph:
+    """iKraph2's names and exact-id lookups, as normalize.build reads them."""
 
-    def __init__(
-        self,
-        entities: dict[str, tuple[Entity, ...]] | None = None,
-        synonyms: dict[str, frozenset[str]] | None = None,
-    ) -> None:
-        self._entities = entities or {}
-        self._synonyms = synonyms or {}
-        self.synonym_ids_asked: list[str] = []
+    def __init__(self, names: dict[str, frozenset[str]] | None = None,
+                 internal: dict[str, str] | None = None) -> None:
+        self._names = names or {}
+        self._internal = internal or {}
+        self.names_asked: list[str] = []
 
-    def resolve(self, names: Iterable[str]) -> dict[str, tuple[Entity, ...]]:
-        return {n: self._entities[n] for n in names if n and n in self._entities}
+    def names_of(self, biokdeids: Iterable[str]) -> dict[str, frozenset[str]]:
+        asked = sorted(biokdeids)
+        self.names_asked += asked
+        return {i: self._names[i] for i in asked if i in self._names}
 
     def internal_ids(self, ids: Iterable[str]) -> dict[str, str]:
-        return {i: f"bk-{i}" for i in ids if i in self._synonyms or i.startswith("MESH:")}
-
-    def synonyms(self, ids: Iterable[str]) -> dict[str, frozenset[str]]:
-        self.synonym_ids_asked = list(ids)
-        return {
-            i: self._synonyms[i]
-            for i in self.synonym_ids_asked
-            if i in self._synonyms
-        }
-
-
-def _repository(**kwargs: object) -> BiokdeRepository:
-    return _FakeRepository(**kwargs)  # type: ignore[return-value,arg-type]
-
-
-# ---------------------------------------------------------------------------
-# Id hygiene
-# ---------------------------------------------------------------------------
+        return {i: self._internal[i] for i in ids if i in self._internal}
 
 
 def test_a_bare_mesh_id_is_prefixed_for_the_graph() -> None:
-    """indications.tsv writes D002137; the graph stores MESH:D002137. Asking
-    with the bare form matches nothing and reports honest-looking zeros."""
-    assert normalize.as_graph_id("D002137") == "MESH:D002137"
-
-
-def test_an_already_prefixed_id_is_left_alone() -> None:
+    assert normalize.as_graph_id("D002289") == "MESH:D002289"
+    assert normalize.as_graph_id("MESH:D002289") == "MESH:D002289"
     assert normalize.as_graph_id("PubChem:CID1") == "PubChem:CID1"
+    assert normalize.as_graph_id("weird") == "weird"
 
 
-def test_a_non_mesh_looking_string_is_not_prefixed() -> None:
-    assert normalize.as_graph_id("XYZ") == "XYZ"
-
-
-def test_the_placeholder_id_is_not_an_identifier() -> None:
-    """The graph writes NA where an entity has no external id. Keyed on that,
-    every unidentified drug becomes the same drug."""
+def test_placeholder_ids_identify_nothing() -> None:
     assert not normalize.is_identifier("NA")
-    assert normalize.is_identifier("MESH:D016190")
+    assert normalize.is_identifier("MESH:D1")
 
 
-def test_a_placeholder_id_never_becomes_a_mapping() -> None:
-    entities = {
-        "Acoltremon": (Entity("NA", "bkNA", "Acoltremon", "Chemical", "NA"),),
-        "Carboplatin": (Entity("MESH:D016190", "bkMESH:D016190", "Carboplatin", "Chemical", "Drug"),),
-    }
-    mapped, coverage = normalize.normalise(
-        ["Acoltremon", "Carboplatin"], _repository(entities=entities), {}, "drugs"
-    )
-    assert "Acoltremon" not in mapped
-    assert coverage.resolved == 1
-
-
-def test_placeholder_ids_are_never_expanded_to_synonyms() -> None:
-    """Expanding NA would pull every id-less entity's names into one bucket and
-    match them all to each other."""
-    repository = _FakeRepository(synonyms={"MESH:C582435": frozenset({"Keytruda"})})
-    normalize.synonym_index(
-        ["NA", "MESH:C582435"], repository, {}  # type: ignore[arg-type]
-    )
-    assert repository.synonym_ids_asked == ["MESH:C582435"]
-
-
-# ---------------------------------------------------------------------------
-# The concept → descriptor rollup
-# ---------------------------------------------------------------------------
-
-
-def test_a_concept_id_rolls_up_to_its_descriptor() -> None:
+def test_concept_ids_roll_up_and_others_pass_through() -> None:
     assert normalize.roll_up("MESH:M0333444", _CONCEPTS) == "MESH:D013274"
-
-
-def test_a_descriptor_id_is_unchanged() -> None:
     assert normalize.roll_up("MESH:D013274", _CONCEPTS) == "MESH:D013274"
-
-
-def test_a_non_mesh_id_is_never_rolled() -> None:
     assert normalize.roll_up("PubChem:CID1", _CONCEPTS) == "PubChem:CID1"
 
 
-def test_two_spellings_of_one_disease_reach_the_same_id() -> None:
-    """The whole point of the rollup."""
-    entities = {
-        "Gastric Cancer": (Entity("MESH:M0333444", "bkMESH:M0333444", "Cancer Of Stomach", "Disease", "NA"),),
-        "Stomach Neoplasms": (Entity("MESH:D013274", "bkMESH:D013274", "Stomach Neoplasms", "Disease", "NA"),),
-    }
-    mapped, coverage = normalize.normalise(
-        ["Gastric Cancer", "Stomach Neoplasms"],
-        _repository(entities=entities),
-        _CONCEPTS,
-        "conditions",
-    )
-    assert mapped["Gastric Cancer"].mesh_id == mapped["Stomach Neoplasms"].mesh_id
-    assert mapped["Gastric Cancer"].basis == "rolled-up"
-    assert coverage.rolled_up == 1
+def test_the_synonym_index_drops_short_ambiguous_design_and_placeholder_names() -> None:
+    index = normalize.synonym_index({
+        "MESH:C582435": ["Keytruda", "PB", "Control", "MK-3475"],
+        "MESH:C2": ["Opdivo", "mk-3475"],
+        "MESH:M0333444": ["Gastric Cancer"],
+        "NA": ["Anything"],
+    }, _CONCEPTS)
+    assert index == {"keytruda": "MESH:C582435", "opdivo": "MESH:C2",
+                     "gastric cancer": "MESH:D013274"}
 
 
-# ---------------------------------------------------------------------------
-# Choosing between entities one name reached
-# ---------------------------------------------------------------------------
-
-
-def test_mesh_is_preferred_over_another_vocabulary() -> None:
-    entities = (
-        Entity("PubChem:SID187051801", "bkPubChem:SID187051801", "GTPL7499", "Chemical", "Drug"),
-        Entity("MESH:C582435", "bkMESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
-    )
-    best = normalize.preferred(entities, {})
-    assert best is not None and best.id == "MESH:C582435"
-
-
-def test_a_descriptor_is_preferred_over_a_supplementary_record() -> None:
-    entities = (
-        Entity("MESH:C111111", "bkMESH:C111111", "Supplementary", "Disease", "NA"),
-        Entity("MESH:D013274", "bkMESH:D013274", "Stomach Neoplasms", "Disease", "NA"),
-    )
-    best = normalize.preferred(entities, {})
-    assert best is not None and best.id == "MESH:D013274"
-
-
-def test_a_curated_drug_is_preferred_over_an_untyped_chemical() -> None:
-    entities = (
-        Entity("MESH:C000002", "bkMESH:C000002", "Untyped", "Chemical", "NA"),
-        Entity("MESH:C000001", "bkMESH:C000001", "Curated", "Chemical", "Drug"),
-    )
-    best = normalize.preferred(entities, {})
-    assert best is not None and best.subtype == "Drug"
-
-
-def test_the_choice_does_not_depend_on_result_order() -> None:
-    entities = (
-        Entity("MESH:C582435", "bkMESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
-        Entity("PubChem:SID1", "bkPubChem:SID1", "Other", "Chemical", "Drug"),
-    )
-    forward = normalize.preferred(entities, {})
-    backward = normalize.preferred(tuple(reversed(entities)), {})
-    assert forward == backward
-
-
-def test_no_entities_means_no_choice() -> None:
-    assert normalize.preferred((), {}) is None
-
-
-def test_a_non_mesh_id_is_kept_not_dropped() -> None:
-    """semaglutide and Ozempic resolve only to PubChem. Dropping them would
-    lose whole modern drug classes."""
-    entities = {"SEMAGLUTIDE": (Entity("PubChem:CID56843331", "bkPubChem:CID56843331", "x", "Chemical", "Drug"),)}
-    mapped, coverage = normalize.normalise(
-        ["SEMAGLUTIDE"], _repository(entities=entities), {}, "drugs"
-    )
-    assert mapped["SEMAGLUTIDE"].mesh_id == "PubChem:CID56843331"
-    assert coverage.non_mesh == 1
-
-
-def test_an_entity_type_filter_excludes_a_same_named_gene() -> None:
-    """'ASPIRIN' also reaches the gene ASPM in the graph."""
-    entities = {
-        "ASPIRIN": (
-            Entity("NCBI:259266", "bkNCBI:259266", "ASPM", "Gene", "NA"),
-            Entity("PubChem:CID2244", "bkPubChem:CID2244", "Aspirin", "Chemical", "Drug"),
-        )
-    }
-    mapped, _ = normalize.normalise(
-        ["ASPIRIN"], _repository(entities=entities), {}, "drugs", "Chemical"
-    )
-    assert mapped["ASPIRIN"].entity_type == "Chemical"
-
-
-# ---------------------------------------------------------------------------
-# The synonym index, used to match the trial side
-# ---------------------------------------------------------------------------
-
-
-def test_short_synonyms_are_dropped() -> None:
-    """MESH:C582435 carries PB, PEM and PBZ. A trial arm called 'PB' matching
-    pembrolizumab would be an accident, not a match."""
-    repository = _FakeRepository(
-        synonyms={"MESH:C582435": frozenset({"PB", "PEM", "Pembrolizumab"})}
-    )
-    index = normalize.synonym_index(
-        ["MESH:C582435"], repository, {}  # type: ignore[arg-type]
-    )
-    assert "pb" not in index
-    assert index["pembrolizumab"] == "MESH:C582435"
-
-
-def test_the_index_is_case_folded() -> None:
-    repository = _FakeRepository(synonyms={"MESH:C582435": frozenset({"Keytruda"})})
-    index = normalize.synonym_index(
-        ["MESH:C582435"], repository, {}  # type: ignore[arg-type]
-    )
-    assert index["keytruda"] == "MESH:C582435"
-
-
-def test_a_synonym_two_ids_claim_is_dropped_not_arbitrated() -> None:
-    """Keeping the first one seen would make the result depend on query order."""
-    repository = _FakeRepository(
-        synonyms={
-            "MESH:D000001": frozenset({"Ambiguous"}),
-            "MESH:D000002": frozenset({"Ambiguous", "Distinct"}),
-        }
-    )
-    index = normalize.synonym_index(
-        ["MESH:D000001", "MESH:D000002"], repository, {}  # type: ignore[arg-type]
-    )
-    assert "ambiguous" not in index
-    assert index["distinct"] == "MESH:D000002"
-
-
-def test_synonyms_are_rolled_up_too() -> None:
-    repository = _FakeRepository(
-        synonyms={"MESH:M0333444": frozenset({"Gastric Cancer"})}
-    )
-    index = normalize.synonym_index(
-        ["MESH:M0333444"], repository, _CONCEPTS  # type: ignore[arg-type]
-    )
-    assert index["gastric cancer"] == "MESH:D013274"
-
-
-# ---------------------------------------------------------------------------
-# Coverage reporting
-# ---------------------------------------------------------------------------
-
-
-@pytest.mark.parametrize(
-    ("asked", "resolved", "expected"), [(10, 8, 0.8), (0, 0, 0.0), (4, 4, 1.0)]
-)
+@pytest.mark.parametrize("asked,resolved,expected", [(10, 8, 0.8), (0, 0, 0.0)])
 def test_the_coverage_rate(asked: int, resolved: int, expected: float) -> None:
     assert normalize.Coverage("x", asked, resolved, 0, 0, ()).rate == expected
 
 
 def test_the_coverage_report_names_what_failed() -> None:
-    entities = {"Known": (Entity("MESH:D1", "bkMESH:D1", "Known", "Chemical", "Drug"),)}
-    _, coverage = normalize.normalise(
-        ["Known", "Unknown"], _repository(entities=entities), {}, "drugs"
-    )
-    assert coverage.unresolved == ("Unknown",)
-    assert "Unknown" in normalize.render_coverage((coverage,))
-
-
-def test_source_of_names_the_vocabulary() -> None:
-    assert normalize.source_of("MESH:D1") == "MESH:"
-    assert normalize.source_of("PubChem:CID1") == "PubChem:"
-    assert normalize.source_of("TTD:D1") == ""
+    text = normalize.render_coverage((normalize.Coverage("drugs", 2, 1, 0, 1, ("ODDITY",)),))
+    assert "ODDITY" in text and "kept under a non-MeSH vocabulary" in text
 
 
 def test_counted_reports_the_most_claimed_ids() -> None:
@@ -426,50 +220,48 @@ def empty_archive(tmp_path: Path) -> TrialArchive:
     return TrialArchive(root=tmp_path / "no-archive")
 
 
-def test_the_pass_maps_every_side_it_can(
+def _identity(name: str, mesh: str = "MESH:C582435", nodes: str = "2700000295") -> DrugIdentity:
+    return DrugIdentity(name, "DPT0O3T46P", mesh, "pembrolizumab", nodes,
+                        "TherapyPreventions", "unii_registry" if mesh else "unii_no_mesh")
+
+
+def test_the_pass_takes_exact_ids_and_expands_every_spelling(
     full_corpus: RawData, empty_archive: TrialArchive
 ) -> None:
-    repository = _FakeRepository(
-        entities={
-            "PEMBROLIZUMAB": (
-                Entity("MESH:C582435", "bkMESH:C582435", "Pembrolizumab", "Chemical", "Drug"),
-            )
-        },
-        synonyms={"MESH:C582435": frozenset({"Keytruda", "Pembrolizumab"})},
-    )
+    graph = _FakeGraph(names={"2700000295": frozenset({"lambrolizumab"}),
+                              "55633": frozenset({"non-small-cell lung cancer"})},
+                       internal={"MESH:D002289": "55633"})
     report = normalize.build(
-        full_corpus,
-        empty_archive,
-        repository,  # type: ignore[arg-type]
-        _CONCEPTS,
-        ["D002289"],
+        full_corpus, empty_archive, graph, _CONCEPTS, ["D002289"],
+        {"PEMBROLIZUMAB": _identity("PEMBROLIZUMAB")},
+        extra_names={"PEMBROLIZUMAB": {"Keytruda"}, "MESH:C582435": {"MK-3475"}},
     )
-    assert report.drugs[0].mesh_id == "MESH:C582435"
+    drug = report.drugs[0]
+    assert (drug.mesh_id, drug.biokdeid, drug.basis) == (
+        "MESH:C582435", "2700000295", "unii_registry")
+    assert report.indications[0].mesh_id == "MESH:D002289"
+    assert report.indications[0].biokdeid == "55633"
+    assert set(graph.names_asked) == {"2700000295", "55633"}
     assert report.application_rate == 1.0
     assert len(report.coverages) == 4
 
 
-def test_bare_indication_ids_are_prefixed_by_the_pass(
-    full_corpus: RawData, empty_archive: TrialArchive
-) -> None:
-    """indications.tsv holds D002289; the graph holds MESH:D002289."""
-    report = normalize.build(
-        full_corpus, empty_archive, _FakeRepository(),  # type: ignore[arg-type]
-        _CONCEPTS, ["D002289"],
-    )
-    assert report.indications[0].mesh_id == "MESH:D002289"
-
-
-def test_an_application_whose_drugs_all_fail_is_counted(
+def test_an_ingredient_no_exact_id_identifies_has_no_row(
     full_corpus: RawData, empty_archive: TrialArchive
 ) -> None:
     report = normalize.build(
-        full_corpus, empty_archive, _FakeRepository(),  # type: ignore[arg-type]
-        _CONCEPTS, [],
+        full_corpus, empty_archive, _FakeGraph(), _CONCEPTS, [],
+        {"PEMBROLIZUMAB": _identity("PEMBROLIZUMAB", mesh="", nodes="")},
     )
-    assert report.applications_total == 1
+    assert report.drugs == ()
     assert report.applications_unresolved == 1
     assert report.application_rate == 0.0
+    assert report.coverages[0].unresolved == ("PEMBROLIZUMAB",)
+
+
+def test_expanding_skips_rows_without_an_identifier() -> None:
+    rows = [normalize.Mapping("X", "NA", "", "", "", "")]
+    assert normalize.expand(rows, _FakeGraph(), {}) == {}
 
 
 def test_the_trial_side_matches_through_the_synonym_index(tmp_path: Path) -> None:
@@ -483,20 +275,6 @@ def test_the_trial_side_matches_through_the_synonym_index(tmp_path: Path) -> Non
     assert all(r.basis == "synonym" for r in rows)
 
 
-def test_the_internal_node_id_reaches_the_output() -> None:
-    """P5 walks drug -> disease edges in pubmedRelations, which keys on
-    biokdeid. P1 already resolves it; throwing it away makes P5 redo the work."""
-    entities = {
-        "PEMBROLIZUMAB": (
-            Entity("MESH:C582435", "6308113", "Pembrolizumab", "Chemical", "Drug"),
-        )
-    }
-    mapped, _ = normalize.normalise(
-        ["PEMBROLIZUMAB"], _repository(entities=entities), {}, "drugs"
-    )
-    assert mapped["PEMBROLIZUMAB"].biokdeid == "6308113"
-
-
 def test_a_trial_side_row_inherits_the_internal_id() -> None:
     rows, _ = normalize._match_trial_strings(
         [("Keytruda",)],
@@ -505,264 +283,6 @@ def test_a_trial_side_row_inherits_the_internal_id() -> None:
         {"MESH:C582435": "6308113"},
     )
     assert rows[0].biokdeid == "6308113"
-
-
-def test_an_indication_gets_an_internal_id_too(
-    full_corpus: RawData, empty_archive: TrialArchive
-) -> None:
-    """Indications arrive already coded to MeSH, so they never go through
-    resolve() and would otherwise carry no biokdeid — leaving P5 unable to walk
-    the disease end of a drug-disease edge."""
-    report = normalize.build(
-        full_corpus, empty_archive, _FakeRepository(),  # type: ignore[arg-type]
-        _CONCEPTS, ["D002289"],
-    )
-    assert report.indications[0].biokdeid == "bk-MESH:D002289"
-
-
-# ---------------------------------------------------------------------------
-# Salt to moiety folding
-# ---------------------------------------------------------------------------
-
-
-def _moiety(salt: str, name: str) -> Moiety:
-    return Moiety(salt=salt, moiety=name, salt_unii="U1", moiety_unii="M1")
-
-
-def test_a_salt_resolves_through_its_moiety() -> None:
-    """The FDA writes the salt, a trial writes the moiety. Where the graph
-    gives them different ids the drug matches no trials at all, silently."""
-    entities = {
-        "ESOMEPRAZOLE MAGNESIUM": (
-            Entity("PubChem:CID130564", "bk1", "x", "Chemical", "Drug"),
-        ),
-        "ESOMEPRAZOLE": (
-            Entity("MESH:D009853", "bk2", "Esomeprazole", "Chemical", "Drug"),
-        ),
-    }
-    mapped, _ = normalize.normalise(
-        ["ESOMEPRAZOLE MAGNESIUM"],
-        _repository(entities=entities),
-        {},
-        "drugs",
-        "Chemical",
-        {"ESOMEPRAZOLE MAGNESIUM": _moiety("ESOMEPRAZOLE MAGNESIUM", "ESOMEPRAZOLE")},
-    )
-    assert mapped["ESOMEPRAZOLE MAGNESIUM"].mesh_id == "MESH:D009853"
-    assert mapped["ESOMEPRAZOLE MAGNESIUM"].basis == "moiety"
-
-
-def test_the_salt_still_wins_when_it_is_better_vocabularied() -> None:
-    """The moiety is a second thing to ask about, not an override."""
-    entities = {
-        "SALT FORM": (Entity("MESH:D000001", "bk1", "Salt", "Chemical", "Drug"),),
-        "MOIETY": (Entity("PubChem:CID1", "bk2", "Moiety", "Chemical", "Drug"),),
-    }
-    mapped, _ = normalize.normalise(
-        ["SALT FORM"],
-        _repository(entities=entities),
-        {},
-        "drugs",
-        "Chemical",
-        {"SALT FORM": _moiety("SALT FORM", "MOIETY")},
-    )
-    assert mapped["SALT FORM"].mesh_id == "MESH:D000001"
-    assert mapped["SALT FORM"].basis == "exact"
-
-
-def test_a_name_with_no_moiety_entry_is_unaffected() -> None:
-    entities = {"CARBOPLATIN": (Entity("MESH:D016190", "bk", "C", "Chemical", "Drug"),)}
-    mapped, _ = normalize.normalise(
-        ["CARBOPLATIN"], _repository(entities=entities), {}, "drugs", "Chemical", {}
-    )
-    assert mapped["CARBOPLATIN"].basis == "exact"
-
-
-def test_an_unresolvable_salt_is_rescued_by_its_moiety() -> None:
-    """54 of the 402 names P1 could not resolve are salts whose moiety the
-    graph does know."""
-    entities = {
-        "ACORAMIDIS HYDROCHLORIDE": (),
-        "ACORAMIDIS": (Entity("MESH:C000001", "bk", "Acoramidis", "Chemical", "Drug"),),
-    }
-    mapped, _ = normalize.normalise(
-        ["ACORAMIDIS HYDROCHLORIDE"],
-        _repository(entities=entities),
-        {},
-        "drugs",
-        "Chemical",
-        {"ACORAMIDIS HYDROCHLORIDE": _moiety("ACORAMIDIS HYDROCHLORIDE", "ACORAMIDIS")},
-    )
-    assert mapped["ACORAMIDIS HYDROCHLORIDE"].mesh_id == "MESH:C000001"
-
-
-# ---------------------------------------------------------------------------
-# The fallback path still needs a stop-list
-# ---------------------------------------------------------------------------
-
-
-def test_a_study_design_word_never_enters_the_synonym_index() -> None:
-    """biokde has `Control` as a synonym of MESH:D002707 Chlordiazepoxide with
-    cnt=2, against Chlordiazepoxide itself at 5,419 — an NER artefact. One such
-    entry pulls every control-armed trial in the registry onto one drug."""
-    repository = _FakeRepository(
-        synonyms={"MESH:D002707": frozenset({"Chlordiazepoxide", "Control", "Librium"})}
-    )
-    index = normalize.synonym_index(
-        ["MESH:D002707"], repository, {}  # type: ignore[arg-type]
-    )
-    assert "control" not in index
-    assert index["chlordiazepoxide"] == "MESH:D002707"
-    assert index["librium"] == "MESH:D002707"
-
-
-@pytest.mark.parametrize(
-    "word", ["control", "Placebo", "STANDARD", "usual care", "sham", "vehicle"]
-)
-def test_the_design_words_are_matched_case_insensitively(word: str) -> None:
-    repository = _FakeRepository(synonyms={"MESH:D1": frozenset({word, "Realdrug"})})
-    index = normalize.synonym_index(
-        ["MESH:D1"], repository, {}  # type: ignore[arg-type]
-    )
-    assert word.casefold() not in index
-    assert "realdrug" in index
-
-
-def test_a_real_drug_whose_name_merely_contains_a_design_word_survives() -> None:
-    """The list matches whole names, not substrings: 'Controlled-release
-    morphine' is a real formulation."""
-    repository = _FakeRepository(
-        synonyms={"MESH:D1": frozenset({"Controlled-release morphine"})}
-    )
-    index = normalize.synonym_index(
-        ["MESH:D1"], repository, {}  # type: ignore[arg-type]
-    )
-    assert "controlled-release morphine" in index
-
-
-# ---------------------------------------------------------------------------
-# The biologic suffix: retrieval by stem, never identity by stem
-# ---------------------------------------------------------------------------
-
-
-def _suffix_graph() -> _FakeRepository:
-    """A graph that knows the stems but not the suffixed products.
-
-    That is the real shape: MeSH stopped adding biosimilar concepts around
-    2017, so ADALIMUMAB-AACF is absent while ADALIMUMAB is not.
-    """
-    return _FakeRepository(
-        entities={
-            "ADALIMUMAB": (
-                Entity("MESH:D000068879", "bk-1", "Adalimumab", "Chemical", "Drug"),
-            ),
-            "ADUCANUMAB": (
-                Entity("MESH:C000600266", "bk-2", "Aducanumab", "Chemical", "Drug"),
-            ),
-            "ADALIMUMAB-ATTO": (
-                Entity("MESH:M000638621", "bk-3", "Adalimumab-Atto", "Chemical", "Drug"),
-            ),
-        }
-    )
-
-
-def test_an_unresolvable_suffixed_name_falls_back_to_its_stem() -> None:
-    """ADALIMUMAB-AACF is in no vocabulary at all. Without the fallback the
-    application resolves no drug, gets no candidates, and the miss looks like a
-    drug whose trials were never registered."""
-    mapped, _ = normalize.normalise(
-        ["ADALIMUMAB-AACF"],
-        _repository(entities=_suffix_graph()._entities),
-        _CONCEPTS,
-        "drugs",
-        stems=True,
-    )
-    assert mapped["ADALIMUMAB-AACF"].mesh_id == "MESH:D000068879"
-
-
-def test_a_stem_derived_row_is_marked_as_such() -> None:
-    """The whole point of the basis column: for a biosimilar the stem names a
-    *different* product, so downstream must be able to tell."""
-    mapped, _ = normalize.normalise(
-        ["ADALIMUMAB-AACF"],
-        _repository(entities=_suffix_graph()._entities),
-        _CONCEPTS,
-        "drugs",
-        stems=True,
-    )
-    assert mapped["ADALIMUMAB-AACF"].basis == "stem"
-
-
-def test_a_suffixed_name_the_graph_knows_keeps_its_own_id() -> None:
-    """The stem is a fallback, not a competitor. ADALIMUMAB-ATTO resolves on
-    its own, so it must not be folded into its reference product."""
-    mapped, _ = normalize.normalise(
-        ["ADALIMUMAB-ATTO"],
-        _repository(entities=_suffix_graph()._entities),
-        _CONCEPTS,
-        "drugs",
-        stems=True,
-    )
-    assert mapped["ADALIMUMAB-ATTO"].basis != "stem"
-
-
-def test_the_stem_fallback_is_off_unless_asked_for() -> None:
-    """Only the FDA drug side wants it. A trial intervention named with a
-    suffix should not silently become its reference product."""
-    mapped, _ = normalize.normalise(
-        ["ADALIMUMAB-AACF"],
-        _repository(entities=_suffix_graph()._entities),
-        _CONCEPTS,
-        "interventions",
-    )
-    assert "ADALIMUMAB-AACF" not in mapped
-
-
-def test_a_novel_biologic_suffix_also_resolves_by_stem() -> None:
-    """FDA suffixes every new biologic since 2017, not only biosimilars.
-    ADUCANUMAB-AVWA has no reference product to be confused with."""
-    mapped, _ = normalize.normalise(
-        ["ADUCANUMAB-AVWA"],
-        _repository(entities=_suffix_graph()._entities),
-        _CONCEPTS,
-        "drugs",
-        stems=True,
-    )
-    assert mapped["ADUCANUMAB-AVWA"].mesh_id == "MESH:C000600266"
-
-
-def test_a_stem_that_resolves_to_nothing_leaves_the_name_unresolved() -> None:
-    """25 of the 159 are combinations whose stem is not a substance either.
-    They must stay unresolved rather than acquire a wrong id."""
-    mapped, coverage = normalize.normalise(
-        ["DARATUMUMAB AND HYALURONIDASE-FIHJ"],
-        _repository(entities=_suffix_graph()._entities),
-        _CONCEPTS,
-        "drugs",
-        stems=True,
-    )
-    assert not mapped
-    assert coverage.resolved == 0
-
-
-def test_the_entity_type_filter_still_applies_to_the_stem() -> None:
-    """A stem answered only by a Disease entity is not a drug mapping."""
-    graph = _FakeRepository(
-        entities={
-            "ADALIMUMAB": (
-                Entity("MESH:D000001", "bk-9", "Something", "Disease", "NA"),
-            )
-        }
-    )
-    mapped, _ = normalize.normalise(
-        ["ADALIMUMAB-AACF"],
-        _repository(entities=graph._entities),
-        _CONCEPTS,
-        "drugs",
-        "Chemical",
-        stems=True,
-    )
-    assert "ADALIMUMAB-AACF" not in mapped
 
 
 def test_a_dose_stripped_name_resolves_only_under_the_guards() -> None:

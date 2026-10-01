@@ -29,6 +29,7 @@ _log = get_logger(__name__)
 #: The two entity types a drug can be, preferred first (the user's rule).
 DRUG = "TherapyPreventions"
 CHEMICAL = "Chemical"
+DISEASE = "Disease"
 TYPES: tuple[str, ...] = (DRUG, CHEMICAL)
 
 BATCH: int = 1_000
@@ -58,6 +59,42 @@ class Ikraph2Entities:
 
     def __init__(self, client: Any, connection: Ikraph2Connection) -> None:
         self._entities = client[connection.database][connection.entities]
+        self._names = client[connection.database][connection.entity_names]
+
+    def names_of(self, biokdeids: Iterable[str]) -> dict[str, frozenset[str]]:
+        """Every spelling iKraph2 records for each entity: its normalised name
+        keys and every surface variant seen in the literature."""
+        wanted = sorted({int(i) for i in biokdeids if str(i).isdigit()})
+        out: dict[str, set[str]] = defaultdict(set)
+        for start in range(0, len(wanted), BATCH):
+            for row in self._names.find(
+                {"biokdeid": {"$in": wanted[start:start + BATCH]}},
+                {"_id": 0, "biokdeid": 1, "term_key": 1, "variants.term": 1},
+            ):
+                names = out[str(row["biokdeid"])]
+                if row.get("term_key"):
+                    names.add(str(row["term_key"]))
+                names.update(str(v["term"]) for v in row.get("variants") or [] if v.get("term"))
+        _log.info("iKraph2: names for %d of %d entities", len(out), len(wanted))
+        return {k: frozenset(v) for k, v in out.items()}
+
+    def internal_ids(self, ids: Iterable[str]) -> dict[str, str]:
+        """External id → the iKraph2 entity carrying exactly it, a ``Disease``
+        entity first, then the most mentioned. For indication codes (S5)."""
+        wanted = [i for i in dict.fromkeys(ids) if i]
+        best: dict[str, tuple[int, int, str]] = {}
+        for start in range(0, len(wanted), BATCH):
+            for row in self._entities.find(
+                {"db_id": {"$in": wanted[start:start + BATCH]}},
+                {"_id": 0, "biokdeid": 1, "type": 1, "db_id": 1, "mention_count": 1},
+            ):
+                key = (0 if row.get("type") == DISEASE else 1,
+                       -int(row.get("mention_count") or 0), str(row["biokdeid"]))
+                held = best.get(str(row["db_id"]))
+                if held is None or key < held:
+                    best[str(row["db_id"])] = key
+        _log.info("iKraph2: %d of %d ids have an entity", len(best), len(wanted))
+        return {db_id: key[2] for db_id, key in best.items()}
 
     def by_db_id(self, ids: Iterable[str]) -> dict[str, list[Node]]:
         """Every drug or chemical entity whose ``db_id`` is one of ``ids``.
@@ -86,4 +123,4 @@ class Ikraph2Entities:
         return dict(out)
 
 
-__all__ = ["BATCH", "CHEMICAL", "DRUG", "Ikraph2Entities", "Node", "TYPES", "connection_uri"]
+__all__ = ["BATCH", "CHEMICAL", "DISEASE", "DRUG", "Ikraph2Entities", "Node", "TYPES", "connection_uri"]

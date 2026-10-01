@@ -34,7 +34,7 @@ from config.settings import (
     RawData,
     TrialArchive,
 )
-from dao.biokde import BiokdeRepository, connection_uri
+from dao.biokde import connection_uri
 from dao.graph_evidence import GraphEvidenceRepository
 from dao.tsv_repository import TsvRepository
 from source import (
@@ -1176,9 +1176,9 @@ def main(argv: list[str] | None = None) -> int:
         if not vocabulary.exists:
             print(f"{vocabulary.descriptors} not found — pass --mesh")
             return 1
-        connection = BiokdeConnection(credentials=Path(args.creds))
-        if not connection.has_credentials:
-            print(f"{connection.credentials} not found — pass --creds")
+        ik2_connection = Ikraph2Connection(credentials=Path(args.creds))
+        if not ik2_connection.has_credentials:
+            print(f"{ik2_connection.credentials} not found — pass --creds")
             return 1
         out_dir = Path(args.out)
         in_scope = [
@@ -1238,9 +1238,10 @@ def main(argv: list[str] | None = None) -> int:
         checked_terms = frozenset(aliases)
         import pymongo
 
+        # D42: indication codes get their iKraph2 entity by exact db_id.
         in_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
-            connection_uri(connection),
-            serverSelectionTimeoutMS=connection.timeout_ms,
+            ikraph2_uri(ik2_connection),
+            serverSelectionTimeoutMS=ik2_connection.timeout_ms,
         )
         try:
             in_report = indication_normalize.build(
@@ -1254,7 +1255,7 @@ def main(argv: list[str] | None = None) -> int:
                 known_biokdeids=known,
                 index=indications.build_index(vocabulary, extra=extra_terms,
                                               checked=checked_terms),
-                internal_ids=BiokdeRepository(in_client, connection).internal_ids,
+                internal_ids=Ikraph2Entities(in_client, ik2_connection).internal_ids,
                 heading_text=heading_text,
                 openfda_text=openfda_text,
             )
@@ -1305,9 +1306,9 @@ def main(argv: list[str] | None = None) -> int:
         if not data.exists:
             print(f"{data.root} not found — normalisation needs the bulk data tree")
             return 1
-        connection = BiokdeConnection(credentials=Path(args.creds))
-        if not connection.has_credentials:
-            print(f"{connection.credentials} not found — pass --creds")
+        ik2_connection = Ikraph2Connection(credentials=Path(args.creds))
+        if not ik2_connection.has_credentials:
+            print(f"{ik2_connection.credentials} not found — pass --creds")
             return 1
         vocabulary = MeshVocabulary(descriptors=Path(args.mesh))
         if not vocabulary.exists:
@@ -1342,42 +1343,39 @@ def main(argv: list[str] | None = None) -> int:
             unii_mesh.unii_names(read_rows(data.unii_names)))
         pubchem_of = unii_bridge.unii_to_pubchem(
             unii_bridge.read_unii_records(data.unii_records))
-        ik2_connection = Ikraph2Connection(credentials=Path(args.creds))
+        concepts, descriptor_names = mesh_descriptors.rollup_and_names(vocabulary)
+        # D42: spellings for the trial side — FDA UNII names per ingredient,
+        # MeSH entry terms per id; iKraph2's own names are read in the build.
+        extra_names: dict[str, set[str]] = drug_identity.spellings(
+            read_rows(data.unii_names), ingredient_uniis)
+        extra_names.update(unii_mesh.entry_terms(mesh_files, {
+            r.mesh_id for r in unii_mesh_rows} | {
+            normalize.roll_up(normalize.as_graph_id(i), concepts) for i in indication_ids}))
+        # One client per process: MongoClient is the pool. It is built here and
+        # injected, so nothing under service/ knows a host or a credential.
         import pymongo
 
         ik2_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
             ikraph2_uri(ik2_connection), serverSelectionTimeoutMS=ik2_connection.timeout_ms)
         try:
+            ik2_entities = Ikraph2Entities(ik2_client, ik2_connection)
             identities, identity_report = drug_identity.build(
                 ingredient_names, ingredient_uniis,
                 {r.unii: (r.mesh_id, r.mesh_name) for r in unii_mesh_rows}, pubchem_of,
-                Ikraph2Entities(ik2_client, ik2_connection).by_db_id)
-        finally:
-            ik2_client.close()
-        # One client per process: MongoClient is the pool. It is built here and
-        # injected, so nothing under service/ knows a host or a credential.
-        client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
-            connection_uri(connection),
-            serverSelectionTimeoutMS=connection.timeout_ms,
-        )
-        try:
-            graph = BiokdeRepository(client, connection)
-            concepts, descriptor_names = mesh_descriptors.rollup_and_names(
-                vocabulary
-            )
+                ik2_entities.by_db_id)
             archive = TrialArchive(root=Path(args.trial_archive))
             normalize_report = normalize.build(
                 data,
                 archive,
-                graph,
+                ik2_entities,
                 concepts,
                 indication_ids,
-                folded,
-                descriptor_names,
                 identities,
+                descriptor_names,
+                extra_names,
             )
         finally:
-            client.close()
+            ik2_client.close()
         repository_out = TsvRepository(args.out)
         repository_out.save("unii_mesh", unii_mesh.UniiMesh._fields, unii_mesh_rows)
         repository_out.save("drug_identity", drug_identity.DrugIdentity._fields,

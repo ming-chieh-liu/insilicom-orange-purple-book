@@ -44,6 +44,11 @@ class Ikraph2Connection:
         return f"ikraph2_entities_{self.release}"
 
     @property
+    def entity_names(self) -> str:
+        """The (name, entity) collection of this release."""
+        return f"ikraph2_entity_names_{self.release}"
+
+    @property
     def has_credentials(self) -> bool:
         return self.credentials.is_file()
 
