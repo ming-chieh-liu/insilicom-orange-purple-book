@@ -1198,3 +1198,72 @@ def test_name_words_and_generic_arms() -> None:
                                 frozenset({"zanubrutinib"}), frozenset({"MESH:A", "MESH:Z"}),
                                 {"acalabrutinib": "MESH:A"})
     assert got == "other"   # the generic arm no longer leaves it unresolved
+
+
+# ---------------------------------------------------------------------------
+# D39: phase rule, sponsor rank, UNII bridge, normalised codes
+# ---------------------------------------------------------------------------
+
+
+def test_phase_one_is_kept_only_when_large() -> None:
+    """Option (c): phase 1 alone needs >=100 enrolled; NA and blank never pass."""
+    assert candidates.phase_kept(["PHASE1"], "100")
+    assert not candidates.phase_kept(["PHASE1"], "99")
+    assert not candidates.phase_kept(["PHASE1"], "")
+    assert candidates.phase_kept(["PHASE1", "PHASE2"], "12")
+    assert candidates.phase_kept(["PHASE4"], "")
+    assert not candidates.phase_kept(["NA"], "5000")
+    assert not candidates.phase_kept([], "5000")
+
+
+def test_the_applicants_own_trial_ranks_after_the_start_date() -> None:
+    """Sponsor is a key after the start date and before the count, never a filter."""
+    def own(nct: str, start: str, sponsor: str) -> candidates.Candidate:
+        return _candidate(nct, start=start)._replace(lead_sponsor=sponsor)
+
+    studies = {
+        "NCT1": own("NCT1", "2016-01-01", "Other Co"),
+        "NCT2": own("NCT2", "2016-01-01", "Hoffmann-La Roche"),
+        "NCT3": own("NCT3", "2012-01-01", "Genentech, Inc."),
+    }
+    got = candidates.shortlist(
+        {"MESH:D1"}, "", "2017-06-01", studies, {"MESH:D1": set(studies)}, {},
+        applicant="GENENTECH INC",
+    )
+    assert [c.nct_id for c in got] == ["NCT2", "NCT1", "NCT3"]
+
+
+def test_index_carries_normalised_codes_beside_the_raw_text(patched_archive: None) -> None:
+    archive = _Archive([_facts("NCT1")])
+    studies, _, _ = candidates.index_studies(
+        archive,  # type: ignore[arg-type]
+        {"keytruda": "MESH:C582435"}, {"nsclc": "MESH:D002289"},
+        {"MESH:C582435": "pembrolizumab", "MESH:D002289": "Carcinoma, Non-Small-Cell Lung"},
+    )
+    assert studies["NCT1"].intervention_codes == "pembrolizumab [MeSH C582435]"
+    assert studies["NCT1"].condition_codes == "Carcinoma, Non-Small-Cell Lung [MeSH D002289]"
+
+
+def test_a_pubchem_keyed_drug_reaches_mesh_coded_trials_through_the_bridge(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """The FDA side resolved to PubChem, the trial to MeSH; the exact UNII bridge joins them."""
+    report = _run_pass(tmp_path, monkeypatch, files={
+        "drug_map.tsv": "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
+        "PEMBROLIZUMAB\tPubChem:CID1\t1\tPembrolizumab\tChemical\texact\n",
+        "id_bridge.tsv": "unii\tpubchem\tmesh\nDPT0O3T46P\tPubChem:CID1\tMESH:C582435\n",
+    })
+    judged = next(u for u in report.units if u.needs_judgement)
+    assert [c.nct_id for c in judged.candidates] == ["NCT02578680"]
+    assert judged.drug_codes == "[MeSH C582435]; PubChem:CID1"
+
+
+def test_without_the_bridge_the_pubchem_drug_finds_nothing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    report = _run_pass(tmp_path, monkeypatch, files={
+        "drug_map.tsv": "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
+        "PEMBROLIZUMAB\tPubChem:CID1\t1\tPembrolizumab\tChemical\texact\n",
+    })
+    judged = next(u for u in report.units if u.needs_judgement)
+    assert judged.candidates == ()

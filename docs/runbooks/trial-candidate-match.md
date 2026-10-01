@@ -15,7 +15,7 @@
 > `match-prepare` writes one prompt per batch file: `batch-NNN.ids` (excerpt prompt) and
 > `nolabel-NNN.ids` (no-label prompt); judges write `batch-NNN-{A,B}.txt` / `nolabel-NNN-{A,B}.txt`.
 > Answers are stamped with the prompt's name and version. Pilots: two judges + third, 50 units per
-> case family; full runs: one judge.
+> case family; full runs: two judges + third as well (D40, 2026-10-01).
 
 Replaces `docs/runbooks/identify-trial.md` (pick one of the whole shortlist, two judges plus a
 third) for P4. That runbook, its prompt and `identify-prepare/combine/record` stay in the repo for
@@ -52,9 +52,9 @@ shortlisted answers in tier 1.
 - **Pilot:** two independent judges (A, B) per tier. A candidate's answer is final when they
   agree; a disagreement goes to a fresh third judge (C) whose answer is final. The pilot's job is
   to measure A/B agreement per candidate.
-- **Full run:** **one judge (A)**. This is a recorded exception to the project's two-judge
-  convention (D33), taken for cost and resting on the pilot's agreement rate. Re-enable two
-  judges with `--judges 2`; the code path is the pilot's.
+- **Full run:** the same — **two judges plus a third** (D40, 2026-10-01). D33's one-judge
+  exception is withdrawn. `match-combine` defaults to `--judges 2`; `--judges 1` remains only
+  for re-reading old one-judge rounds.
 
 ## Steps
 
@@ -64,7 +64,7 @@ $PY main.py --mode match-prepare --case B|C|D|CD [--limit 50]   # or: make judge
 #   -> adjudication/candidate_match_tiers.jsonl (every tier issued)
 #   -> adjudication/candidate_match_batches/round-RR/batch-NNN.ids (10 tiers each)
 #   judges write adjudication/candidate_match_raw/round-RR/batch-NNN-{A,B}.txt
-$PY main.py --mode match-combine --judges 2       # pilot (1 for the full run)
+$PY main.py --mode match-combine                  # two judges + third (D40)
 #   -> appends complete tiers to adjudication/candidate_match_answers.jsonl
 #   -> candidate_match_tiebreak_needed.txt: "<tier_id> | <nct>" lines for judge C, whose
 #      answers go in candidate_match_raw/round-RR/tiebreak-NNN-C.txt

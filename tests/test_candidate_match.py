@@ -439,3 +439,34 @@ def test_select_units_attaches_abstracts_and_keeps_literature_only_units(tmp_pat
         json.dumps({"pmid": "11", "title": "T", "abstract": "A"}) + "\n", encoding="utf-8")
     [got] = cm.select_units(tmp_path / "candidates.jsonl", tmp_path / "x", tmp_path / "y", None, "D")
     assert got["literature"][0]["abstracts"] == [{"pmid": "11", "title": "T", "abstract": "A"}]  # type: ignore[index]
+
+
+def test_prompt_v3_shows_normalised_codes_beside_the_raw_text() -> None:
+    """D39: the judge sees our MeSH coding next to the registry's own words."""
+    block = cm.render_candidate(1, {
+        "nct_id": "NCT1", "conditions": "NSCLC", "interventions": "MK-3475",
+        "condition_codes": "Carcinoma, Non-Small-Cell Lung [MeSH D002289]",
+        "intervention_codes": "pembrolizumab [MeSH C582435]",
+    })
+    lines = block.splitlines()
+    at = lines.index("   Conditions: NSCLC")
+    assert lines[at + 1] == "   Conditions (normalised): Carcinoma, Non-Small-Cell Lung [MeSH D002289]"
+    assert lines[at + 3] == "   Interventions (normalised): pembrolizumab [MeSH C582435]"
+    bare = cm.render_candidate(1, {"nct_id": "NCT1"})
+    assert "normalised" not in bare
+    assert (cm.PROMPT_VERSION, cm.NOLABEL_PROMPT_VERSION, cm.LITERATURE_PROMPT_VERSION) == (3, 3, 2)
+
+
+def test_a_no_label_tier_shows_codes_for_drug_and_indication() -> None:
+    unit: dict[str, object] = {"unit_id": "U", "case": "C", "drug": "BRUKINSA (zanubrutinib)",
+            "drug_codes": "zanubrutinib [MeSH C000629551]",
+            "indication_text": "Waldenstrom's macroglobulinemia",
+            "indication_codes": "Waldenstrom Macroglobulinemia [MeSH D008258]",
+            "candidates": [{"nct_id": "NCT1"}],
+            "literature": [{"nct_id": "NCT2"}]}
+    literature = cm.build_tier(unit, 1)
+    assert "section 14 heading" not in literature.approval
+    assert "Drug (normalised): zanubrutinib [MeSH C000629551]" in literature.approval
+    registry = cm.build_tier(unit, 2)
+    assert registry.drug.endswith("(normalised: zanubrutinib [MeSH C000629551])")
+    assert registry.indication.endswith("(normalised: Waldenstrom Macroglobulinemia [MeSH D008258])")

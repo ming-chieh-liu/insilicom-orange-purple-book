@@ -10,19 +10,23 @@ to-do list in `CLAUDE.md` ("Current status") points here.
 | Stage | State | Notes |
 |---|---|---|
 | S1 spine | done | 11,295 trial-relevant events |
-| S2 drugs | **code changed, not rebuilt** | `drug_names.tsv` new (brand, generic, ingredients, moieties, UNIIs); iKraph2 migration pending the user; tie-break (enoxaparin → heparin, 4 drugs) and belatacept roll-up reported, not changed |
+| S2 drugs | **D39 code changed, not rebuilt** | `id_bridge.tsv` new (UNII PubChem ↔ MeSH, one-to-one, 14,462); `drug_names.tsv` gains `sponsor`; `drug_names.tsv` new (brand, generic, ingredients, moieties, UNIIs); iKraph2 migration pending the user; tie-break (enoxaparin → heparin, 4 drugs) and belatacept roll-up left for the iKraph2 migration (user, 2026-10-01) |
 | S3 registry | **code changed, not rebuilt** | dose-stripped drug names (99.7% precise); status and why-stopped read; WITHDRAWN / NOT_YET_RECRUITING dropped |
 | S4 documents | done | labels 6,423/6,451 PDFs; letters 6,596/6,662; reviews as complete as FDA allows (118 of 131 missing are 404) |
 | S5 indications | **code changed, not rebuilt** | registry aliases must share a word with their descriptor |
 | S6 review roles | **done** | 4,825/4,825 (2026-09-30) |
 | S7 literature | **code changed, not rebuilt** | PMIDs, found-under diseases and abstracts files; case D start ≤ approval only |
-| S8 route + candidates | **code changed, not rebuilt** | literature set (drug + indication checked) separate from the registry shortlist; never-ran excluded; drug name and §14 subsection on every unit |
-| S9 judge | **code changed**: three prompts (registry v2 ×2, literature v1), literature tiers first, route on every decision | D35 pilots superseded by v2 — every answer re-judged; digest-keyed tiers; agent pool verified (cap 32) |
+| S8 route + candidates | **D39 code changed, not rebuilt** | phase rule (c); sponsor rank key after start date; bridged drug ids; normalised codes on candidates and units; literature set (drug + indication checked) separate from the registry shortlist; never-ran excluded; drug name and §14 subsection on every unit |
+| S9 judge | **code changed**: three prompts (registry v3 ×2, literature v2 — D39 codes), literature tiers first, route on every decision | D35 pilots superseded by v2 — every answer re-judged; digest-keyed tiers; agent pool verified (cap 32) |
 | S10 assemble | **code changed**, not run on the current scope | route tiers; D16 across routes and same-moiety applications |
 | S11 validate | **code changed**, not run | first appearances by moiety and trial name; recall counts both routes |
 
-Next: the user's iKraph2 review → remaining D37 code → `make candidates` → pilots per route (two
-judges) → full runs (one judge) → S10 → D28 label roles → S10 → S11.
+D37 was committed (9aa3db5) and rebuilt (recall 80.0%, 2,206/2,756 first appearances). D39 is in code since.
+
+Biosimilar copied labels stay in the S11 ground truth (user, 2026-10-01).
+
+Next: commit D39 → `make candidates` → pilots per route (two
+judges + third) → full runs (two judges + third, D40) → S10 → D28 label roles → S10 → S11.
 
 ## Where the rebuild stands (audited 2026-09-29 against the files on disk)
 
@@ -165,10 +169,10 @@ Resolved with the user, 2026-09-29:
 9. P4r: combine the uncombined raw files, then resume (two judges + third).
 
 **Phase 4 — full runs**
-10. Case B and cases C/D, one judge each; P4r to completion.
+10. Case B and cases C/D, two judges + third each (D40); P4r to completion.
 11. P5 first pass → D28 pilot (user hand-check) → D28 full run.
 12. P5 final → P6: `validate` (shortlist recall, free) and judge precision per
-    `docs/runbooks/validate-precision.md` (200 withheld units, one judge) → status lines in
+    `docs/runbooks/validate-precision.md` (200 withheld units, two judges + third) → status lines in
     CLAUDE.md / DESIGN.md → commits.
 
 ## Deck

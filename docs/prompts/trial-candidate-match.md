@@ -1,6 +1,8 @@
 # Prompt — is this candidate the trial the label describes? (per-candidate Yes/No)
 
-**Version:** 2 · **Created:** 2026-09-28 · **v2:** 2026-09-30 (D37) · **Decision:** D33 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
+**Version:** 3 · **Created:** 2026-09-28 · **v2:** 2026-09-30 (D37) · **v3:** 2026-10-01 (D39) · **Decision:** D33 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
+
+**v3 (2026-10-01, D39):** prompt wording unchanged; fields gain our normalised codes beside the raw text — `Conditions (normalised):` / `Interventions (normalised):` lines per candidate and the approved drug's and indication's codes, each as `Name [MeSH D…]` or `PubChem:CID…`. They are NLM's and our coding and may be incomplete; a missing line means no code, not a mismatch.
 
 Replaces `docs/prompts/trial-identification.md` (v1, "pick one of the list") for P4. That prompt
 and its two-judge runbook stay in the repo, unchanged, for reuse.
@@ -70,6 +72,8 @@ Output exactly one line per candidate, in the order shown, and nothing else:
 ---
 
 ## Field contents
+
+v3 additions (D39): `{{approval}}` gains `Drug (normalised): …` and `Indication (normalised): …` lines where codes exist; `{{drug}}` and `{{indication}}` (no-label prompt) gain a `(normalised: …)` line; every candidate block gains `Conditions (normalised):` and `Interventions (normalised):` after the raw lines. Candidates also pass the D39 phase rule (phase 2, 3, 2/3, 1/2, 4, or phase 1 with ≥100 enrolled) and are ranked with the applicant's own trials first after the start date.
 
 | Field | Built from |
 |---|---|

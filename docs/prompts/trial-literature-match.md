@@ -1,6 +1,8 @@
 # Prompt — is this literature-named trial the evidence for an approval? (per-candidate Yes/No)
 
-**Version:** 1 · **Created:** 2026-09-30 · **In code:** 2026-10-01 (`candidate_match.LITERATURE_PROMPT`) ·
+**Version:** 2 · **Created:** 2026-09-30 · **v2:** 2026-10-01 (D39) · **In code:** 2026-10-01 (`candidate_match.LITERATURE_PROMPT`) ·
+
+**v3 (2026-10-01, D39):** prompt wording unchanged; fields gain our normalised codes beside the raw text — `Conditions (normalised):` / `Interventions (normalised):` lines per candidate and the approved drug's and indication's codes, each as `Name [MeSH D…]` or `PubChem:CID…`. They are NLM's and our coding and may be incomplete; a missing line means no code, not a mismatch.
 **Decision:** D37 · **Runbook:** `docs/runbooks/trial-candidate-match.md` (to be extended)
 
 The literature routes' prompt: **B+** (a §14 description), **C+** (an indication, no §14
@@ -75,6 +77,8 @@ Output exactly one line per candidate, in the order shown, and nothing else:
 ---
 
 ## Field contents
+
+v3 additions (D39): `{{approval}}` gains `Drug (normalised): …` and `Indication (normalised): …` lines where codes exist; `{{drug}}` and `{{indication}}` (no-label prompt) gain a `(normalised: …)` line; every candidate block gains `Conditions (normalised):` and `Interventions (normalised):` after the raw lines. Candidates also pass the D39 phase rule (phase 2, 3, 2/3, 1/2, 4, or phase 1 with ≥100 enrolled) and are ranked with the applicant's own trials first after the start date.
 
 | Field | Built from |
 |---|---|

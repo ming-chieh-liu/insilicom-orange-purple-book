@@ -106,6 +106,11 @@ class RawData:
     ndc_json: Path = field(init=False)
     ndc_records: int = 137_804
 
+    #: The FDA's UNII Records (``UNII_Data.zip``: UNII -> PubChem CID), and NLM's
+    #: MeSH supplementary concept records — both public downloads, for the
+    #: exact UNII bridge (D39). Not part of the Drugs@FDA tree's checks.
+    unii_records: Path = field(init=False)
+    mesh_supplementary: Path = field(init=False)
     #: The UNII registry, inside ``UNIIs.zip``. Tab-delimited and **LF-only**,
     #: unlike every FDA file above. 1,050,022 data rows; line 1 is the header.
     #: Names are stored mixed case, so matching must case-fold.
@@ -114,6 +119,8 @@ class RawData:
 
     def __post_init__(self) -> None:
         drugsfda_zip = self.root / "drugsfda" / "drugsatfda.zip"
+        object.__setattr__(self, "unii_records", self.root / "unii" / "UNII_Data.zip")
+        object.__setattr__(self, "mesh_supplementary", self.root / "mesh" / "supp2026.xml")
         unii_zip = self.root / "unii" / "UNIIs.zip"
         orangebook = self.root / "orangebook" / "x"
         object.__setattr__(self, "drugsfda_zip", drugsfda_zip)

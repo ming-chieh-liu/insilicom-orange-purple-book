@@ -48,7 +48,8 @@ from typing import NamedTuple
 
 from config.settings import RawData, TrialArchive
 from service import approval_events, drug_names, indications, normalize, section14
-from source import trial_studies
+from source import trial_studies, unii_bridge
+from source.sponsor_families import same_sponsor
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -100,6 +101,36 @@ TRIAL_KEY: str = "trial_key"
 #: Trial phases that can support an approval. Phase 1 and 2 trials do support
 #: accelerated approvals, so nothing is excluded by phase alone — the field is
 #: carried for the judge rather than filtered on.
+#: D39 phase rule: a trial is a candidate when it is registered phase 2, 3,
+#: 2/3, 1/2 or 4, or phase 1 with at least :data:`PHASE1_MIN_ENROLLED`
+#: participants (the expansion cohorts that carried accelerated approvals —
+#: KEYNOTE solid-tumour cohorts, ASCEND-1, AG-120). Measured on the 2,122 known
+#: answers the drug pool reaches: keeps 98.8%, median pool 89 → 61.
+PHASE_SETS_KEPT: frozenset[frozenset[str]] = frozenset({
+    frozenset({"PHASE2"}), frozenset({"PHASE3"}), frozenset({"PHASE2", "PHASE3"}),
+    frozenset({"PHASE1", "PHASE2"}), frozenset({"PHASE4"}),
+})
+PHASE1_MIN_ENROLLED: int = 100
+
+
+def phase_kept(phases: Iterable[str], enrollment: str) -> bool:
+    """Whether a trial's registered phase admits it as a candidate (D39).
+
+    >>> phase_kept(["PHASE3"], ""), phase_kept(["PHASE1", "PHASE2"], "20")
+    (True, True)
+    >>> phase_kept(["PHASE1"], "304"), phase_kept(["PHASE1"], "24"), phase_kept(["NA"], "900")
+    (True, False, False)
+    >>> phase_kept([], "500")
+    False
+    """
+    kept = frozenset(p for p in phases if p)
+    if kept in PHASE_SETS_KEPT:
+        return True
+    return (kept == frozenset({"PHASE1"}) and enrollment.isdigit()
+            and int(enrollment) >= PHASE1_MIN_ENROLLED)
+
+
+#: Superseded by :func:`phase_kept` (D39); kept for the measurement it records.
 PHASES_KEPT: frozenset[str] = frozenset(
     {"PHASE1", "PHASE2", "PHASE3", "PHASE4", "PHASE1_PHASE2", "PHASE2_PHASE3", "NA"}
 )
@@ -144,6 +175,11 @@ class Candidate(NamedTuple):
     #: Literature routes (D37): the PMIDs naming this trial, trial reports
     #: first, at most three — the abstracts the judge reads.
     pmids: str = ""
+    #: D39: the trial's conditions and interventions as normalised codes,
+    #: ``Name [MeSH D008258]`` — NLM's coding and the name index's — shown to
+    #: the judge beside the raw text.
+    condition_codes: str = ""
+    intervention_codes: str = ""
     #: Literature routes: ``same``, ``unresolved`` — what the drug check found
     #: (an ``other`` trial never reaches a unit). Information for the record.
     drug_check: str = ""
@@ -191,6 +227,10 @@ class Unit(NamedTuple):
     #: D37: the whole §14 subsection the description came from (B routes),
     #: up to :data:`service.section14.SUBSECTION_KEEP` characters.
     subsection: str = ""
+    #: D39: the approved drug's and the indication's normalised codes,
+    #: ``Name [MeSH …]; PubChem:CID…`` — shown to the judge beside the names.
+    drug_codes: str = ""
+    indication_codes: str = ""
 
     @property
     def needs_judgement(self) -> bool:
@@ -557,6 +597,23 @@ def _is_generic_arm(arm: str) -> bool:
     folded = arm.strip().casefold()
     return (not folded or folded in GENERIC_ARMS or folded in normalize.DESIGN_WORDS
             or "placebo" in folded)
+
+
+def coded(ids: Iterable[str], names: Mapping[str, str]) -> str:
+    """``Name [MeSH D008258]; …`` for each distinct id, in first-seen order (D39).
+
+    >>> coded(["MESH:D008258", "", "MESH:D008258", "PubChem:CID5"], {"MESH:D008258": "Waldenstrom Macroglobulinemia"})
+    'Waldenstrom Macroglobulinemia [MeSH D008258]; PubChem:CID5'
+    """
+    out: list[str] = []
+    for identifier in dict.fromkeys(i for i in ids if i):
+        if identifier.startswith("MESH:"):
+            ui = identifier.removeprefix("MESH:")
+            name = names.get(identifier, "")
+            out.append(f"{name} [MeSH {ui}]" if name else f"[MeSH {ui}]")
+        else:
+            out.append(identifier)
+    return "; ".join(out)
 
 
 def drug_check(
@@ -947,6 +1004,7 @@ def index_studies(
     archive: TrialArchive,
     drug_of: dict[str, str],
     condition_of: dict[str, str],
+    mesh_names: Mapping[str, str] | None = None,
 ) -> tuple[dict[str, Candidate], dict[str, set[str]], dict[str, set[str]]]:
     """The registry, indexed by the two MeSH keys the filters use.
 
@@ -966,7 +1024,7 @@ def index_studies(
     by_drug: dict[str, set[str]] = {}
     by_condition: dict[str, set[str]] = {}
     for facts in trial_studies.read_study_facts(archive):
-        if facts.phases and not (set(facts.phases) & PHASES_KEPT):
+        if not phase_kept(facts.phases, facts.enrollment):
             continue
         # D37: a trial that never ran (withdrawn, not yet recruiting) can
         # support no approval. Leaving it out of ``studies`` keeps it off every
@@ -988,6 +1046,16 @@ def index_studies(
             primary_completion=facts.primary_completion,
             overall_status=facts.overall_status,
             why_stopped=facts.why_stopped,
+            # D39: the normalised codes beside the raw text, for the judge.
+            condition_codes=coded(
+                (i for i in [*facts.derived_condition_mesh,
+                             *(condition_of.get(c.casefold(), "") for c in facts.conditions)]
+                 if i and not _non_indication(i)),
+                mesh_names or {}),
+            intervention_codes=coded(
+                [*facts.derived_drug_mesh,
+                 *(drug_of.get(i.casefold(), "") for i in facts.interventions)],
+                mesh_names or {}),
         )
         # CT.gov's own curation first, the synonym index only where it is
         # absent. NLM assigns MeSH to 46% of studies' interventions and 79% of
@@ -1078,6 +1146,7 @@ def shortlist(
     from_graph: frozenset[str] = frozenset(),
     condition_ids: Mapping[str, frozenset[str]] | None = None,
     ancestors: Mapping[str, frozenset[str]] | None = None,
+    applicant: str = "",
 ) -> tuple[Candidate, ...]:
     """The studies that could have supported this approval.
 
@@ -1127,6 +1196,10 @@ def shortlist(
     4. Condition match: 22%.
     5. Phase 3 ahead of earlier phases: 70% of true answers are phase 3.
     6. Nearest start date to the approval.
+    6a. **The applicant's own trials (D39)** — the lead sponsor is the
+       applicant or of its family (:mod:`source.sponsor_families`). After
+       the start date by the user's choice, and a rank key, not a filter:
+       sponsor = applicant keeps only 62% of known answers.
     7. **Enrollment distance, demoted.** D8 measured that every candidate in a
        drug-and-condition set had a distinct count, and that holds *within a
        small relevant set*. As the primary sort over a median pool of 1,344 it
@@ -1183,7 +1256,7 @@ def shortlist(
         matching |= by_condition.get(mesh, set())
     target = int(stated_enrollment) if stated_enrollment.isdigit() else None
 
-    def rank(nct: str) -> tuple[int, int, int, int, int, int, int, str]:
+    def rank(nct: str) -> tuple[int, int, int, int, int, int, int, int, str]:
         candidate = studies[nct]
         enrolled = candidate.enrollment
         if target is None or not enrolled.isdigit():
@@ -1197,6 +1270,10 @@ def shortlist(
             0 if nct in matching else 1,
             0 if "PHASE3" in candidate.phases else 1,
             _years_before(candidate.start_date, approval_date),
+            # D39: the applicant's own (or its family's) trials first, after
+            # the start date and before the patient count. A rank key only:
+            # 38% of known answers were run by another sponsor.
+            0 if applicant and same_sponsor(applicant, candidate.lead_sponsor) else 1,
             distance,
             nct,
         )
@@ -1228,6 +1305,10 @@ __all__ = [
     "SubmissionRoute",
     "TRIAL_KEY",
     "PHASES_KEPT",
+    "PHASE_SETS_KEPT",
+    "PHASE1_MIN_ENROLLED",
+    "coded",
+    "phase_kept",
     "Candidate",
     "CandidatesReport",
     "Unit",
@@ -1258,6 +1339,7 @@ def build(
     out_dir: Path,
     ancestors: Mapping[str, frozenset[str]] | None = None,
     review_linked: frozenset[str] = frozenset(),
+    mesh_names: Mapping[str, str] | None = None,
 ) -> CandidatesReport:
     """Collapse the descriptions, index the registry, and shortlist each unit.
 
@@ -1311,7 +1393,16 @@ def build(
     if not heading_ids and not chosen_ids:
         _log.warning("submission_indications.tsv is empty or missing — run "
                      "--mode indication-normalize first; units get no indication")
-    studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of)
+    studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of, mesh_names)
+    names = mesh_names or {}
+    # D39: each drug id with its exact UNII counterpart (PubChem <-> MeSH,
+    # one-to-one only), so a PubChem-keyed drug reaches the trials NLM coded
+    # in MeSH.
+    bridged = unii_bridge.equivalents(unii_bridge.read_bridges(out_dir / "id_bridge.tsv"))
+
+    def with_bridged(ids: Iterable[str]) -> set[str]:
+        found = set(ids)
+        return found | {bridged[i] for i in found if i in bridged}
     reviewed = review_names(out_dir)
     display_of = read_drug_display(out_dir)
     # D37: the literature routes. Each trial's drug ids (NLM's and the name
@@ -1320,10 +1411,12 @@ def build(
     for mesh, ncts in by_drug.items():
         for nct in ncts:
             trial_drug_ids.setdefault(nct, set()).add(mesh)
-    fda_ids = frozenset(fda_drug.values())
+    fda_ids = frozenset(with_bridged(fda_drug.values()))
     literature_of = read_literature(out_dir)
     words_of: dict[str, frozenset[str]] = {}
+    applicant_of: dict[str, str] = {}
     for names_row in _read_tsv(out_dir / "drug_names.tsv"):
+        applicant_of[names_row["application"]] = names_row.get("sponsor") or ""
         words_of[names_row["application"]] = name_words(
             part
             for field in ("brand_names", "generic_name", "active_ingredients", "moieties")
@@ -1332,7 +1425,7 @@ def build(
 
     def checker(application: str, approved: set[str]) -> Callable[[Candidate], str]:
         words = words_of.get(application) or name_words(ingredients.get(application, ()))
-        frozen = frozenset(approved)
+        frozen = frozenset(with_bridged(approved))
         return lambda c: drug_check(
             c, frozenset(trial_drug_ids.get(c.nct_id, ())), frozen, words, fda_ids, drug_of)
     condition_ids: dict[str, frozenset[str]] | None = None
@@ -1349,9 +1442,9 @@ def build(
     for row in collapsed:
         key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
         application_names = ingredients.get(row["application"], ())
-        drug_mesh = {
+        drug_mesh = with_bridged(
             fda_drug[name] for name in application_names if name in fda_drug
-        }
+        )
         stem_sourced = any(name in via_stem for name in application_names)
         heading = (row.get("heading") or "").strip()
         indication_mesh = pick_indication(
@@ -1404,6 +1497,7 @@ def build(
                 from_graph=frozenset(c.nct_id for c in literature),
                 condition_ids=condition_ids,
                 ancestors=ancestors,
+                applicant=applicant_of.get(row["application"], ""),
             )
         if stated:
             already += 1
@@ -1438,13 +1532,15 @@ def build(
                 or "; ".join(sorted(ingredients.get(row["application"], ()))),
                 literature=literature,
                 subsection=row.get("subsection", ""),
+                drug_codes=coded(sorted(drug_mesh), names),
+                indication_codes=coded(indication_ids, names),
             )
         )
     # D35: route every trial-relevant submission, then add the C and D units.
     borrowed = {fda_drug[name] for name in via_stem if name in fda_drug}
     drug_of_app = {
-        application: {fda_drug[n] for n in names if n in fda_drug}
-        for application, names in ingredients.items()
+        application: with_bridged(fda_drug[n] for n in app_names if n in fda_drug)
+        for application, app_names in ingredients.items()
     }
     routes = route(
         [(f"{r.application}|{r.submission_type}|{r.submission_no}", r.trial_scope)
@@ -1466,7 +1562,7 @@ def build(
             continue
         event = events[key]
         drugs = drug_of_app.get(event.application, set())
-        names = display_of.get(event.application, "") or "; ".join(
+        drug_display = display_of.get(event.application, "") or "; ".join(
             sorted(ingredients.get(event.application, ())))
         check = checker(event.application, drugs)
         if case == CASE_C:
@@ -1481,6 +1577,7 @@ def build(
                 prefer_biosimilar=False,
                 from_graph=frozenset(c.nct_id for c in literature),
                 condition_ids=condition_ids, ancestors=ancestors,
+                applicant=applicant_of.get(event.application, ""),
             ) if drugs else ()
             with_c += bool(listed or literature)
             text = chosen_text.get(key, "")
@@ -1518,8 +1615,10 @@ def build(
                 indication_ids=ids,
                 case=case,
                 indication_text=text,
-                drug=names,
+                drug=drug_display,
                 literature=literature,
+                drug_codes=coded(sorted(drugs), names),
+                indication_codes=coded(ids, names),
             )
         )
     sizes.sort()

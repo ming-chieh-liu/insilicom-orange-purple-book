@@ -184,7 +184,7 @@ code says `not yet implemented` until it lands.
   the P4 prompt tells the judge the count is its strongest signal, so D17 rewarded the evidence
   the judge chose on; and a ±15% match was unique in only 45 of 2,363 known cases. On the rebuilt
   scope 366 judged links move A → B; submissions with a tier-A link 1,709 → 1,448.
-- **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — two templates (registry v2, literature v1); candidates show status and why stopped]** **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — the drug pool is indication-filtered and capped at 10 tiers (100); literature candidates are added beyond the cap; the format also judges cases C and D]** **D33 — P4 judges each candidate Yes/No, in ranked tiers of 10, with one judge** (2026-09-28,
+- **[PARTIALLY SUPERSEDED by D40, 2026-10-01 — full runs use two judges plus a third on disagreement; the one-judge exception is withdrawn]** **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — two templates (registry v2, literature v1); candidates show status and why stopped]** **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — the drug pool is indication-filtered and capped at 10 tiers (100); literature candidates are added beyond the cap; the format also judges cases C and D]** **D33 — P4 judges each candidate Yes/No, in ranked tiers of 10, with one judge** (2026-09-28,
   **implemented in code 2026-09-28; pilot not yet run**). P3 returns every shortlist in rank order,
   with no cap for literature-injected candidates (commit 308887d); P4 works down it in tiers of 10
   (ranks 1–10, 11–20, …) and a description stops at the first tier holding a Yes, taking its
@@ -207,7 +207,7 @@ code says `not yet implemented` until it lands.
   every id of the submission's own letter + label §1, instead of refusing on two. Condition still
   ranks, never filters. Why: 36% of judged descriptions had no id and an exact filter lost 51% of
   answers; detail `docs/DESIGN.md` §3.
-- **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — literature candidates are no longer added to the shortlist: they are their own routes B+, C+, D, judged with their abstracts; tiers A > B+ > {B−, C+, C−, D}]** **[PARTIALLY SUPERSEDED by D36, 2026-09-30 — a submission whose FDA review names a PIVOTAL or SUPPORTING trial is case A and gets no C/D unit]** **D35 — route by what the FDA documents give; four tiers; indication filters before the cap**
+- **[PARTIALLY SUPERSEDED by D40, 2026-10-01 — full runs use two judges plus a third, like pilots]** **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — literature candidates are no longer added to the shortlist: they are their own routes B+, C+, D, judged with their abstracts; tiers A > B+ > {B−, C+, C−, D}]** **[PARTIALLY SUPERSEDED by D36, 2026-09-30 — a submission whose FDA review names a PIVOTAL or SUPPORTING trial is case A and gets no C/D unit]** **D35 — route by what the FDA documents give; four tiers; indication filters before the cap**
   (2026-09-29, **implemented in code 2026-09-29; not yet run**). Tiers are defined in `docs/TIERS.md`.
   **A**: an FDA document names the trial (label NCT, review protocol id, label name = review id) →
   role judge (P4r, P4b) keeps pivotal/supporting. **B**: a §14 description with no id → drug + date
@@ -267,6 +267,26 @@ code says `not yet implemented` until it lands.
   P2a/b/c→S4; P2i→S5; P4r→S6; P2g→S7; P3→S8; P4, P4b→S9; P5→S10; P6→S11. Older decisions keep
   their P-numbers; read them through this table. Dependency graph: `docs/DESIGN.md` §4;
   `make <stage>` builds a stage and what it needs.
+- **D39 — the registry pool: phase rule, sponsor rank key, exact UNII bridge, codes shown to the
+  judge** (2026-10-01, **implemented in code 2026-10-01; `output/` not yet rebuilt**). (1) **Phase:**
+  keep PHASE2, PHASE3, PHASE2/3, PHASE1/2, PHASE4, and PHASE1 with ≥100 enrolled; drop NA, blank and
+  small phase 1 (`candidates.phase_kept`). Keeps 98.8% of 2,122 reachable known answers; median
+  pool 89 → 61. (2) **Sponsor ranks, never filters**, after the start date and before the patient
+  count: the applicant's own or its family's trials first (`source/sponsor_families.py`); sponsor
+  = applicant holds only 62% of answers (Roche/Genentech, NCI, licensing). (3) **PubChem ↔ MeSH
+  through the UNII, one-to-one only** (`source/unii_bridge.py`, `id_bridge.tsv`, S2): FDA UNII
+  Records give UNII → CID, MeSH desc + supp `RegistryNumber` give MeSH → UNII; a pair is kept only
+  where every link is unique both ways — precision over recall, the user's rule. 14,462 bridges.
+  S8 expands each drug id with its counterpart. (4) **Prompts v3** (excerpt 3, no-label 3,
+  literature 2): wording unchanged; candidates show `Conditions/Interventions (normalised): Name
+  [MeSH D…]` beside the raw text, and the approval its drug and indication codes.
+- **D40 — every judged route uses two judges plus a third, full runs included** (2026-10-01,
+  **implemented in code 2026-10-01: `match-combine --judges` defaults to 2**). Withdraws D33's
+  recorded one-judge exception and D35's "full runs 1". Two independent judges answer every
+  candidate; agreement is final; a disagreement goes to a fresh third judge whose answer is final.
+  Applies to B±, C±, D (S9) and to the S11 precision sample; S6 and D28 already worked this way.
+  Why: the user's decision — the project's two-judge convention, not one sampled answer. Cost:
+  judge calls roughly double, plus a third judge on ~1% of candidates (pilot agreement 99.2%).
 
 ## Current status and to-do
 
@@ -274,13 +294,13 @@ Full detail, evidence and commands: **`docs/STATUS.md`** — read it at the star
 update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026-10-01:
 
 1. **S4 documents and S6 review roles done** (4,825 / 4,825 roles decided, 2026-09-30).
-2. **D37 implemented in code** (2026-10-01); `output/` not rebuilt since; `make status`
-   lists what is stale. The D35 pilots (2026-09-30) are superseded by the v2 prompts — every
+2. **D37 committed and rebuilt** (9aa3db5, 2026-10-01); **D39 implemented in code, uncommitted,
+   not rebuilt** — `make status` lists what is stale. The D35 pilots (2026-09-30) are superseded by the v2 prompts — every
    answer is re-judged under them.
 3. **Pending the user:** the iKraph2 migration for S2/S3/S5 (TherapyPreventions UNII-keyed drugs;
-   edges stay on iKraph1 ids — a bridge is needed); the remaining D37 code; the agent pool
+   edges stay on iKraph1 ids — a bridge is needed); the agent pool
    (verified 2026-09-30, cap 32 concurrent).
-4. Then: rebuild (`make candidates`) → pilots per route (two judges) → full runs (one judge) →
+4. Then: rebuild (`make candidates`) → pilots per route → full runs (both two judges + third, D40) →
    S10 → D28 label roles → S10 → S11.
 
 ## Hard constraints
@@ -322,8 +342,9 @@ S8  ROUTE +        each submission / §14 description -> route and candidate set
                      C-  indication only  x registry shortlist
                      D   no indication    x drug-only literature
 S9  JUDGE          agents, per candidate Yes/No in tiers of 10, first Yes wins (D33):
-                     A: label role (D28)        B+ C+ D: literature template v1
-                     "+" before "-"             B- C-:   registry templates v2
+                     A: label role (D28)        B+ C+ D: literature template v2
+                     "+" before "-"             B- C-:   registry templates v3
+                   two judges + a third on disagreement, pilots and full runs (D40)
 S10 ASSEMBLE       earliest submission wins (D16, every route, same-moiety applications);
                    tiers A > B+ > {B-, C+, C-, D}; sources, conflict
                    -> trial_submission_map.tsv, unlinked_submissions.tsv

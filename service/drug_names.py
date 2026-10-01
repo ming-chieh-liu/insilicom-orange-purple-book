@@ -48,6 +48,9 @@ class DrugNames(NamedTuple):
     moieties: str
     ingredient_uniis: str
     moiety_uniis: str
+    #: The applicant, as Drugs@FDA ``Applications.txt`` names it (D39): a rank
+    #: key for the registry shortlist, never a filter.
+    sponsor: str = ""
 
     @property
     def display(self) -> str:
@@ -98,10 +101,12 @@ def build(
 ) -> list[DrugNames]:
     """One row per application in ``applications``, names in a stable order."""
     canonical_of: dict[str, str] = {}
+    sponsor_of: dict[str, str] = {}
     for row in read_rows(data.applications):
         parsed = appno.from_parts(row.get("ApplType"), row.get("ApplNo"))
         if parsed.is_application:
             canonical_of[parsed.digits] = parsed.canonical
+            sponsor_of[parsed.canonical] = (row.get("SponsorName") or "").strip()
     brands: dict[str, dict[str, None]] = defaultdict(dict)
     ingredients: dict[str, dict[str, None]] = defaultdict(dict)
     for row in read_rows(data.products):
@@ -136,6 +141,7 @@ def build(
                     moieties[n].moiety_unii if n in moieties else uniis.get(m, "")
                     for n, m in zip(names, folded)
                 ),
+                sponsor=sponsor_of.get(application, ""),
             )
         )
     return out

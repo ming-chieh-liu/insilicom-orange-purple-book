@@ -10,7 +10,7 @@ production `identify_verdicts.jsonl`.
 
 ## What it measures
 
-**P4's precision in the configuration the full run uses**: one judge, per-candidate Yes/No in
+**P4's precision in the configuration the full run uses**: two judges plus a third (D40), per-candidate Yes/No in
 tiers of 10, first Yes wins (D33, D35). P6's other number, shortlist recall, costs no agent call
 (`--mode validate` without `--limit`); this one needs judges.
 
@@ -41,8 +41,8 @@ PY=/data/mliu/miniforge3/envs/clinical-trials-claude/bin/python
 ADJ=adjudication/precision_d35
 $PY main.py --mode validate --limit 200            # writes $ADJ/units.jsonl, truth.json (once)
 $PY main.py --mode match-prepare --units $ADJ/units.jsonl --adjudication $ADJ
-#   judges write $ADJ/candidate_match_raw/round-RR/batch-NNN-A.txt (message: trial-candidate-match runbook)
-$PY main.py --mode match-combine --judges 1 --adjudication $ADJ
+#   judges write $ADJ/candidate_match_raw/round-RR/batch-NNN-{A,B}.txt (message: trial-candidate-match runbook)
+$PY main.py --mode match-combine --adjudication $ADJ   # two judges + third (D40)
 $PY main.py --mode match-prepare --units $ADJ/units.jsonl --adjudication $ADJ   # next round
 # ... repeat prepare -> judge -> combine until prepare writes 0 batch files ...
 $PY main.py --mode match-record --units $ADJ/units.jsonl --adjudication $ADJ
@@ -54,8 +54,7 @@ Delete the folder only to draw a new sample.
 
 ## Judges
 
-**One judge**, because the measurement is of the production configuration (D33's recorded
-exception). The judge message is the one in `docs/runbooks/trial-candidate-match.md`, with the
+**Two judges plus a third** (D40), because the measurement is of the production configuration. The judge message is the one in `docs/runbooks/trial-candidate-match.md`, with the
 prompt copied verbatim; no hint that the answer is known, no batch context, lookups forbidden.
 Missing or unparseable lines leave the tier undecided for a re-run — never guessed.
 

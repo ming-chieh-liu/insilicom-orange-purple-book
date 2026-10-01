@@ -39,12 +39,12 @@ _log = get_logger(__name__)
 
 #: Bumped whenever ``docs/prompts/trial-candidate-match.md`` changes, and stamped
 #: on every row this module writes.
-PROMPT_VERSION: int = 2
+PROMPT_VERSION: int = 3
 
 #: The no-label prompt (D35) — cases C and D, where there is no §14 excerpt —
 #: ``docs/prompts/trial-candidate-match-nolabel.md``, with its own version.
 NOLABEL_PROMPT: str = "trial-candidate-match-nolabel"
-NOLABEL_PROMPT_VERSION: int = 2
+NOLABEL_PROMPT_VERSION: int = 3
 #: The excerpt prompt's name, stamped beside its version.
 EXCERPT_PROMPT: str = "trial-candidate-match"
 
@@ -52,7 +52,7 @@ EXCERPT_PROMPT: str = "trial-candidate-match"
 #: literature names and are shown with their abstracts —
 #: ``docs/prompts/trial-literature-match.md``.
 LITERATURE_PROMPT: str = "trial-literature-match"
-LITERATURE_PROMPT_VERSION: int = 1
+LITERATURE_PROMPT_VERSION: int = 2
 
 #: Every prompt's current version, for stamping answers.
 PROMPT_VERSIONS: dict[str, int] = {
@@ -214,7 +214,13 @@ def render_candidate(index: int, candidate: dict[str, object]) -> str:
             f"   Sponsor: {field('lead_sponsor')}",
             f"   Phase: {field('phases')}",
             f"   Conditions: {field('conditions')}",
+        ]
+        + _normalised("Conditions", candidate.get("condition_codes"))
+        + [
             f"   Interventions: {field('interventions')}",
+        ]
+        + _normalised("Interventions", candidate.get("intervention_codes"))
+        + [
             f"   Enrolled: {field('enrollment')}",
             f"   Start date: {field('start_date')}",
             f"   Primary completion: {field('primary_completion')}",
@@ -233,7 +239,23 @@ def render_candidate(index: int, candidate: dict[str, object]) -> str:
     )
 
 
-def approval_line(unit: dict[str, object]) -> str:
+def _with_codes(text: str, codes: object) -> str:
+    """A field's text and, on its own line, our coding of it (D39, prompt v3).
+
+    >>> _with_codes("BRUKINSA (zanubrutinib)", "zanubrutinib [MeSH C000629551]")
+    'BRUKINSA (zanubrutinib)\\n(normalised: zanubrutinib [MeSH C000629551])'
+    >>> _with_codes("x", "")
+    'x'
+    """
+    return f"{text}\n(normalised: {codes})" if codes else text
+
+
+def _normalised(label: str, codes: object) -> list[str]:
+    """``   <label> (normalised): …`` when codes exist (D39, prompt v3)."""
+    return [f"   {label} (normalised): {str(codes)[:1000]}"] if codes else []
+
+
+def approval_line(unit: dict[str, object], heading: bool = True) -> str:
     """The APPROVAL field.
 
     >>> approval_line({"application": "BLA125514", "submission_type": "SUPPL",
@@ -242,14 +264,24 @@ def approval_line(unit: dict[str, object]) -> str:
     'BLA125514 SUPPL 35 · approved 2017-05-10 · section 14 heading: Non-Small Cell Lung Cancer'
     >>> approval_line({"application": "BLA125514", "drug": "KEYTRUDA (pembrolizumab)"})
     'KEYTRUDA (pembrolizumab) · BLA125514   · approved unknown · section 14 heading: none'
+    >>> print(approval_line({"application": "NDA1", "drug_codes": "Zanubrutinib [MeSH C000629551]",
+    ...                      "indication_codes": "Waldenstrom Macroglobulinemia [MeSH D008258]"}))
+    NDA1   · approved unknown · section 14 heading: none
+    Drug (normalised): Zanubrutinib [MeSH C000629551]
+    Indication (normalised): Waldenstrom Macroglobulinemia [MeSH D008258]
     """
     drug = str(unit.get("drug") or "")
-    return (
+    line = (
         (f"{drug} · " if drug else "")
         + f"{unit.get('application') or ''} {unit.get('submission_type') or ''} "
         f"{unit.get('submission_no') or ''} · approved {unit.get('approval_date') or 'unknown'}"
-        f" · section 14 heading: {unit.get('heading') or 'none'}"
+        + (f" · section 14 heading: {unit.get('heading') or 'none'}" if heading else "")
     )
+    # D39 (prompt v3): our coding of the drug and the indication, beside the text.
+    for label, key in (("Drug", "drug_codes"), ("Indication", "indication_codes")):
+        if unit.get(key):
+            line += f"\n{label} (normalised): {unit[key]}"
+    return line
 
 
 def _listed(unit: dict[str, object], key: str) -> list[dict[str, object]]:
@@ -331,9 +363,7 @@ def build_tier(unit: dict[str, object], tier: int) -> TierUnit:
     if tier <= lit_tiers:
         start = (tier - 1) * TIER_SIZE
         chosen = literature[start : start + TIER_SIZE]
-        approval = approval_line(unit)
-        if str(unit.get("case") or "B") != "B":
-            approval = approval.rsplit(" · section 14 heading:", 1)[0]
+        approval = approval_line(unit, heading=str(unit.get("case") or "B") == "B")
         built = TierUnit(
             prompt=LITERATURE_PROMPT,
             label_block=label_block(unit),
@@ -357,8 +387,10 @@ def build_tier(unit: dict[str, object], tier: int) -> TierUnit:
     no_label = str(unit.get("case") or "B") in ("C", "D")
     built = TierUnit(
         prompt=NOLABEL_PROMPT if no_label else EXCERPT_PROMPT,
-        drug=str(unit.get("drug") or "") if no_label else "",
-        indication=(str(unit.get("indication_text") or "not recorded")
+        drug=_with_codes(str(unit.get("drug") or ""), unit.get("drug_codes"))
+        if no_label else "",
+        indication=(_with_codes(str(unit.get("indication_text") or "not recorded"),
+                                unit.get("indication_codes"))
                     if no_label else ""),
         approval_date=str(unit.get("approval_date") or "unknown") if no_label else "",
         tier_id="",

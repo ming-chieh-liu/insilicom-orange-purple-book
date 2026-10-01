@@ -37,7 +37,7 @@ from config.settings import (
 from dao.biokde import BiokdeRepository, connection_uri
 from dao.graph_evidence import GraphEvidenceRepository
 from dao.tsv_repository import TsvRepository
-from source import label_pdf, mesh_descriptors, moiety, review_docs, trial_studies
+from source import label_pdf, mesh_descriptors, moiety, review_docs, trial_studies, unii_bridge
 from source.raw_table import read_rows
 from service import (
     candidate_match,
@@ -130,7 +130,7 @@ MODES: dict[str, str] = {
     "description's next tier of 10 and the judge batches "
     "(see docs/runbooks/trial-candidate-match.md; --limit = pilot descriptions)",
     "match-combine": "record every tier whose judge answers are complete "
-    "(--judges 2 for the pilot, 1 for the full run)",
+    "(--judges 2, the default: two judges + a third on disagreement, D40)",
     "match-record": "append newly decided descriptions to identify_verdicts.jsonl",
     "assemble": "join the units, the verdicts and the spine into "
     "trial_submission_map.tsv and unlinked_submissions.tsv",
@@ -188,8 +188,9 @@ def build_parser() -> argparse.ArgumentParser:
         "--judges",
         type=int,
         choices=(1, 2),
-        default=1,
-        help="match-combine: judges per candidate (2 for the pilot, 1 for the full run)",
+        default=2,
+        help="match-combine: judges per candidate (D40: 2, plus a third on disagreement; "
+        "1 only to re-read old one-judge rounds)",
     )
     parser.add_argument(
         "--units",
@@ -782,6 +783,8 @@ def main(argv: list[str] | None = None) -> int:
             data, archive, out_dir,
             ancestors=mesh_descriptors.ancestors(mesh_descriptors.read(cand_vocabulary)),
             review_linked=review_linked,
+            # D39: MeSH names for the codes shown beside each raw text.
+            mesh_names=unii_bridge.mesh_names([Path(args.mesh), data.mesh_supplementary]),
         )
         TsvRepository(args.out).save(
             "submission_routes", ("submission", "route"),
@@ -1257,6 +1260,14 @@ def main(argv: list[str] | None = None) -> int:
             drug_names_table.unii_index(data),
         )
         repository_out.save("drug_names", drug_names_table.DrugNames._fields, names_rows)
+        # D39: the exact PubChem <-> MeSH bridge through UNII, one-to-one only.
+        bridges = unii_bridge.build(
+            unii_bridge.unii_to_pubchem(unii_bridge.read_unii_records(data.unii_records)),
+            unii_bridge.mesh_to_unii(unii_bridge.mesh_registry(
+                [Path(args.mesh), data.mesh_supplementary])),
+        )
+        repository_out.save("id_bridge", unii_bridge.Bridge._fields, bridges)
+        print(f"id_bridge: {len(bridges):,} exact UNII bridges (PubChem <-> MeSH)")
         print(normalize.render(normalize_report))
         print(f"drug_names: {len(names_rows):,} applications, "
               f"{sum(1 for r in names_rows if r.brand_names):,} with a brand, "

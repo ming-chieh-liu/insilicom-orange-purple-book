@@ -37,14 +37,14 @@ LABELS_JSON := $(wildcard $(RAW)/label/drug-label-*.json.zip)
 STEPS := \
   approval_events=service/approval_events.py,dao/tsv_repository.py \
   indications=service/indications.py,dao/tsv_repository.py \
-  normalize=service/normalize.py,service/drug_names.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,dao/biokde.py,dao/tsv_repository.py \
+  normalize=service/normalize.py,service/drug_names.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,source/unii_bridge.py,dao/biokde.py,dao/tsv_repository.py \
   labels=service/section14.py,dao/tsv_repository.py \
   letters=service/letters.py,dao/tsv_repository.py \
   reviews=service/review_trials.py,service/review_role.py,service/label_role.py,service/approval_events.py,source/review_docs.py,source/trial_studies.py,source/raw_table.py,dao/tsv_repository.py \
   indication_normalize=service/indication_normalize.py,service/indications.py,service/letter_locate.py,service/approval_events.py,source/trial_studies.py,dao/biokde.py,dao/tsv_repository.py \
   graph_trials=service/graph_trials.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/tsv_repository.py \
   graph_links=service/graph_links.py,service/indication_normalize.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/tsv_repository.py \
-  candidates=service/candidates.py,service/assemble.py,service/review_role.py,source/mesh_descriptors.py,dao/tsv_repository.py \
+  candidates=service/candidates.py,service/assemble.py,service/review_role.py,source/mesh_descriptors.py,source/unii_bridge.py,source/sponsor_families.py,dao/tsv_repository.py \
   assemble=service/assemble.py,service/candidates.py,service/candidate_match.py,service/identification.py,service/approval_events.py,dao/tsv_repository.py
 
 # CODE_<step>: the step's entry modules (what main.py calls for that --mode)
@@ -73,7 +73,8 @@ $(OUT)/indications.tsv $(OUT)/indication_text.tsv &: $(CODE_indications) $(LABEL
 
 # ---- P1 normalize -------------------------------------------------------------
 $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv $(OUT)/trial_drug_map.tsv \
-$(OUT)/trial_condition_map.tsv $(OUT)/drug_names.tsv &: $(CODE_normalize) $(OUT)/indications.tsv
+$(OUT)/trial_condition_map.tsv $(OUT)/drug_names.tsv $(OUT)/id_bridge.tsv &: $(CODE_normalize) \
+		$(OUT)/indications.tsv fda_raw/unii/UNII_Data.zip fda_raw/mesh/supp2026.xml
 	$(MAIN) --mode normalize
 
 # ---- P2a labels (cached PDFs only) -----------------------------------------------
@@ -113,7 +114,7 @@ $(OUT)/candidates.jsonl $(OUT)/submission_routes.tsv &: $(CODE_candidates) \
 		$(OUT)/label_trials.tsv $(OUT)/graph_trials.tsv $(OUT)/drug_only_trials.tsv \
 		$(OUT)/review_trial_mentions.tsv $(ADJ)/review_role_verdicts.jsonl \
 		$(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv $(OUT)/drug_map.tsv \
-		$(OUT)/drug_names.tsv
+		$(OUT)/drug_names.tsv $(OUT)/id_bridge.tsv
 	$(MAIN) --mode candidates
 
 # ---- P5 assemble ------------------------------------------------------------------------
@@ -126,7 +127,7 @@ $(OUT)/trial_submission_map.tsv $(OUT)/unlinked_submissions.tsv &: $(CODE_assemb
 
 # ---- stages S1-S11 (D38) ------------------------------------------------------------------
 spine: $(OUT)/approval_events.tsv                                              # S1
-drugs: $(OUT)/drug_names.tsv $(OUT)/drug_map.tsv                               # S2
+drugs: $(OUT)/drug_names.tsv $(OUT)/drug_map.tsv $(OUT)/id_bridge.tsv          # S2
 registry: $(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv             # S3
 documents: $(OUT)/label_trials.tsv $(OUT)/letter_indications.tsv \
            $(OUT)/review_trial_mentions.tsv                                    # S4 (--offline)
