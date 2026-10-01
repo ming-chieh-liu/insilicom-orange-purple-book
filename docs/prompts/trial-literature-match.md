@@ -1,8 +1,10 @@
 # Prompt — is this literature-named trial the evidence for an approval? (per-candidate Yes/No)
 
-**Version:** 2 · **Created:** 2026-09-30 · **v2:** 2026-10-01 (D39) · **In code:** 2026-10-01 (`candidate_match.LITERATURE_PROMPT`) ·
+**Version:** 3 · **Created:** 2026-09-30 · **v2:** 2026-10-01 (D39) · **v3:** 2026-10-01 · **In code:** 2026-10-01 (`candidate_match.LITERATURE_PROMPT`) ·
 
-**v3 (2026-10-01, D39):** prompt wording unchanged; fields gain our normalised codes beside the raw text — `Conditions (normalised):` / `Interventions (normalised):` lines per candidate and the approved drug's and indication's codes, each as `Name [MeSH D…]` or `PubChem:CID…`. They are NLM's and our coding and may be incomplete; a missing line means no code, not a mismatch.
+
+**v3 (2026-10-01):** for B+, Section 14 may describe several trials; the candidate must match THE TRIAL IN QUESTION (named and sized below the section), and a match to a different trial there is No. With neither a name nor a size, any one trial the section describes is enough.
+**v2 (2026-10-01, D39):** prompt wording unchanged; fields gain our normalised codes beside the raw text — `Conditions (normalised):` / `Interventions (normalised):` lines per candidate and the approved drug's and indication's codes, each as `Name [MeSH D…]` or `PubChem:CID…`. They are NLM's and our coding and may be incomplete; a missing line means no code, not a mismatch.
 **Decision:** D37 · **Runbook:** `docs/runbooks/trial-candidate-match.md` (to be extended)
 
 The literature routes' prompt: **B+** (a §14 description), **C+** (an indication, no §14
@@ -55,9 +57,12 @@ RULES:
   the approved disease.
 - A review, meta-analysis or indirect comparison that merely mentions the trial
   does not show that; judge from what it says the trial itself tested.
-- When a trial description is given above, the candidate must also match it:
-  the design, the comparator, the population and the size (patients analysed
-  and patients enrolled may differ a little).
+- When Section 14 is given above, it may describe several trials. The
+  candidate must also match the trial in question — the one named and sized
+  below the section — on design, comparator, population and size (patients
+  analysed and patients enrolled may differ a little); a candidate that matches
+  a different trial in the section is No. If neither a name nor a size was
+  found, a match to any one trial the section describes is enough.
 - The trial must have started before the approval date. The abstracts may be
   published later.
 - Each candidate's Status and Why stopped are the registry's today, not as of
@@ -83,7 +88,7 @@ v3 additions (D39): `{{approval}}` gains `Drug (normalised): …` and `Indicatio
 | Field | Built from |
 |---|---|
 | `{{approval}}` | `<brand> (<generic>) · <application> <submission type> <number> · approved <date>` — the drug from S2's `drug_names.tsv`; then `Drug (normalised): …` and `Indication (normalised): …` (v2). No §14 heading on any route (2026-10-01): B+'s subsection opens with it |
-| `{{label_block}}` | **B+:** `Section 14 (Clinical Studies) of this approval's label describes the trial:` + the §14 subsection (up to 3,000 characters), then `A program read its name as: <name>` and `and its size as: <count> patients`, each marked "(may be wrong)" · **C+:** `No description of the trial is available. Approved for: <indication text>` (prefixed as in `-nolabel.md` when it is today's label) · **D:** `No description of the trial is available. Approved for: not recorded.` |
+| `{{label_block}}` | **B+ (v3):** `Section 14 (Clinical Studies) of this approval's label (it may describe more than one trial):` + the §14 subsection (up to 3,000 characters), then `THE TRIAL IN QUESTION: a program read its name as: <name> (may be wrong)` and `and its size as: <count> patients (may be wrong)` · **C+:** `No description of the trial is available. Approved for: <indication text>` (prefixed as in `-nolabel.md` when it is today's label) · **D:** `No description of the trial is available. Approved for: not recorded.` |
 | `{{candidates}}` | one block per candidate: the registry fields of `trial-candidate-match.md` v2 (status and why stopped included), then `Abstracts naming this trial (<n> found, up to 3 shown):` and for each: `PMID <pmid> — <title>` and the abstract; trial reports (publication type clinical trial / RCT) first, then by PMID. **D** adds `Named in literature on: <diseases>` |
 
 ## Why it is worded this way

@@ -1,7 +1,8 @@
 # Prompt — is this candidate the trial the label describes? (per-candidate Yes/No)
 
-**Version:** 3 · **Created:** 2026-09-28 · **v2:** 2026-09-30 (D37) · **v3:** 2026-10-01 (D39) · **Decision:** D33 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
+**Version:** 4 · **Created:** 2026-09-28 · **v2:** 2026-09-30 (D37) · **v3:** 2026-10-01 (D39) · **v4:** 2026-10-01 · **Decision:** D33 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
 
+**v4 (2026-10-01):** the excerpt is the whole §14 subsection since D37, and a subsection often describes several trials (MONARCH 1 beside MONARCH 2). "It describes ONE trial" is replaced by "it may describe more than one trial"; the label's name and size now introduce THE TRIAL IN QUESTION, and a candidate matching a different trial in the excerpt is No. With neither a name nor a size, a match to any trial the excerpt describes may be Yes — that trial is in this submission's §14 either way.
 **v3 (2026-10-01, D39):** prompt wording unchanged; fields gain our normalised codes beside the raw text — `Conditions (normalised):` / `Interventions (normalised):` lines per candidate and the approved drug's and indication's codes, each as `Name [MeSH D…]` or `PubChem:CID…`. They are NLM's and our coding and may be incomplete; a missing line means no code, not a mismatch.
 
 Replaces `docs/prompts/trial-identification.md` (v1, "pick one of the list") for P4. That prompt
@@ -26,20 +27,21 @@ that an FDA drug label describes.
 APPROVAL:
 {{approval}}
 
-LABEL EXCERPT (Section 14, Clinical Studies — it describes ONE trial):
+LABEL EXCERPT (Section 14, Clinical Studies — it may describe more than one
+trial):
 <excerpt>
 {{excerpt}}
 </excerpt>
-The label calls this trial: {{trial_name}}
-The label says it enrolled: {{enrollment}} patients
+THE TRIAL IN QUESTION is the one the label calls: {{trial_name}}
+and says enrolled: {{enrollment}} patients
 
 CANDIDATE TRIALS (from ClinicalTrials.gov):
 <candidates>
 {{candidates}}
 </candidates>
 
-QUESTION: for EACH candidate, is it the trial the label excerpt describes,
-i.e. the trial whose results support this approval?
+QUESTION: for EACH candidate, is it the trial in question, i.e. a trial the
+label excerpt describes whose results support this approval?
 
 RULES:
 - Judge each candidate ON ITS OWN, as if it were the only one shown. Do not
@@ -47,8 +49,13 @@ RULES:
   or more candidates may each be Yes, and all of them may be No.
 - Judge ONLY from the text above. Do not use outside knowledge of this drug,
   trial or disease. Do not look anything up.
-- Answer Yes only if the candidate matches the excerpt on the things the
-  excerpt states: the drug and comparator, the disease and population, the
+- The excerpt may describe several trials. Judge each candidate against the
+  trial in question only: a candidate that matches a different trial in the
+  excerpt is No. If the label gives neither a name nor a size for the trial in
+  question, a candidate that matches any one trial the excerpt describes may
+  be Yes.
+- Answer Yes only if the candidate matches what the excerpt states about that
+  trial: the drug and comparator, the disease and population, the
   design (randomized, placebo- or active-controlled, open-label, single-arm)
   and the size. A label may report patients analysed where the registry
   reports patients enrolled, so a small difference in size is normal and a

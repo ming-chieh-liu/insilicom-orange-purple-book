@@ -39,7 +39,7 @@ _log = get_logger(__name__)
 
 #: Bumped whenever ``docs/prompts/trial-candidate-match.md`` changes, and stamped
 #: on every row this module writes.
-PROMPT_VERSION: int = 3
+PROMPT_VERSION: int = 4
 
 #: The no-label prompt (D35) — cases C and D, where there is no §14 excerpt —
 #: ``docs/prompts/trial-candidate-match-nolabel.md``, with its own version.
@@ -52,7 +52,7 @@ EXCERPT_PROMPT: str = "trial-candidate-match"
 #: literature names and are shown with their abstracts —
 #: ``docs/prompts/trial-literature-match.md``.
 LITERATURE_PROMPT: str = "trial-literature-match"
-LITERATURE_PROMPT_VERSION: int = 2
+LITERATURE_PROMPT_VERSION: int = 3
 
 #: Every prompt's current version, for stamping answers.
 PROMPT_VERSIONS: dict[str, int] = {
@@ -338,9 +338,10 @@ def label_block(unit: dict[str, object]) -> str:
     name = str(unit.get("acronym") or "(none found)")
     size = str(unit.get("enrollment") or "(none found)")
     return (
-        "Section 14 (Clinical Studies) of this approval's label describes the trial:\n"
+        "Section 14 (Clinical Studies) of this approval's label (it may describe "
+        "more than one trial):\n"
         f"<section_14>\n{text}\n</section_14>\n"
-        f"A program read the trial's name in it as: {name} (may be wrong)\n"
+        f"THE TRIAL IN QUESTION: a program read its name as: {name} (may be wrong)\n"
         f"and its size as: {size} patients (may be wrong)"
     )
 

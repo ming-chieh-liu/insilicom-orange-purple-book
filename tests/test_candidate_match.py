@@ -454,7 +454,7 @@ def test_prompt_v3_shows_normalised_codes_beside_the_raw_text() -> None:
     assert lines[at + 3] == "   Interventions (normalised): pembrolizumab [MeSH C582435]"
     bare = cm.render_candidate(1, {"nct_id": "NCT1"})
     assert "normalised" not in bare
-    assert (cm.PROMPT_VERSION, cm.NOLABEL_PROMPT_VERSION, cm.LITERATURE_PROMPT_VERSION) == (3, 4, 2)
+    assert (cm.PROMPT_VERSION, cm.NOLABEL_PROMPT_VERSION, cm.LITERATURE_PROMPT_VERSION) == (4, 4, 3)
 
 
 def test_a_no_label_tier_shows_codes_for_drug_and_indication() -> None:

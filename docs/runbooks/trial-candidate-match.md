@@ -98,9 +98,9 @@ Do not look anything up, search the web, or open any other file.
 
 | Batch file | Prompt | Fields the judge uses |
 |---|---|---|
-| `batch-NNN.ids` | `trial-candidate-match.md` v3 | `approval`, `excerpt`, `trial_name`, `enrollment`, `candidates` |
+| `batch-NNN.ids` | `trial-candidate-match.md` v4 | `approval`, `excerpt`, `trial_name`, `enrollment`, `candidates` |
 | `nolabel-NNN.ids` | `trial-candidate-match-nolabel.md` v4 | `drug`, `indication`, `approval_date`, `candidates` |
-| `literature-NNN.ids` | `trial-literature-match.md` v2 | `approval`, `label_block`, `candidates` (abstracts included) |
+| `literature-NNN.ids` | `trial-literature-match.md` v3 | `approval`, `label_block`, `candidates` (abstracts included) |
 
 ### Delivery without files (agent pool, 2026-10-01)
 
