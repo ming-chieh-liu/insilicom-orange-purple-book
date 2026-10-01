@@ -536,13 +536,15 @@ def test_an_approval_with_no_indication_is_searched_on_the_drug_alone(
     repo = _graph(
         [_treats("d1", "Growth Hormone Deficiency", ["1", "2"], score="9"),
          _treats("d2", "Turner Syndrome", ["2", "3"], score="4")],
-        [_paper("1", "NCT00000101"), _paper("2", "NCT00000102"), _paper("3", "NCT00000103")],
+        [_paper("1", "NCT00000101"), _paper("2", "NCT00000102"), _paper("3", "NCT00000103"),
+         _paper("3", "NCT00000104")],
     )
     report = graph_links.build(
         workspace, repo,
         {"NCT00000101": ("2001-01-01", "200", "PHASE3", "2003-01-01"),
-         "NCT00000102": ("2002-01-01", "90", "PHASE3", "2006-05-01"),   # finished after
-         "NCT00000103": ("2001-06-01", "50", "PHASE2", "")},            # unknown: kept
+         "NCT00000102": ("2002-01-01", "90", "PHASE3", "2006-05-01"),   # finished after: kept (D37)
+         "NCT00000103": ("2001-06-01", "50", "PHASE2", ""),             # unknown: kept
+         "NCT00000104": ("2030-01-01", "50", "PHASE3", "")},            # started after: dropped
         {"NDA000002|ORIG|1"},
         {"NDA000002": frozenset({"SOMATROPIN"})},
     )
@@ -550,7 +552,7 @@ def test_an_approval_with_no_indication_is_searched_on_the_drug_alone(
     assert unit.basis == graph_links.BASIS_DRUG_ONLY and unit.indication_term == ""
     assert unit.drug == "SOMATROPIN"
     by = {c.nct_id: c for c in unit.candidates}
-    assert set(by) == {"NCT00000101", "NCT00000103"}
+    assert set(by) == {"NCT00000101", "NCT00000102", "NCT00000103"}
     assert by["NCT00000101"].diseases == "Growth Hormone Deficiency"
     assert by["NCT00000103"].diseases == "Turner Syndrome"
     assert report.drug_only_with_candidates == 1
@@ -659,3 +661,28 @@ def test_submissions_of_one_drug_share_one_literature_walk(workspace: Path) -> N
     rows = graph_links.drug_only_rows(report.units)
     assert [(r.application, r.nct_id, r.diseases) for r in rows] == [
         ("NDA000002", "NCT00000101", "Dwarfism"), ("NDA019640", "NCT00000101", "Dwarfism")]
+
+
+def test_the_repository_returns_abstracts_once_per_pmid() -> None:
+    """D37: the literature routes' judges read these."""
+    repo = _graph([], [
+        {"pmid": 11, "articleTitle": "A", "abstract": "about NCT1", "publicationType": ["Clinical Trial"]},
+        {"pmid": "11", "articleTitle": "A again"},
+        {"pmid": "22", "articleTitle": "B"},
+    ])
+    got = repo.abstracts(["11", "22", "33", "11"])
+    assert [(a.pmid, a.title, a.publication_types) for a in got] == [
+        ("11", "A", ("Clinical Trial",)), ("22", "B", ())]
+
+
+def test_drug_only_rows_carry_their_pmids(workspace: Path) -> None:
+    repo = _graph(
+        [_treats("d1", "Growth Hormone Deficiency", ["1"], score="9")],
+        [_paper("1", "NCT00000101")],
+    )
+    report = graph_links.build(
+        workspace, repo, {"NCT00000101": ("2001-01-01", "200", "PHASE3", "2003-01-01")},
+        {"NDA000002|ORIG|1"}, {"NDA000002": frozenset({"SOMATROPIN"})},
+    )
+    [row] = graph_links.drug_only_rows(report.units)
+    assert row.pmids == "1"

@@ -26,10 +26,11 @@ from __future__ import annotations
 
 import csv
 import hashlib
+import re
 from pathlib import Path
 from typing import NamedTuple
 
-from service import identification
+from service import drug_names, identification
 from service.section14 import NCT
 from utility.logging import get_logger
 
@@ -101,6 +102,78 @@ class Precision(NamedTuple):
         return self.abstained / self.scored if self.scored else 0.0
 
 
+#: Trial "names" that are positions, not names (see :func:`first_appearances`).
+GENERIC_NAME = re.compile(r"^(study|trial|table|figure|part|cohort|arm|n=|#)\s*[\w-]*$")
+
+
+def first_appearances(rows: list[dict[str, object]], groups: dict[str, str]) -> set[str]:
+    """Unit ids that are a label-stated trial's **first** appearance (D16, D37).
+
+    A unit is a first appearance when no earlier unit of the same moiety group
+    (:func:`service.drug_names.moiety_key`; the application where unknown)
+    states the same NCT id, **and** no earlier unit of the group describes a
+    trial under the same name. The second rule catches labels that described
+    a trial years before printing its NCT id: Xarelto's RECORD-2 is in §14 from
+    2011 but carries its id only from 2017, so the 2017 supplement is not
+    where it was evidence. Measured 2026-09-30: 13 of 18 sampled "known
+    answers" the indication check dropped were such later appearances.
+
+    >>> rows = [{"unit_id": "a", "application": "X", "approval_date": "2011", "acronym": "RECORD 2"},
+    ...         {"unit_id": "b", "application": "X", "approval_date": "2017", "acronym": "RECORD 2",
+    ...          "stated_nct": "NCT1"},
+    ...         {"unit_id": "c", "application": "Y", "approval_date": "2020", "stated_nct": "NCT2"}]
+    >>> sorted(first_appearances(rows, {}))
+    ['c']
+    """
+    def group(unit: dict[str, object]) -> str:
+        application = str(unit.get("application") or "")
+        return groups.get(application, application)
+
+    def trial_name(unit: dict[str, object]) -> str:
+        # "Study 1", "Table 2", "Trial 3" name different trials on different
+        # labels; only a distinctive name says it is the same trial.
+        name = str(unit.get("acronym") or "").strip().casefold()
+        return "" if GENERIC_NAME.match(name) else name
+
+    first_id: dict[tuple[str, str], str] = {}
+    first_name: dict[tuple[str, str], str] = {}
+    for unit in rows:
+        when = str(unit.get("approval_date") or "")
+        stated = str(unit.get("stated_nct") or "")
+        name = trial_name(unit)
+        if stated:
+            key = (group(unit), stated)
+            if key not in first_id or when < first_id[key]:
+                first_id[key] = when
+        if name:
+            key = (group(unit), name)
+            if key not in first_name or when < first_name[key]:
+                first_name[key] = when
+    out: set[str] = set()
+    for unit in rows:
+        stated = str(unit.get("stated_nct") or "")
+        if not stated:
+            continue
+        when = str(unit.get("approval_date") or "")
+        name = trial_name(unit)
+        if first_id[(group(unit), stated)] != when:
+            continue
+        if name and first_name.get((group(unit), name), when) < when:
+            continue
+        out.add(str(unit.get("unit_id") or ""))
+    return out
+
+
+def _offered(unit: dict[str, object]) -> set[str]:
+    """Every NCT id a unit puts before a judge: the shortlist and the literature (D37)."""
+    out: set[str] = set()
+    for key in ("candidates", "literature"):
+        raw = unit.get(key)
+        if isinstance(raw, list):
+            out |= {str(c.get("nct_id") or "") for c in raw if isinstance(c, dict)}
+    return out
+
+
 def shortlist_recall(units_path: Path, limit: int | None = None) -> Recall:
     """Of the units whose label states an NCT id, how many shortlist it?
 
@@ -112,28 +185,17 @@ def shortlist_recall(units_path: Path, limit: int | None = None) -> Recall:
     units no judge ever sees, carrying a later submission's indication.
     Counting them measured the wrong population.
     """
-    rows = [
-        unit for unit in identification.iter_json_lines(units_path)
-        if unit.get("stated_nct") and isinstance(unit.get("candidates"), list)
-        and unit.get("candidates")
-    ]
-    first: dict[tuple[str, str], str] = {}
-    for unit in rows:
-        pair = (str(unit.get("application") or ""), str(unit["stated_nct"]))
-        when = str(unit.get("approval_date") or "")
-        if pair not in first or when < first[pair]:
-            first[pair] = when
+    every = list(identification.iter_json_lines(units_path))
+    firsts = first_appearances(
+        every, drug_names.moiety_groups(units_path.parent / "drug_names.tsv"))
+    rows = [unit for unit in every
+            if str(unit.get("unit_id") or "") in firsts and _offered(unit)]
     checked = present = 0
     missing: list[str] = []
     for unit in rows:
         truth = str(unit.get("stated_nct") or "")
-        raw = unit.get("candidates")
-        pair = (str(unit.get("application") or ""), truth)
-        if not isinstance(raw, list) or str(unit.get("approval_date") or "") != first[pair]:
-            continue
         checked += 1
-        ids = {str(c.get("nct_id") or "") for c in raw if isinstance(c, dict)}
-        if truth in ids:
+        if truth in _offered(unit):
             present += 1
         elif len(missing) < 20:
             missing.append(f"{unit.get('unit_id')} -> {truth}")
@@ -181,31 +243,22 @@ def withhold(units_path: Path, out_path: Path, limit: int) -> dict[str, str]:
     """
     eligible: list[dict[str, object]] = []
     rows = list(identification.iter_json_lines(units_path))
-    # Only a trial's earliest appearance is a unit P4 would judge (D16), so
-    # only those measure the judge on the population it works on (D35).
-    first: dict[tuple[str, str], str] = {}
-    for unit in rows:
-        if unit.get("stated_nct"):
-            pair = (str(unit.get("application") or ""), str(unit["stated_nct"]))
-            when = str(unit.get("approval_date") or "")
-            if pair not in first or when < first[pair]:
-                first[pair] = when
+    # Only a trial's first appearance is a unit S9 would judge (D16, D37), so
+    # only those measure the judge on the population it works on.
+    firsts = first_appearances(
+        rows, drug_names.moiety_groups(units_path.parent / "drug_names.tsv"))
     for unit in rows:
         stated = str(unit.get("stated_nct") or "")
-        raw = unit.get("candidates")
-        if not stated or not isinstance(raw, list) or not raw:
+        if not stated or str(unit.get("unit_id") or "") not in firsts:
             continue
-        if str(unit.get("approval_date") or "") != first[
-            (str(unit.get("application") or ""), stated)
-        ]:
-            continue
-        ids = {str(c.get("nct_id") or "") for c in raw if isinstance(c, dict)}
-        if stated not in ids:
-            # Unanswerable: P3 never offered it. Counted by shortlist_recall,
+        if stated not in _offered(unit):
+            # Unanswerable: S8 never offered it. Counted by shortlist_recall,
             # not by the judge's score.
             continue
-        if NCT.search(str(unit.get("excerpt") or "")):
-            # The answer is printed in the text the judge reads.
+        if NCT.search(str(unit.get("excerpt") or "")) or NCT.search(
+                str(unit.get("subsection") or "")):
+            # The answer is printed in the text the judge reads (D37: the
+            # whole §14 subsection is read now, not one sentence).
             continue
         eligible.append(unit)
     eligible.sort(key=lambda u: hashlib.sha256(
@@ -313,6 +366,7 @@ def render(recall: Recall, tiers: tuple[tuple[str, int], ...]) -> str:
 
 
 __all__ = [
+    "first_appearances",
     "Precision",
     "Recall",
     "Scored",

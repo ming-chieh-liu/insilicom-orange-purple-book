@@ -419,18 +419,21 @@ def test_registry_aliases_need_enough_single_condition_studies() -> None:
 def test_extra_terms_widen_the_sweep_but_never_overrule_mesh(vocabulary: MeshVocabulary) -> None:
     base = indications.build_index(vocabulary)
     some_term, some_ui = next(iter(base.by_term.items()))
+    taken = f"brand new {some_term}"               # shares the descriptor's words
     extra = [
-        ("Brand New Disease Name", some_ui),        # taken
+        (taken, some_ui),                           # taken
+        ("Wholly Unrelated Words", some_ui),        # D37: shares no word, refused
         (some_term + " x", "D999999"),              # not a disease descriptor
         ("single", some_ui),                        # one word
         ("Disease Words Here", "D004194"),          # a non-indication
         (some_term, "MESH:D000001"),                # MeSH already has it
     ]
-    index = indications.build_index(vocabulary, extra=extra)
+    index = indications.build_index(vocabulary, extra=extra,
+                                    checked=frozenset({"Wholly Unrelated Words"}))
     assert index.added_terms == 1
-    assert index.by_term["brand new disease name"] == some_ui
+    assert index.by_term[indications.normalise(taken)] == some_ui
+    assert "wholly unrelated words" not in index.by_term
     assert index.by_term[some_term] == base.by_term[some_term]
-    assert indications.code("treating brand new disease name today", index) == {some_ui}
 
 
 def test_branch_roots_are_generic(vocabulary: MeshVocabulary) -> None:

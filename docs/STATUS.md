@@ -1,7 +1,28 @@
 # Rebuild status and to-do
 
-**Last updated:** 2026-09-30. Update this file whenever a stage finishes or is paused; the short
+**Last updated:** 2026-10-01. Stage names S1–S11 since D38; the sections below that say P0–P6 predate it. Update this file whenever a stage finishes or is paused; the short
 to-do list in `CLAUDE.md` ("Current status") points here.
+
+## Progress by stage (D38) — 2026-10-01
+
+`make status` is the authority on what is stale; this table says what has been *done*.
+
+| Stage | State | Notes |
+|---|---|---|
+| S1 spine | done | 11,295 trial-relevant events |
+| S2 drugs | **code changed, not rebuilt** | `drug_names.tsv` new (brand, generic, ingredients, moieties, UNIIs); iKraph2 migration pending the user; tie-break (enoxaparin → heparin, 4 drugs) and belatacept roll-up reported, not changed |
+| S3 registry | **code changed, not rebuilt** | dose-stripped drug names (99.7% precise); status and why-stopped read; WITHDRAWN / NOT_YET_RECRUITING dropped |
+| S4 documents | done | labels 6,423/6,451 PDFs; letters 6,596/6,662; reviews as complete as FDA allows (118 of 131 missing are 404) |
+| S5 indications | **code changed, not rebuilt** | registry aliases must share a word with their descriptor |
+| S6 review roles | **done** | 4,825/4,825 (2026-09-30) |
+| S7 literature | **code changed, not rebuilt** | PMIDs, found-under diseases and abstracts files; case D start ≤ approval only |
+| S8 route + candidates | **code changed, not rebuilt** | literature set (drug + indication checked) separate from the registry shortlist; never-ran excluded; drug name and §14 subsection on every unit |
+| S9 judge | **code changed**: three prompts (registry v2 ×2, literature v1), literature tiers first, route on every decision | D35 pilots superseded by v2 — every answer re-judged; digest-keyed tiers; agent pool verified (cap 32) |
+| S10 assemble | **code changed**, not run on the current scope | route tiers; D16 across routes and same-moiety applications |
+| S11 validate | **code changed**, not run | first appearances by moiety and trial name; recall counts both routes |
+
+Next: the user's iKraph2 review → remaining D37 code → `make candidates` → pilots per route (two
+judges) → full runs (one judge) → S10 → D28 label roles → S10 → S11.
 
 ## Where the rebuild stands (audited 2026-09-29 against the files on disk)
 

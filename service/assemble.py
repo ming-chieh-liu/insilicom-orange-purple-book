@@ -42,6 +42,7 @@ from typing import NamedTuple
 
 from service import (
     candidate_match,
+    drug_names,
     graph_judging,
     identification,
     judging,
@@ -80,6 +81,33 @@ CASE_SOURCE: dict[str, tuple[str, str]] = {
     "C": (TIER_INDICATION, INDICATION_SOURCE),
     "D": (TIER_GRAPH, graph_judging.EVIDENCE_SOURCE),
 }
+
+#: D37 routes of a judged pick, as ``identify_verdicts.jsonl`` records them;
+#: the route is the tier (``docs/TIERS.md``). A decision recorded before D37
+#: has no route and keeps the D35 tier of its case.
+ROUTES: frozenset[str] = frozenset({"B+", "B-", "C+", "C-", "D"})
+#: Source added to a row whose pick came from the literature route.
+LITERATURE_SOURCE: str = "literature"
+
+
+def read_routes(path: Path) -> dict[str, str]:
+    """Unit → the D37 route of its latest decision (``B+`` … ``D``); empty if none.
+
+    >>> import tempfile, json
+    >>> p = Path(tempfile.mkdtemp()) / "v.jsonl"
+    >>> _ = p.write_text(json.dumps({"unit_id": "u", "route": "B+"}) + "\\n"
+    ...                  + json.dumps({"unit_id": "u", "route": "B-"}) + "\\n")
+    >>> read_routes(p)
+    {'u': 'B-'}
+    """
+    out: dict[str, str] = {}
+    if not path.is_file():
+        return out
+    for row in read_jsonl(path):
+        route = str(row.get("route") or "")
+        out[str(row.get("unit_id") or "")] = route if route in ROUTES else ""
+    return out
+
 
 #: Label-route evidence sources that identify a trial without the shortlist.
 DIRECT_SOURCES: frozenset[str] = frozenset({"label_nct", "review_name_match"})
@@ -476,6 +504,13 @@ def build(out_dir: Path, adjudication_dir: Path, *,
         ).items()
         if verdict.prompt_version >= MIN_IDENTIFY_VERSION
     }
+    routes = read_routes(adjudication_dir / "identify_verdicts.jsonl")
+    # D37: D16 runs over every application of the same active moiety, so a
+    # new formulation repeating Xarelto's RECORD trials is a later appearance.
+    moiety_of = drug_names.moiety_groups(out_dir / "drug_names.tsv")
+
+    def group(application: str) -> str:
+        return moiety_of.get(application, application)
     # Section-14 polarity: trials the label cites but does not present as
     # evidence. The fenofibrate label discusses ACCORD Lipid under a heading
     # reading "Lack of Efficacy in Cardiovascular Outcomes Trials"; a regex
@@ -544,7 +579,7 @@ def build(out_dir: Path, adjudication_dir: Path, *,
         found = _identified(unit, verdicts)
         if not found:
             continue
-        pair = (str(unit["application"]), found)
+        pair = (group(str(unit["application"])), found)
         when = str(unit.get("approval_date") or "")
         if pair not in earliest or when < earliest[pair]:
             earliest[pair] = when
@@ -559,15 +594,36 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     ]
     review_earliest: dict[tuple[str, str], str] = {}
     for key, nct, _protocol in review_links:
-        pair = (key.split("|", 1)[0], nct)
+        pair = (group(key.split("|", 1)[0]), nct)
         when = spine[key].get("approval_date", "")
         if pair not in review_earliest or when < review_earliest[pair]:
             review_earliest[pair] = when
         if pair not in earliest or when < earliest[pair]:
             earliest[pair] = when
+    # D37: case C and D picks take part in D16 like every other route — a
+    # trial found for an earlier submission by its indication alone moves the
+    # attribution there (recorded as attribution_moved).
+    case_earliest: dict[tuple[str, str], str] = {}
+    for unit in case_units:
+        verdict = verdicts.get(str(unit.get("unit_id") or ""))
+        if verdict is None or not verdict.identified:
+            continue
+        case_key = f"{unit['application']}|{unit['submission_type']}|{unit['submission_no']}"
+        if case_key not in spine:
+            continue
+        pair = (group(str(unit["application"])), verdict.final)
+        when = spine[case_key].get("approval_date", "")
+        if pair not in case_earliest or when < case_earliest[pair]:
+            case_earliest[pair] = when
+        if pair not in earliest or when < earliest[pair]:
+            earliest[pair] = when
     moved = {
         pair for pair in label_earliest
-        if pair in review_earliest and review_earliest[pair] != label_earliest[pair]
+        if (pair in review_earliest and review_earliest[pair] != label_earliest[pair])
+        or (pair in case_earliest and case_earliest[pair] < label_earliest[pair])
+    } | {
+        pair for pair in review_earliest
+        if pair in case_earliest and case_earliest[pair] < review_earliest[pair]
     }
 
     # Step two: among the submissions tied at that date, the **label** decides
@@ -588,14 +644,14 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     for unit in units:
         found = _identified(unit, verdicts)
         when = str(unit.get("approval_date") or "")
-        if not found or earliest.get((str(unit["application"]), found)) != when:
+        if not found or earliest.get((group(str(unit["application"])), found)) != when:
             continue
-        group = (str(unit["application"]), found, when, _label_group(unit))
+        tie_key = (str(unit["application"]), found, when, _label_group(unit))
         number = str(unit["submission_no"])
-        if group not in keeper or _submission_sort(number) < _submission_sort(
-            keeper[group]
+        if tie_key not in keeper or _submission_sort(number) < _submission_sort(
+            keeper[tie_key]
         ):
-            keeper[group] = number
+            keeper[tie_key] = number
 
     submissions_with_units: set[str] = set()
     for unit in units:
@@ -659,11 +715,11 @@ def build(out_dir: Path, adjudication_dir: Path, *,
             nct, source = verdict.final, "label_description"
 
         when = str(unit.get("approval_date") or "")
-        pair = (str(unit["application"]), nct)
-        group = (str(unit["application"]), nct, when, _label_group(unit))
+        pair = (group(str(unit["application"])), nct)
+        tie = (str(unit["application"]), nct, when, _label_group(unit))
         if earliest.get(pair) != when:
             reason = "later_appearance_of_the_same_trial"
-        elif keeper.get(group) != str(unit["submission_no"]):
+        elif keeper.get(tie) != str(unit["submission_no"]):
             # Not later -- simultaneous. A sibling submission approved the same
             # day off the same label document already carries it.
             reason = "same_day_sibling_submission"
@@ -687,6 +743,7 @@ def build(out_dir: Path, adjudication_dir: Path, *,
             isinstance(c, dict) and c.get("nct_id") == nct and c.get("injected")
             for c in raw_candidates
         )
+        route = routes.get(str(unit.get("unit_id") or ""), "") if source == "label_description" else ""
 
         role = label_roles.get((key, nct))
         if not apply_label_roles:
@@ -736,15 +793,16 @@ def build(out_dir: Path, adjudication_dir: Path, *,
                 trial_name=name,
                 label_enrollment=label_count,
                 registry_enrollment=registry.get(nct, ""),
-                evidence_tier=tier_for(source, check, basis, was_injected),
+                evidence_tier=route or tier_for(source, check, basis, was_injected),
                 evidence_source=source,
                 count_check=check,
                 drug_basis=basis,
                 injected="true" if was_injected else "",
                 sources="label_description;review_protocol"
-                if source == "review_name_match" else source,
+                if source == "review_name_match"
+                else f"{source};{LITERATURE_SOURCE}" if route == "B+" else source,
                 conflict=add_conflict(
-                    ATTRIBUTION_MOVED if (str(unit["application"]), nct) in moved else "",
+                    ATTRIBUTION_MOVED if pair in moved else "",
                     JUDGED_CONTRADICTS_DIRECT if contradicted else "",
                 ),
             )
@@ -759,9 +817,9 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     for key, nct, protocol in review_links:
         application = key.split("|", 1)[0]
         when = spine[key].get("approval_date", "")
-        if earliest.get((application, nct)) != when:
+        if earliest.get((group(application), nct)) != when:
             continue
-        conflict = ATTRIBUTION_MOVED if (application, nct) in moved else ""
+        conflict = ATTRIBUTION_MOVED if (group(application), nct) in moved else ""
         if (nct, key) in label_rejected:
             conflict = add_conflict(conflict, ROLE_DISAGREES)
         if (nct, key) in position:
@@ -792,20 +850,20 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     # attributes the trial to another submission of the application, it adds
     # nothing. Among C/D picks the higher tier wins, then the earliest
     # submission (D16).
-    linked_trials = {(link.application, link.nct_id) for link in links}
-    case_first: dict[tuple[str, str], tuple[str, str, tuple[int, str], str, str]] = {}
+    case_first: dict[tuple[str, str], tuple[str, tuple[int, str], str, str, str]] = {}
     for unit in case_units:
         key = f"{unit['application']}|{unit['submission_type']}|{unit['submission_no']}"
         if key not in spine:
             continue
         submissions_with_units.add(key)
         tier, source = CASE_SOURCE[str(unit.get("case"))]
+        tier = routes.get(str(unit.get("unit_id") or ""), "") or tier
         verdict = verdicts.get(str(unit.get("unit_id") or ""))
         label = "(indication only)" if tier == TIER_INDICATION else "(drug only)"
         if verdict is None or not verdict.identified:
             reason = (
                 "judged_none" if verdict is not None
-                else "not_yet_judged" if unit.get("candidates")
+                else "not_yet_judged" if unit.get("candidates") or unit.get("literature")
                 else "no_drug_resolved" if not unit.get("drug_mesh")
                 else "no_candidates"
             )
@@ -815,22 +873,31 @@ def build(out_dir: Path, adjudication_dir: Path, *,
             continue
         nct = verdict.final
         application, _, submission_no = key.split("|")
+        when = spine[key].get("approval_date", "")
+        if earliest.get((group(application), nct)) != when:
+            # D16 (D37): another route, or another submission of this moiety,
+            # carries the trial earlier.
+            unlinked.append(Unlinked(application, str(unit["submission_type"]), submission_no,
+                                     when, label, "later_appearance_of_the_same_trial"))
+            continue
+        extra = [source] + ([LITERATURE_SOURCE] if tier == "C+" else [])
         if (nct, key) in position:
             held = links[position[(nct, key)]]
             links[position[(nct, key)]] = held._replace(sources=";".join(
-                dict.fromkeys([*held.sources.split(";"), source])))
+                dict.fromkeys([*held.sources.split(";"), *extra])))
             continue
-        if (application, nct) in linked_trials:
-            continue
-        rank_key = (tier, spine[key].get("approval_date", ""), _submission_sort(submission_no))
-        held_first = case_first.get((application, nct))
-        if held_first is None or rank_key < held_first[:3]:
-            case_first[(application, nct)] = (*rank_key, key, str(unit.get("unit_id") or ""))
+        # Among picks at the earliest date: the lowest submission, then the tier.
+        rank_key = (when, _submission_sort(submission_no))
+        held_first = case_first.get((group(application), nct))
+        if held_first is None or (rank_key, tier) < (held_first[:2], held_first[4]):
+            case_first[(group(application), nct)] = (
+                *rank_key, key, str(unit.get("unit_id") or ""), tier)
     by_unit_id = {str(u.get("unit_id") or ""): u for u in case_units}
-    for (application, nct), (tier, when, _, key, unit_id) in sorted(case_first.items()):
-        _, submission_type, submission_no = key.split("|")
+    for (moiety, nct), (when, _, key, unit_id, tier) in sorted(case_first.items()):
+        application, submission_type, submission_no = key.split("|")
         unit = by_unit_id[unit_id]
-        source = INDICATION_SOURCE if tier == TIER_INDICATION else graph_judging.EVIDENCE_SOURCE
+        source = (INDICATION_SOURCE if str(unit.get("case")) == "C"
+                  else graph_judging.EVIDENCE_SOURCE)
         links.append(Link(
             nct_id=nct, application=application, submission_type=submission_type,
             submission_no=submission_no, approval_date=when,
@@ -840,7 +907,9 @@ def build(out_dir: Path, adjudication_dir: Path, *,
             drug_mesh=str(unit.get("drug_mesh") or ""), trial_name="",
             label_enrollment="", registry_enrollment=_registry_counts(unit).get(nct, ""),
             evidence_tier=tier, evidence_source=source,
-            count_check="no_count", sources=source,
+            count_check="no_count",
+            sources=";".join([source] + ([LITERATURE_SOURCE] if tier == "C+" else [])),
+            conflict=ATTRIBUTION_MOVED if (moiety, nct) in moved else "",
         ))
         linked_submissions.add(key)
 

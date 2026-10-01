@@ -133,6 +133,15 @@ class Mention(NamedTuple):
         )
 
 
+class Abstract(NamedTuple):
+    """One PubMed record, as a literature-route judge reads it (D37)."""
+
+    pmid: str
+    title: str
+    abstract: str
+    publication_types: tuple[str, ...]
+
+
 class GraphEvidenceRepository:
     """Edge and abstract lookups against one injected, pooled client."""
 
@@ -250,8 +259,39 @@ class GraphEvidenceRepository:
                 )
         return out
 
+    def abstracts(self, pmids: Iterable[str]) -> list[Abstract]:
+        """The title, abstract and publication types of these PMIDs (D37).
+
+        Asked in batches of :data:`LOOKUP_BATCH`, both pmid forms, as in
+        :meth:`mentions_in`; a PMID the collection lacks is left out.
+        """
+        wanted = list(dict.fromkeys(str(p) for p in pmids))
+        out: list[Abstract] = []
+        for start in range(0, len(wanted), LOOKUP_BATCH):
+            chunk = wanted[start:start + LOOKUP_BATCH]
+            forms: list[object] = [*chunk, *(int(p) for p in chunk if p.isdigit())]
+            seen: set[str] = set()
+            for document in self._documents.find(
+                {"pmid": {"$in": forms}},
+                {"_id": 0, "pmid": 1, "abstract": 1, "articleTitle": 1, "publicationType": 1},
+            ):
+                pmid = str(document.get("pmid"))
+                if pmid in seen:
+                    continue
+                seen.add(pmid)
+                out.append(Abstract(
+                    pmid=pmid,
+                    title=str(document.get("articleTitle") or ""),
+                    abstract=str(document.get("abstract") or ""),
+                    publication_types=tuple(
+                        str(k) for k in (document.get("publicationType") or [])),
+                ))
+        return out
+
+
 __all__ = [
     "ABSTRACT_BUDGET",
+    "Abstract",
     "DISEASE_TYPE",
     "NCT",
     "NEGATIVE_CORRELATION",

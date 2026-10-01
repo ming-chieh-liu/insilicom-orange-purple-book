@@ -293,18 +293,17 @@ def test_the_shortlist_is_returned_in_rank_order_below_the_cap() -> None:
     assert [c.nct_id for c in got] == ["NCT2", "NCT1"]
 
 
-def test_injected_candidates_are_ranked_not_appended() -> None:
-    """A graph-named trial outranks an un-named phase 3 from the drug pool."""
+def test_literature_trials_are_kept_out_of_the_shortlist() -> None:
+    """D37: a trial the literature names is judged on the "+" route only."""
     studies = {
         "NCT1": _candidate("NCT1")._replace(phases="PHASE3"),
         "NCT9": _candidate("NCT9")._replace(phases="PHASE2"),
     }
-    by_drug = {"MESH:D1": {"NCT1"}}
+    by_drug = {"MESH:D1": {"NCT1", "NCT9"}}
     got = candidates.shortlist(
         {"MESH:D1"}, "", "", studies, by_drug, {}, from_graph=frozenset({"NCT9"})
     )
-    assert [c.nct_id for c in got] == ["NCT9", "NCT1"]
-    assert got[0].injected
+    assert [c.nct_id for c in got] == ["NCT1"]
 
 
 # ---------------------------------------------------------------------------
@@ -564,7 +563,9 @@ def test_submissions_without_their_own_description_become_cases_c_and_d(
     d = next(u for u in report.units if u.case == "D")
     assert c.unit_id == "BLA125514|SUPPL|50|indication" and c.indication_text == "provides for NSCLC"
     assert [x.nct_id for x in c.candidates] == ["NCT02578680"] and c.drug == "PEMBROLIZUMAB"
-    assert [(x.nct_id, x.found_under) for x in d.candidates] == [("NCT02578680", "Melanoma")]
+    # D37: case D's candidates are the drug-only literature, on the "+" side.
+    assert d.candidates == ()
+    assert [(x.nct_id, x.found_under) for x in d.literature] == [("NCT02578680", "Melanoma")]
     assert (report.case_c_with_candidates, report.case_d_with_candidates) == (1, 1)
     assert "case D units with candidates                     1" in candidates.render(report)
 
@@ -590,9 +591,10 @@ def test_the_indication_filter_runs_before_the_cap_but_spares_the_literature(
     assert [c.nct_id for c in unit.candidates] == ["NCT02578680"]
 
 
-def test_a_literature_candidate_is_never_filtered_on_the_indication(
+def test_a_literature_trial_for_another_disease_reaches_neither_route(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
+    """D37: the literature set takes the indication check too (id-less kept)."""
     melanoma = trial_studies.StudyFacts(
         nct_id="NCT00000002", brief_title="t", org_study_id="", acronym="",
         start_date="2015-01-01", phases=("PHASE3",), enrollment="100",
@@ -603,11 +605,12 @@ def test_a_literature_candidate_is_never_filtered_on_the_indication(
         ancestors={"MESH:D002289": frozenset(), "MESH:D008545": frozenset()},
         files={"submission_indications.tsv": _INDICATIONS_HEAD
                + "BLA125514\tSUPPL\t35\tlabel_14_heading\tNSCLC\tNSCLC\tMESH:D002289\tb\tt\tfalse\n",
-               "graph_trials.tsv": "application\tnct_id\tmentions\tvia\nBLA125514\tNCT00000002\t1\tprotocol\n"},
+               "graph_trials.tsv": "application\tnct_id\tmentions\tvia\tpmids\n"
+               "BLA125514\tNCT00000002\t1\tprotocol\t7\n"},
     )
     unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
-    assert {c.nct_id for c in unit.candidates} == {"NCT02578680", "NCT00000002"}
-    assert next(c for c in unit.candidates if c.nct_id == "NCT00000002").injected
+    assert unit.literature == ()
+    assert "NCT00000002" not in {c.nct_id for c in unit.candidates}
 
 
 def test_a_review_with_a_linking_trial_routes_to_review_not_c_or_d() -> None:
@@ -1025,20 +1028,13 @@ def test_years_before_handles_a_missing_date() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_a_graph_supported_trial_is_ranked_into_the_shortlist() -> None:
-    """The graph finds trials bibliographically, so it fails independently of
-    the MeSH drug filter: of 1,425 units whose answer the shortlist missed, it
-    names the true trial for 448."""
-    studies = {
-        f"NCT{i:08d}": _named(f"NCT{i:08d}")
-        for i in range(candidates.CANDIDATE_CAP + 20)
-    }
-    studies["NCT09999999"] = _named("NCT09999999")
-    got = candidates.shortlist(
-        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": set(studies)}, {},
-        from_graph=frozenset({"NCT09999999"}),
-    )
-    assert "NCT09999999" in {c.nct_id for c in got}
+def test_a_literature_trial_carries_its_pmids_and_drug_check() -> None:
+    studies = {"NCT00000001": _named("NCT00000001")}
+    got = candidates.literature_set(
+        [("NCT00000001", "5;6"), ("NCT00000001", "9"), ("NCT00000404", "1")],
+        "2020-01-01", studies, lambda c: "unresolved")
+    assert [(c.nct_id, c.pmids, c.drug_check) for c in got] == [
+        ("NCT00000001", "5;6", "unresolved")]
 
 
 def test_without_the_graph_the_same_pool_loses_it() -> None:
@@ -1091,36 +1087,27 @@ def test_a_missing_precompute_is_silent(tmp_path: Path) -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_a_graph_named_trial_the_drug_filter_missed_is_injected() -> None:
+def test_the_literature_reaches_a_drug_the_registry_cannot_join() -> None:
     """53% of the drug map is keyed on PubChem while the trial index is keyed
-    on MeSH, and biokde gives an entity one external id, never both — so those
-    drugs can never retrieve candidates. Measured: 337 of 339 units whose
-    answer the pool lacked entirely were this."""
+    on MeSH, so those drugs retrieve nothing from the registry: the literature
+    set is their only route (337 of 339 such units, measured)."""
     studies = {"NCT00000001": _named("NCT00000001")}
-    got = candidates.shortlist(
-        {"PubChem:CID1"}, "", "2020-01-01", studies, {}, {},
-        from_graph=frozenset({"NCT00000001"}),
-    )
+    assert candidates.shortlist({"PubChem:CID1"}, "", "2020-01-01", studies, {}, {}) == ()
+    got = candidates.literature_set([("NCT00000001", "")], "2020-01-01", studies,
+                                    lambda c: "unresolved")
     assert [c.nct_id for c in got] == ["NCT00000001"]
 
 
-def test_an_injected_candidate_is_marked_as_such() -> None:
-    """It skipped the drug filter, so P5 must be able to tier it lower."""
+def test_another_drugs_trial_is_dropped_from_the_literature() -> None:
     studies = {"NCT00000001": _named("NCT00000001")}
-    got = candidates.shortlist(
-        {"PubChem:CID1"}, "", "2020-01-01", studies, {}, {},
-        from_graph=frozenset({"NCT00000001"}),
-    )
-    assert got[0].injected is True
+    assert candidates.literature_set([("NCT00000001", "")], "2020-01-01", studies,
+                                     lambda c: "other") == ()
 
 
-def test_a_candidate_the_drug_filter_found_is_not_marked() -> None:
-    studies = {"NCT00000001": _named("NCT00000001")}
-    got = candidates.shortlist(
-        {"MESH:D1"}, "", "2020-01-01", studies, {"MESH:D1": {"NCT00000001"}}, {},
-        from_graph=frozenset({"NCT00000001"}),
-    )
-    assert got[0].injected is False
+def test_a_literature_trial_started_after_the_approval_is_dropped() -> None:
+    studies = {"NCT00000001": _named("NCT00000001", start="2024-01-01")}
+    assert candidates.literature_set([("NCT00000001", "")], "2020-01-01", studies,
+                                     lambda c: "same") == ()
 
 
 def test_the_graph_cannot_inject_a_trial_the_archive_lacks() -> None:
@@ -1172,3 +1159,42 @@ def test_the_shortlist_carries_sponsor_and_primary_completion() -> None:
     )
     assert got[0].lead_sponsor == "Merck Sharp & Dohme LLC"
     assert got[0].primary_completion == "2017-11-08"
+
+
+def test_todays_label_text_is_marked_for_the_judge(tmp_path: Path) -> None:
+    """2026-09-30: a case-C judge must know the text is not this submission's own."""
+    (tmp_path / "submission_indications.tsv").write_text(
+        _INDICATIONS_HEAD
+        + "NDA1\tORIG\t1\topenfda_current\t\tFor asthma.\tMESH:D001249\tb\tAsthma\ttrue\n"
+        + "NDA2\tORIG\t1\tletter\t\tprovides for asthma\tMESH:D001249\tb\tAsthma\ttrue\n",
+        encoding="utf-8",
+    )
+    got = candidates.read_chosen_text(tmp_path)
+    assert got["NDA1|ORIG|1"] == candidates.CURRENT_LABEL_NOTE + "For asthma."
+    assert got["NDA2|ORIG|1"] == "provides for asthma"
+
+
+def test_a_literature_trial_of_the_drug_is_on_the_plus_route_only(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """D37: KEYNOTE-189 named by the literature is judged on B+, not again on B−."""
+    report = _run_pass(
+        tmp_path, monkeypatch,
+        files={"graph_trials.tsv": "application\tnct_id\tmentions\tvia\tpmids\n"
+               "BLA125514\tNCT02578680\t3\tnct\t41;42\n"},
+    )
+    unit = next(u for u in report.units if u.acronym == "KEYNOTE-189")
+    assert [(c.nct_id, c.pmids, c.drug_check) for c in unit.literature] == [
+        ("NCT02578680", "41;42", "same")]
+    assert "NCT02578680" not in {c.nct_id for c in unit.candidates}
+
+
+def test_name_words_and_generic_arms() -> None:
+    assert candidates.name_words(["DESCOVY", "TENOFOVIR ALAFENAMIDE FUMARATE"]) == frozenset(
+        {"descovy", "tenofovir", "alafenamide"})
+    c = candidates.Candidate("NCT1", "AMPLIFY", "", "", "", "", "", "",
+                             "Acalabrutinib;Chemoimmunotherapy;Placebo")
+    got = candidates.drug_check(c, frozenset({"MESH:A"}), frozenset({"MESH:Z"}),
+                                frozenset({"zanubrutinib"}), frozenset({"MESH:A", "MESH:Z"}),
+                                {"acalabrutinib": "MESH:A"})
+    assert got == "other"   # the generic arm no longer leaves it unresolved

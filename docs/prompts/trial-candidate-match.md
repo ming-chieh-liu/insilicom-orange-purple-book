@@ -1,6 +1,6 @@
 # Prompt — is this candidate the trial the label describes? (per-candidate Yes/No)
 
-**Version:** 1 · **Created:** 2026-09-28 · **Decision:** D33 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
+**Version:** 2 · **Created:** 2026-09-28 · **v2:** 2026-09-30 (D37) · **Decision:** D33 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
 
 Replaces `docs/prompts/trial-identification.md` (v1, "pick one of the list") for P4. That prompt
 and its two-judge runbook stay in the repo, unchanged, for reuse.
@@ -53,6 +53,11 @@ RULES:
   large one is not.
 - A matching trial name or protocol id is strong evidence; a trial of the same
   drug in the same disease that differs in design, size or population is No.
+- Each candidate's Status and Why stopped are the registry's today, not as of
+  the approval. A trial still running today may have reported its primary
+  results before the approval. A trial stopped early because it met its goal,
+  or after its primary analysis, can support an approval; one stopped for
+  safety, futility, poor enrollment, or before it produced results cannot.
 - Answer No if the text does not give you enough to tell. A wrong Yes invents
   a link between a trial and an approval that does not exist, which is far
   worse than a missed one.
@@ -68,11 +73,20 @@ Output exactly one line per candidate, in the order shown, and nothing else:
 
 | Field | Built from |
 |---|---|
-| `{{approval}}` | `<application> <submission type> <number> · approved <date> · section 14 heading: <heading>` |
+| `{{approval}}` | `<brand> (<generic>) · <application> <submission type> <number> · approved <date> · section 14 heading: <heading>` — the drug from P1's `drug_names.tsv` (v2) |
 | `{{excerpt}}` | the section-14 excerpt P2 extracted for this description |
 | `{{trial_name}}` | the label's trial name, or `(the label gives no name)` |
 | `{{enrollment}}` | the label's patient count, or `(the label gives no count)` |
-| `{{candidates}}` | one block per candidate, in rank order: NCT id, title, acronym, protocol id (`orgStudyId`), lead sponsor, phase, conditions, interventions, enrolled, start date, primary completion |
+| `{{candidates}}` | one block per candidate, in rank order: NCT id, title, acronym, protocol id (`orgStudyId`), lead sponsor, phase, conditions, interventions (each up to 1,000 characters, v2), enrolled, start date, primary completion, **status**, and **why stopped** when the registry gives one (v2). Trials that never ran (WITHDRAWN, NOT_YET_RECRUITING) are never candidates |
+
+## Changes in v2 (2026-09-30, D37)
+
+- `APPROVAL` names the drug: brand and generic name (P1 `drug_names.tsv`).
+- Each candidate shows its registry **status** and **why stopped**, with the rule above. A
+  hard filter on COMPLETED was measured and rejected: 14% of the trials FDA labels name are not
+  COMPLETED in the registry (11% ACTIVE_NOT_RECRUITING, 1.4% TERMINATED — some stopped *for*
+  efficacy).
+- Conditions and interventions are cut at 1,000 characters instead of 300.
 
 ## Why it is worded this way
 

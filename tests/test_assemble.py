@@ -917,7 +917,7 @@ def test_a_case_pick_never_moves_a_trial_another_route_attributes(
     assert [(l.submission_no, l.evidence_tier) for l in links] == [("35", "A")]
 
 
-def test_among_case_picks_the_higher_tier_then_the_earliest_keeps_the_trial(
+def test_among_case_picks_the_earliest_submission_keeps_the_trial(
     workspace: tuple[Path, Path],
 ) -> None:
     out, adj = workspace
@@ -928,8 +928,9 @@ def test_among_case_picks_the_higher_tier_then_the_earliest_keeps_the_trial(
     _picks(adj, [(str(d_early["unit_id"]), "NCT07777777"), (str(c_late["unit_id"]), "NCT07777777"),
                  (str(outside["unit_id"]), "NCT07777778")])
     links = [l for l in assemble.build(out, adj).links if l.evidence_tier in "CD"]
+    # D37: tiers C and D are not ordered; D16 earliest-wins decides.
     assert [(l.nct_id, l.submission_no, l.evidence_tier) for l in links] == [
-        ("NCT07777777", "45", "C")]
+        ("NCT07777777", "35", "D")]
 
 
 def test_undecided_and_none_case_units_are_unlinked_with_a_reason(
@@ -981,3 +982,49 @@ def test_an_identification_made_before_d35_is_not_linked(workspace: tuple[Path, 
     report = assemble.build(out, adj)
     assert report.links == ()
     assert [u.reason for u in report.unlinked if u.submission_no == "35"] == ["not_yet_judged"]
+
+
+def test_d37_routes_become_tiers_and_an_earlier_case_pick_moves_the_trial(
+    workspace: tuple[Path, Path],
+) -> None:
+    """D37: the decision's route is the tier; D16 runs over every route."""
+    out, adj = workspace
+    with (out / "approval_events.tsv").open("a", encoding="utf-8") as handle:
+        handle.write("BLA125514\tBLA\tSUPPL\t30\tEfficacy\tEfficacy-New Indication"
+                     "\t2017-01-01\t2008+\tP\tfalse\ttrue\ttrue\n")
+    early = _case_unit("BLA125514|SUPPL|30", "C", ["NCT02578680"])
+    _write_units(out, [_unit(), early])
+    _picks(adj, [(str(early["unit_id"]), "NCT02578680")])
+    with (adj / "identify_verdicts.jsonl").open("a", encoding="utf-8") as handle:
+        handle.write(json.dumps({"unit_id": early["unit_id"], "judge_a": "NCT02578680",
+                                 "final": "NCT02578680", "prompt_version": 3,
+                                 "route": "C+"}) + "\n")
+    report = assemble.build(out, adj)
+    [link] = report.links
+    assert (link.submission_no, link.evidence_tier, link.sources) == (
+        "30", "C+", "indication_candidate;literature")
+    assert "attribution_moved" in link.conflict
+    assert ("35", "later_appearance_of_the_same_trial") in {
+        (u.submission_no, u.reason) for u in report.unlinked}
+
+
+def test_d16_runs_across_applications_of_the_same_moiety(
+    workspace: tuple[Path, Path],
+) -> None:
+    """D37: a new formulation repeating the original's trial is a later appearance."""
+    out, adj = workspace
+    (out / "drug_names.tsv").write_text(
+        "application\tbrand_names\tgeneric_name\tactive_ingredients\tmoieties"
+        "\tingredient_uniis\tmoiety_uniis\n"
+        "BLA125514\tKEYTRUDA\t\tPEMBROLIZUMAB\tPEMBROLIZUMAB\t\t\n"
+        "NDA021029\tNEWFORM\t\tPEMBROLIZUMAB\tPEMBROLIZUMAB\t\t\n", encoding="utf-8")
+    later = _unit(unit_id="NDA021029|SUPPL|36|KEYNOTE-189", application="NDA021029",
+                  submission_no="36", approval_date="2023-09-14")
+    _write_units(out, [_unit(), later])
+    report = assemble.build(out, adj)
+    assert [(l.application, l.submission_no) for l in report.links] == [("BLA125514", "35")]
+    assert ("36", "later_appearance_of_the_same_trial") in {
+        (u.submission_no, u.reason) for u in report.unlinked}
+    # Without the shared moiety each application keeps its own link.
+    (out / "drug_names.tsv").unlink()
+    assert len(assemble.build(out, adj).links) == 2

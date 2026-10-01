@@ -763,3 +763,16 @@ def test_the_entity_type_filter_still_applies_to_the_stem() -> None:
         stems=True,
     )
     assert "ADALIMUMAB-AACF" not in mapped
+
+
+def test_a_dose_stripped_name_resolves_only_under_the_guards() -> None:
+    """2026-09-30: dose, route and form removed; short or NLM-contradicted refused."""
+    index = {"cr845": "PubChem:CID24794466", "surgery": "MESH:D013455", "nacl": "MESH:D000111"}
+    rows, coverage = normalize._match_trial_strings(
+        [("CR845 0.5 mcg/kg", "Oral surgery", "NaCl 0.9%", "Unknown 5 mg")],
+        index, "trial intervention", nlm_of={"Oral surgery": {"MESH:D013514"}}, strip_doses=True,
+    )
+    assert [(r.name, r.mesh_id, r.basis) for r in rows] == [
+        ("CR845 0.5 mcg/kg", "PubChem:CID24794466", normalize.BASIS_DOSE_STRIPPED)
+    ]
+    assert coverage.resolved == 1

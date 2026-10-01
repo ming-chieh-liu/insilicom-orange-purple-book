@@ -55,7 +55,7 @@ code says `not yet implemented` until it lands.
 - **D8 — enrollment count is the disambiguating key.** Across 5 drug+condition candidate sets,
   every candidate had a distinct enrollment — zero collisions.
 - **D9 — MeSH descriptor is the shared id space**; biokde `pubmedEntitiesFlat` is the dictionary.
-- **[CLARIFIED 2026-09-29 — four tiers since D35: A/B/C/D, defined in `docs/TIERS.md`]** **D10 — every row carries an evidence tier** (A/B/C).
+- **[CLARIFIED 2026-10-01 — since D37 the tier labels are A > B+ > {B−, C+, C−, D}, defined in `docs/TIERS.md`]** **[CLARIFIED 2026-09-29 — four tiers since D35: A/B/C/D, defined in `docs/TIERS.md`]** **D10 — every row carries an evidence tier** (A/B/C).
 - **D11 — normalise to active moiety**, but keep biosimilar 4-letter suffixes distinct.
 - **D13 — no OCR.** Scanned labels are all pre-2006, which is pre-PLR with no `14.N` structure.
 - **D21 — the trial side normalises from ClinicalTrials.gov's own `derivedSection`, not from
@@ -91,7 +91,7 @@ code says `not yet implemented` until it lands.
   states its own NCT id is tier A outright — the FDA said it, there is nothing to corroborate. This
   exists because a unit keyed `TABLE 3` carried a label "count" of 3 (a table number the extractor
   read as an enrollment) and its row was indistinguishable from CHECKMATE-648's 970 against 970.
-- **[PARTIALLY SUPERSEDED by D26, 2026-09-24 — "whose label carries it" becomes "whose label OR review names it"; the rule itself is unchanged]** **D16 — a trial is attributed to the EARLIEST submission whose label carries it.** Section 14 is
+- **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — applies to every route (B±, C±, D included) and across applications of the same active moiety; not yet implemented]** **[PARTIALLY SUPERSEDED by D26, 2026-09-24 — "whose label carries it" becomes "whose label OR review names it"; the rule itself is unchanged]** **D16 — a trial is attributed to the EARLIEST submission whose label carries it.** Section 14 is
   cumulative: a subsection is added at the approval it supported and then never removed.
   KEYNOTE-087 appears on **37** separate Keytruda submissions, 2017-05-10 through 2026-07-10; it
   supported the first (classical Hodgkin lymphoma). Attributing it to all 37 would make the
@@ -159,7 +159,7 @@ code says `not yet implemented` until it lands.
   P3 reads per-trial heading indications from it; the graph route reads chosen submission
   indications instead of application-level `indications.tsv`. Replaces three separate coding paths;
   `submission_indication_text.tsv` had no reader.
-- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — its links are tier D, judged in the D33 per-candidate format, not pick-one]** **D31 — no indication: search the drug's treatment edges** (2026-09-25, **implemented in
+- **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — "primary completion ≤ approval" is no longer a filter (start ≤ approval stays); never-ran trials are dropped]** **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — its links are tier D, judged in the D33 per-candidate format, not pick-one]** **D31 — no indication: search the drug's treatment edges** (2026-09-25, **implemented in
   code 2026-09-25; not yet run**). The graph route (D14, tier C) keeps walking drug ↔ *this
   submission's indication*, unchanged, and that stays one of P3/P4's candidate sources. Only where a
   submission has **no indication at all** does it fall back to the drug alone: every
@@ -184,7 +184,7 @@ code says `not yet implemented` until it lands.
   the P4 prompt tells the judge the count is its strongest signal, so D17 rewarded the evidence
   the judge chose on; and a ±15% match was unique in only 45 of 2,363 known cases. On the rebuilt
   scope 366 judged links move A → B; submissions with a tier-A link 1,709 → 1,448.
-- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — the drug pool is indication-filtered and capped at 10 tiers (100); literature candidates are added beyond the cap; the format also judges cases C and D]** **D33 — P4 judges each candidate Yes/No, in ranked tiers of 10, with one judge** (2026-09-28,
+- **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — two templates (registry v2, literature v1); candidates show status and why stopped]** **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — the drug pool is indication-filtered and capped at 10 tiers (100); literature candidates are added beyond the cap; the format also judges cases C and D]** **D33 — P4 judges each candidate Yes/No, in ranked tiers of 10, with one judge** (2026-09-28,
   **implemented in code 2026-09-28; pilot not yet run**). P3 returns every shortlist in rank order,
   with no cap for literature-injected candidates (commit 308887d); P4 works down it in tiers of 10
   (ranks 1–10, 11–20, …) and a description stops at the first tier holding a Yes, taking its
@@ -207,7 +207,7 @@ code says `not yet implemented` until it lands.
   every id of the submission's own letter + label §1, instead of refusing on two. Condition still
   ranks, never filters. Why: 36% of judged descriptions had no id and an exact filter lost 51% of
   answers; detail `docs/DESIGN.md` §3.
-- **[PARTIALLY SUPERSEDED by D36, 2026-09-30 — a submission whose FDA review names a PIVOTAL or SUPPORTING trial is case A and gets no C/D unit]** **D35 — route by what the FDA documents give; four tiers; indication filters before the cap**
+- **[PARTIALLY SUPERSEDED by D37, 2026-10-01 — literature candidates are no longer added to the shortlist: they are their own routes B+, C+, D, judged with their abstracts; tiers A > B+ > {B−, C+, C−, D}]** **[PARTIALLY SUPERSEDED by D36, 2026-09-30 — a submission whose FDA review names a PIVOTAL or SUPPORTING trial is case A and gets no C/D unit]** **D35 — route by what the FDA documents give; four tiers; indication filters before the cap**
   (2026-09-29, **implemented in code 2026-09-29; not yet run**). Tiers are defined in `docs/TIERS.md`.
   **A**: an FDA document names the trial (label NCT, review protocol id, label name = review id) →
   role judge (P4r, P4b) keeps pivotal/supporting. **B**: a §14 description with no id → drug + date
@@ -230,19 +230,58 @@ code says `not yet implemented` until it lands.
   is judged regardless. Why: the evidence is already identified, and a drug + indication search
   would only add a weaker link. Measured: 279 submissions routed `review`; C/D units with
   candidates 2,734 → 2,483 (−251).
+- **D37 — literature trials are their own routes, judged with their abstracts; six routes, two
+  templates; trial status shown, never-ran trials dropped** (2026-10-01; **implemented in code 2026-10-01 — all parts; `output/` not rebuilt, not
+  piloted**). Routes: **A** (an FDA document names the trial) · **B+** a §14
+  description × literature trials · **B−** a §14 description × registry shortlist · **C+**
+  indication only × literature trials · **C−** indication only × registry shortlist · **D** no
+  indication × drug-only literature. Literature trials are **taken out of the ranked shortlist**
+  (they were re-sorted into it by rank key 3, against D35, and crowded tier 1 with other drugs'
+  trials) and judged with up to 3 abstracts naming them (`docs/prompts/trial-literature-match.md`
+  v1); the "+" route runs first, a Yes stops the unit, otherwise "−" runs. Before judging, a
+  literature trial is dropped if **every** non-placebo arm resolves to another FDA drug, and (B+,
+  C+) if its condition fails the MeSH-tree indication check (id-less kept). **Every route** drops
+  trials that never ran (WITHDRAWN, NOT_YET_RECRUITING) and keeps start ≤ approval; nothing else
+  about status or completion is a filter — judges see **status, why stopped and primary
+  completion** (14% of label-stated trials are not COMPLETED in the registry; 9% show a primary
+  completion after their approval). Judges see the drug as **brand (generic)** from P1's
+  `drug_names.tsv` (brand, generic, ingredients, moieties, UNIIs). Tiers **A > B+ > {B−, C+, C−,
+  D}** (no order inside the braces; the same trial on one submission from several routes keeps
+  one row, all routes in `sources`). D16 earliest-wins applies to every route and across
+  applications of the same moiety. **Implemented 2026-09-30:** `drug_names.tsv`; never-ran
+  exclusion (P3 index, P2g); status/why-stopped/drug name shown; registry prompts
+  `trial-candidate-match` v2 and `-nolabel` v2; case D start-only date rule; registry aliases
+  must share a word with their descriptor; trial-side never-an-indication ids dropped; dose
+  stripping of registry drug names (P1, 99.7% precision on 2×200 hand-checked); answers keyed
+  to a digest of what the judge saw. **Implemented 2026-10-01:** literature trials out of the shortlist (`Unit.literature` vs `candidates`), PMIDs and found-under diseases in S7 with `literature_abstracts.jsonl` / `drug_only_abstracts.jsonl`, the drug check (`candidates.drug_check`, every non-control arm another FDA ingredient) and indication check (`literature_set`), the §14 subsection kept by S4 (`label_trials.tsv` `subsection`) and shown to both B templates, literature tiers before registry tiers with the route on every decision, route-as-tier in S10 with D16 across every route and same-moiety applications (`drug_names.moiety_key`), S11 first appearances by moiety and trial name. Measured: the drug check removes ~a third of
+  literature candidates and loses no known answer; the indication check removes more and lost
+  4–5 real answers of 224, every one a disease-coding error (13 of 18 drops were later
+  appearances or new-formulation reuse). Why: the user's routing — literature candidates have
+  exact identity and need a support check, not a ranking. Detail: `docs/DESIGN.md` §3, §4.
+- **D38 — the pipeline is eleven stages, S1–S11, named for what they produce** (2026-10-01,
+  **docs and Makefile targets implemented 2026-10-01; `--mode` names unchanged**). P0–P6 no longer
+  matched the order (review roles must run before routing, D36; registry normalisation before
+  indications, D34) or the steps. **S1 SPINE · S2 DRUGS · S3 REGISTRY · S4 DOCUMENTS · S5
+  INDICATIONS · S6 REVIEW ROLES (agents) · S7 LITERATURE · S8 ROUTE + CANDIDATES · S9 JUDGE
+  (agents) · S10 ASSEMBLE · S11 VALIDATE.** Old → new: P0→S1; P1 drug side→S2, trial side→S3;
+  P2a/b/c→S4; P2i→S5; P4r→S6; P2g→S7; P3→S8; P4, P4b→S9; P5→S10; P6→S11. Older decisions keep
+  their P-numbers; read them through this table. Dependency graph: `docs/DESIGN.md` §4;
+  `make <stage>` builds a stage and what it needs.
 
 ## Current status and to-do
 
-Full detail, evidence and commands: **`docs/STATUS.md`** (audited 2026-09-29) — read it at the
-start of a session and update it when a stage finishes or pauses. As of 2026-09-29:
+Full detail, evidence and commands: **`docs/STATUS.md`** — read it at the start of a session and
+update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026-10-01:
 
-1. **P2c review route done** — download as complete as FDA allows (118 of 131 missing files are
-   404 on FDA); **P4r review roles 4,825 / 4,825 decided (2026-09-30)**.
-2. **D34 implemented and rebuilt through P3; D35 implemented in code (Phase 1 done); both uncommitted.**
-3. Next (Phase 2): finish the review download → rebuild P2g (`graph-trials`, `graph-links`) → P3 → pilots B and C/D (two
-   judges) → full runs (one judge) with P4r alongside → P5 → D28 → P5 → P6.
-4. The D33 pilot so far is obsolete (built on the pre-D34 order); `trial_submission_map.tsv` is
-   still the 2026-09-23 pre-D23 map.
+1. **S4 documents and S6 review roles done** (4,825 / 4,825 roles decided, 2026-09-30).
+2. **D37 implemented in code** (2026-10-01); `output/` not rebuilt since; `make status`
+   lists what is stale. The D35 pilots (2026-09-30) are superseded by the v2 prompts — every
+   answer is re-judged under them.
+3. **Pending the user:** the iKraph2 migration for S2/S3/S5 (TherapyPreventions UNII-keyed drugs;
+   edges stay on iKraph1 ids — a bridge is needed); the remaining D37 code; the agent pool
+   (verified 2026-09-30, cap 32 concurrent).
+4. Then: rebuild (`make candidates`) → pilots per route (two judges) → full runs (one judge) →
+   S10 → D28 label roles → S10 → S11.
 
 ## Hard constraints
 
@@ -254,55 +293,93 @@ start of a session and update it when a stage finishes or pauses. As of 2026-09-
 - Combination regimens are legitimately many-to-many: KEYNOTE-189 approved pembrolizumab *with*
   chemo owned by other applications.
 
-## Pipeline — six phases, four sources, four cases (D35)
+## Pipeline — eleven stages, six routes (D37, D38)
+
+*The P0–P6 diagram (D35) is in git history; old → new names are in D38.*
 
 ```
-P0 spine      Submissions + Applications + ActionTypes -> 87,055 approved NDA|BLA events
-              -> D23: 5,766 ORIG + 4,009 SUPPL + 1,520 D24-guard SUPPL = 11,295 trial-relevant
-                              |
-P1 normalize  FDA side  : ingredient -> MeSH/PubChem via biokde synonyms (+ moiety fold)
-              TRIAL side: derivedSection.*BrowseModule.meshes (NLM) + biokde name matches
-                              |
-P2 read       P2a LABELS  (ApplicationDocs 2)  §14: NCT | trial name | count | heading (+wrap, D34); §1
-              P2b LETTERS (ApplicationDocs 1)  "provides for …" -> indication only, never trials
-              P2c REVIEWS (ApplicationDocs 21, 3 TOC, pediatric) -> protocol id -> exactly 1 registry
-                          study (orgStudyId | secondary id) + guards (date, sponsor|drug, package)
-              P2i INDICATION TABLE (D30, D34): letter > letter_located > label §1 > openfda_current,
-                          coded once to MeSH + biokdeid -> submission_indications.tsv
-              P2g LITERATURE (no agents, D35): graph edges drug x indication -> abstracts ->
-                          NCT ids + full protocol ids (exactly 1 registry study) -> graph_trials.tsv;
-                          no indication: drug's treats edges (D31) -> drug_only_trials.tsv
-                              |
-P3 route      every trial-relevant submission / §14 description -> submission_routes.tsv
-      +-----------------------+---------------------------+-------------------------+-------------+
-      | CASE A                | CASE B                    | CASE C                  | CASE D      |
-      | an FDA document names | a §14 description, no id  | indication known, no    | no          |
-      | the trial: label NCT, |                           | §14 description of its  | indication  |
-      | review protocol id,   |                           | own (no label, pre-PLR, |             |
-      | label name = review id|                           | §14 names no trial)     |             |
-      |                       | drug + start <= approval  | same candidate build as | drug-only   |
-      | no search             | -> indication filter      | B, on the submission's  | literature  |
-      |                       |    (MeSH tree; id-less    | chosen indication       | candidates, |
-      |                       |    trials kept)           |                         | start and   |
-      |                       | -> rank -> top 100        |                         | completion  |
-      |                       |    (10 tiers)             |                         | <= approval |
-      |                       | + literature candidates,  |                         |             |
-      |                       |   unfiltered, beyond 100  |                         |             |
-      v                       v                           v                         v             |
-P4    P4r review role (D26)   P4 identify (D33): per candidate Yes/No, tiers of 10, first Yes wins
-      P4b label role (D28)        B: excerpt prompt       C, D: no-label prompt (D35)
-      2 judges + 3rd; only        pilots 2 judges + 3rd, full runs 1 judge
-      PIVOTAL|SUPPORTING link
-      -> TIER A               -> TIER B                   -> TIER C                 -> TIER D
-      +-----------------------+---------------------------+-------------------------+-------------+
-                              |
-P5 assemble   D16 earliest-wins across label AND review (A, B); C and D never displace a stronger
-              link, only add to `sources`; highest tier wins -> trial_submission_map.tsv
-              columns sources, conflict; + review_trial_context.tsv + unlinked_submissions.tsv
-                              |
-P6 validate   shortlist recall · judge precision (docs/runbooks/validate-precision.md) · route
-              agreement by `sources` · graph cross-check
+S1  SPINE          Drugs@FDA -> 87,055 approved NDA|BLA events -> 11,295 trial-relevant (D23, D24)
+S2  DRUGS          per application: brand, generic, ingredient(s), moiety(ies), UNII(s)
+                   (drug_names.tsv) + normalised drug id and its graph biokdeid (drug_map.tsv)
+S3  REGISTRY       every CT.gov study: interventions -> drug ids (NLM MeSH, then biokde names,
+                   dose stripped), conditions -> disease ids, status, why stopped, dates;
+                   WITHDRAWN / NOT_YET_RECRUITING dropped (trial_drug_map, trial_condition_map)
+S4  DOCUMENTS      fetched by hand at 1 req/s, never by make:
+                     labels  -> §14 descriptions (NCT | name | count | subsection) + §1 text
+                     letters -> "provides for ..." indication sentence (never trials)
+                     reviews -> protocol id -> exactly 1 registry study (+ guards)
+S5  INDICATIONS    one table, coded once: letter > located > label §1 > today's label;
+                   §14 headings coded per description (submission_indications.tsv)
+S6  REVIEW ROLES   agents: each review-named trial PIVOTAL / SUPPORTING / other (D26, D27)
+S7  LITERATURE     graph: drug x indication edges -> abstracts -> trials they name (NCT or
+                   protocol id), with PMIDs; no indication: drug's treats edges (D31);
+                   drug check (every arm another FDA drug -> out) + indication check
+S8  ROUTE +        each submission / §14 description -> route and candidate sets (D35-D37):
+    CANDIDATES       A   an FDA document names the trial          -> no search
+                     B+  §14 description  x literature trials      -> with abstracts
+                     B-  §14 description  x registry shortlist     -> drug pool, indication
+                     C+  indication only  x literature trials         filter, top 100
+                     C-  indication only  x registry shortlist
+                     D   no indication    x drug-only literature
+S9  JUDGE          agents, per candidate Yes/No in tiers of 10, first Yes wins (D33):
+                     A: label role (D28)        B+ C+ D: literature template v1
+                     "+" before "-"             B- C-:   registry templates v2
+S10 ASSEMBLE       earliest submission wins (D16, every route, same-moiety applications);
+                   tiers A > B+ > {B-, C+, C-, D}; sources, conflict
+                   -> trial_submission_map.tsv, unlinked_submissions.tsv
+S11 VALIDATE       shortlist recall · judge precision on withheld answers · route agreement
 ```
+
+### Dependency graph
+
+Each arrow is "is read by". Boxes are `make` targets (`make <name>` builds it and everything it
+needs); `[agents]` stages are run under their runbooks, and their verdict files are inputs that
+make checks for staleness but never writes. Raw inputs are on the left.
+
+```
+ Drugs@FDA ──────────────> [S1 spine] ──────────┬──────────────┬──────────────────┐
+ (drugsatfda.zip)              │                │              │                  │
+                               v                v              v                  │
+ moiety extract, UNII ───> [S2 drugs] ──┐  [S4 documents]  (labels, letters,      │
+ biokde (graph names) ────────┘   │     │   reviews: cached PDFs, --offline)      │
+                                  │     │      │    │    │                         │
+ CT.gov archive ─────────> [S3 registry] <─────┘    │    │                         │
+ (600,762 studies)            │   │     │           │    │                         │
+ openFDA labels ──┐           │   │     │           │    └──> S6 REVIEW ROLES ─┐   │
+ (today's §1) ────┴─────> [S5 indications] <────────┘         [agents]          │   │
+ MeSH tree ───────────────────┘   │     │                                       │   │
+                                  │     v                                       │   │
+ biokde edges, abstracts ─> [S7 literature] <── S2 (graph biokdeids)            │   │
+                                  │     │                                       │   │
+                                  v     v                                       v   │
+                        [S8 route + candidates] <── S2, S3, S4, S5, S6 verdicts ┘   │
+                                  │                                                 │
+                                  v                                                 │
+                           S9 JUDGE [agents] ── identify, label-role verdicts       │
+                                  │                                                 │
+                                  v                                                 │
+                           [S10 assemble] <── S1, S2, S4, S5, S6, S9 ───────────────┘
+                                  │
+                                  v
+                           [S11 validate]
+```
+
+| Stage | `make` target | Writes | Reads |
+|---|---|---|---|
+| S1 spine | `spine` | `approval_events.tsv` | Drugs@FDA |
+| S2 drugs | `drugs` | `drug_names.tsv`, `drug_map.tsv`, `indication_map.tsv` | S1, moiety extract, UNII list, biokde, `indications.tsv` (openFDA) |
+| S3 registry | `registry` | `trial_drug_map.tsv`, `trial_condition_map.tsv` | S2, CT.gov archive, biokde |
+| S4 documents | `documents` | `label_trials.tsv`, `submission_indication_text.tsv`, `letter_indications.tsv`, `review_trial_mentions.tsv`, review role units | S1, cached PDFs |
+| S5 indications | `indications` | `submission_indications.tsv` | S3, S4, letter-span verdicts, openFDA §1, MeSH |
+| S6 review roles | agents | `adjudication/review_role_verdicts.jsonl` | S4 units |
+| S7 literature | `literature` | `graph_trials.tsv`, `drug_only_trials.tsv` | S2, S5, biokde edges and abstracts |
+| S8 route + candidates | `candidates` | `submission_routes.tsv`, `candidates.jsonl` | S2, S3, S4, S5, S6, S7 |
+| S9 judge | agents (`make judge-prepare`) | `adjudication/identify_verdicts.jsonl`, `label_role_verdicts.jsonl` | S8 |
+| S10 assemble | `assemble` | `trial_submission_map.tsv`, `unlinked_submissions.tsv` | S1, S2, S4, S5, S6, S8, S9 |
+| S11 validate | `validate` | report | S8, S10 |
+
+S2 and S3 are both written by `--mode normalize` today (one pass over biokde and the registry);
+their targets name the same command.
 
 **Letters give indications, never trials; reviews give trials by the sponsor's own protocol id**
 (D25, D26). Both are fetched at 1 request/s with a breaker after 5 consecutive 403s — FDA banned

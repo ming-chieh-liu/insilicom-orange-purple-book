@@ -8,7 +8,15 @@
 #
 #   make                 bring every no-agent output up to date
 #   make status          list what is stale and the commands that would fix it
-#   make <mode>          one step and whatever it needs, e.g. `make candidates`
+#   make <stage>         one stage of S1-S11 and whatever it needs (D38):
+#                          spine drugs registry documents indications literature
+#                          candidates assemble validate
+#   make <mode>          the same by --mode name, e.g. `make indication-normalize`
+#   make judge-prepare TASK=identify CASE=B|C|D|CD [LIMIT=n]
+#                        TASK=review-roles | TASK=label-roles
+#                        write the next agent batches; never judges (S6, S9)
+#
+# The dependency graph is drawn in docs/DESIGN.md §4.
 #
 # Agent verdicts (adjudication/*_verdicts.jsonl) are sources, not targets: they
 # are produced by judges under a runbook, never by make. A new verdict makes
@@ -29,7 +37,7 @@ LABELS_JSON := $(wildcard $(RAW)/label/drug-label-*.json.zip)
 STEPS := \
   approval_events=service/approval_events.py,dao/tsv_repository.py \
   indications=service/indications.py,dao/tsv_repository.py \
-  normalize=service/normalize.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,dao/biokde.py,dao/tsv_repository.py \
+  normalize=service/normalize.py,service/drug_names.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,dao/biokde.py,dao/tsv_repository.py \
   labels=service/section14.py,dao/tsv_repository.py \
   letters=service/letters.py,dao/tsv_repository.py \
   reviews=service/review_trials.py,service/review_role.py,service/label_role.py,service/approval_events.py,source/review_docs.py,source/trial_studies.py,source/raw_table.py,dao/tsv_repository.py \
@@ -49,8 +57,9 @@ PROJECT_PY := $(wildcard config/*.py dao/*.py service/*.py source/*.py utility/*
 include .deps.mk
 
 .DELETE_ON_ERROR:
-.PHONY: all status spine indications normalize labels letters reviews \
-        indication-normalize graph-trials graph-links candidates assemble validate
+.PHONY: all status spine drugs registry documents indications literature candidates \
+        assemble validate judge-prepare openfda-labels normalize labels letters reviews \
+        indication-normalize graph-trials graph-links
 
 all: $(OUT)/candidates.jsonl $(OUT)/trial_submission_map.tsv
 
@@ -64,7 +73,7 @@ $(OUT)/indications.tsv $(OUT)/indication_text.tsv &: $(CODE_indications) $(LABEL
 
 # ---- P1 normalize -------------------------------------------------------------
 $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv $(OUT)/trial_drug_map.tsv \
-$(OUT)/trial_condition_map.tsv &: $(CODE_normalize) $(OUT)/indications.tsv
+$(OUT)/trial_condition_map.tsv $(OUT)/drug_names.tsv &: $(CODE_normalize) $(OUT)/indications.tsv
 	$(MAIN) --mode normalize
 
 # ---- P2a labels (cached PDFs only) -----------------------------------------------
@@ -89,11 +98,11 @@ $(OUT)/submission_indications.tsv: $(CODE_indication_normalize) \
 	$(MAIN) --mode indication-normalize
 
 # ---- P2g literature candidates (D35) --------------------------------------------------
-$(OUT)/graph_trials.tsv: $(CODE_graph_trials) \
+$(OUT)/graph_trials.tsv $(OUT)/literature_abstracts.jsonl &: $(CODE_graph_trials) \
 		$(OUT)/submission_indications.tsv $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv
 	$(MAIN) --mode graph-trials
 
-$(OUT)/drug_only_trials.tsv: $(CODE_graph_links) \
+$(OUT)/drug_only_trials.tsv $(OUT)/drug_only_abstracts.jsonl &: $(CODE_graph_links) \
 		$(OUT)/submission_indications.tsv $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv \
 		$(OUT)/approval_events.tsv
 	$(MAIN) --mode graph-links
@@ -103,7 +112,8 @@ $(OUT)/candidates.jsonl $(OUT)/submission_routes.tsv &: $(CODE_candidates) \
 		$(OUT)/submission_indications.tsv \
 		$(OUT)/label_trials.tsv $(OUT)/graph_trials.tsv $(OUT)/drug_only_trials.tsv \
 		$(OUT)/review_trial_mentions.tsv $(ADJ)/review_role_verdicts.jsonl \
-		$(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv $(OUT)/drug_map.tsv
+		$(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv $(OUT)/drug_map.tsv \
+		$(OUT)/drug_names.tsv
 	$(MAIN) --mode candidates
 
 # ---- P5 assemble ------------------------------------------------------------------------
@@ -114,9 +124,37 @@ $(OUT)/trial_submission_map.tsv $(OUT)/unlinked_submissions.tsv &: $(CODE_assemb
 		$(ADJ)/review_role_verdicts.jsonl
 	$(MAIN) --mode assemble
 
-# ---- one step by its --mode name -------------------------------------------------------
-spine: $(OUT)/approval_events.tsv
-indications: $(OUT)/indications.tsv
+# ---- stages S1-S11 (D38) ------------------------------------------------------------------
+spine: $(OUT)/approval_events.tsv                                              # S1
+drugs: $(OUT)/drug_names.tsv $(OUT)/drug_map.tsv                               # S2
+registry: $(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv             # S3
+documents: $(OUT)/label_trials.tsv $(OUT)/letter_indications.tsv \
+           $(OUT)/review_trial_mentions.tsv                                    # S4 (--offline)
+indications: $(OUT)/submission_indications.tsv                                 # S5
+#                                                                                S6 agents
+literature: $(OUT)/graph_trials.tsv $(OUT)/drug_only_trials.tsv \
+            $(OUT)/literature_abstracts.jsonl $(OUT)/drug_only_abstracts.jsonl   # S7
+candidates: $(OUT)/candidates.jsonl                                            # S8
+#                                                                                S9 agents
+assemble: $(OUT)/trial_submission_map.tsv                                      # S10
+
+# Agent batches for S6 / S9, on up-to-date inputs (main.py refuses stale ones).
+TASK  ?= identify
+CASE  ?= B
+LIMIT ?=
+judge-prepare:
+ifeq ($(TASK),identify)
+	$(MAIN) --mode match-prepare --case $(CASE) $(if $(LIMIT),--limit $(LIMIT))
+else ifeq ($(TASK),review-roles)
+	$(MAIN) --mode review-role-prepare
+else ifeq ($(TASK),label-roles)
+	$(MAIN) --mode label-role-prepare
+else
+	$(error TASK must be identify, review-roles or label-roles)
+endif
+
+# ---- the same steps by --mode name -------------------------------------------------------
+openfda-labels: $(OUT)/indications.tsv          # --mode indications (today's openFDA labels)
 normalize: $(OUT)/drug_map.tsv
 labels: $(OUT)/label_trials.tsv
 letters: $(OUT)/letter_indications.tsv
@@ -127,11 +165,11 @@ graph-links: $(OUT)/drug_only_trials.tsv
 candidates: $(OUT)/candidates.jsonl
 assemble: $(OUT)/trial_submission_map.tsv
 
-# P6 writes nothing make tracks; it is always run on the current outputs.
+# S11 writes nothing make tracks; it is always run on the current outputs.
 validate: $(OUT)/candidates.jsonl $(OUT)/trial_submission_map.tsv
 	$(MAIN) --mode validate
 
 status:
-	@stale=$$($(MAKE) --no-print-directory -n all | grep -o -- '--mode [a-z-]*' | sort -u); \
+	@stale=$$(env -u MAKEFLAGS -u MFLAGS -u MAKELEVEL -u MAKE_RESTARTS $(MAKE) --no-print-directory -n all | grep -o -- '--mode [a-z-]*' | sort -u); \
 	if [ -z "$$stale" ]; then echo "all outputs up to date"; \
 	else echo "stale — make would run:"; echo "$$stale" | sed 's/^/  /'; fi

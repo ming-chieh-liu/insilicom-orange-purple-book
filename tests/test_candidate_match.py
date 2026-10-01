@@ -46,7 +46,7 @@ def test_tiers_are_slices_of_ten_in_rank_order() -> None:
     assert third.candidates.startswith("21. NCT00000021")
     assert "Sponsor: Acme" in third.candidates
     assert "Primary completion: 2019-01-01" in third.candidates
-    assert third.tier_id == "NDA000001|ORIG|1|TRIAL-1#T3"
+    assert third.tier_id == "NDA000001|ORIG|1|TRIAL-1#T3@" + cm.input_digest(third)
 
 
 def test_missing_label_fields_are_spelled_out() -> None:
@@ -60,7 +60,8 @@ def test_a_yes_in_the_first_tier_decides_with_the_highest_ranked_yes() -> None:
     unit = _unit(25)
     answers = _answers(unit, 1, {"NCT00000007", "NCT00000003"})
     decision = cm.decide(unit, answers)
-    assert decision == cm.Decision(str(unit["unit_id"]), "NCT00000003", 1, 1)
+    assert decision == cm.Decision(str(unit["unit_id"]), "NCT00000003", 1, 1,
+                                   (cm.build_tier(unit, 1).tier_id,), "B-")
     assert cm.next_tier(unit, answers) is None
 
 
@@ -182,7 +183,7 @@ def test_decisions_are_validated_and_not_repeated(tmp_path: Path) -> None:
         cm.Decision("U4", "NCT00000004", 1, 1),
     ]
     allowed = {"U1": {"NCT00000001"}, "U2": {"NCT00000001"}, "U3": set(), "U4": {"NCT00000004"}}
-    written, refused = cm.record_decisions(decisions, allowed, path, already={"U4"})
+    written, refused = cm.record_decisions(decisions, allowed, path, already={"U4": ()})
     assert (written, refused) == (2, 1)
     verdicts = identification.read_verdicts(path)
     assert verdicts["U1"].final == "NCT00000001"
@@ -210,7 +211,7 @@ def test_a_round_trip_through_prepare_combine_and_record(tmp_path: Path) -> None
     assert "tiers written this round (new)                 1" in report
     batch = (adj / cm.BATCH_DIR / "round-01" / "batch-001.ids").read_text().split()
     tid = batch[0]
-    assert tid.endswith("#T1")
+    assert "#T1@" in tid
 
     raw = adj / cm.RAW_DIR / "round-01"
     raw.mkdir(parents=True)
@@ -225,7 +226,7 @@ def test_a_round_trip_through_prepare_combine_and_record(tmp_path: Path) -> None
     second = cm.prepare_round(units, adj)
     assert "tiers written this round (new)                 1" in second
     tid2 = (adj / cm.BATCH_DIR / "round-02" / "batch-001.ids").read_text().split()[0]
-    assert tid2.endswith("#T2")
+    assert "#T2@" in tid2
     (raw / "batch-002-A.txt").write_text(
         f"{tid2} | NCT00000011 = No\n{tid2} | NCT00000012 = Yes\n", encoding="utf-8"
     )
@@ -313,3 +314,128 @@ def test_no_label_tiers_get_their_own_batch_files_and_prompt_stamp(tmp_path: Pat
         (cm.NOLABEL_PROMPT, cm.NOLABEL_PROMPT_VERSION)}
     assert len(cm.read_answers(adj / cm.ANSWERS_FILE)) == 2
     assert "identified a trial                         1" in cm.record_round(units, adj)
+
+
+# ---- answers are bound to what the judge was shown (2026-09-30) -------------------
+
+def test_a_changed_shortlist_is_judged_again() -> None:
+    unit = _unit(12)
+    answers = _answers(unit, 1, set())
+    assert cm.next_tier(unit, answers) == 2
+    changed = {**unit, "candidates": list(reversed(unit["candidates"]))}  # type: ignore[call-overload]
+    assert cm.build_tier(changed, 1).tier_id != cm.build_tier(unit, 1).tier_id
+    assert cm.next_tier(changed, answers) == 1
+    assert cm.decide(changed, answers) is None
+
+
+def test_a_changed_indication_is_judged_again_but_an_unseen_field_is_not() -> None:
+    unit = {**_unit(3), "case": "C", "drug": "X", "indication_text": "Asthma"}
+    first = cm.build_tier(unit, 1)
+    assert cm.build_tier({**unit, "indication_text": "COPD"}, 1).tier_id != first.tier_id
+    # The no-label prompt never shows the excerpt, so it does not change the tier.
+    assert cm.build_tier({**unit, "excerpt": "other"}, 1).tier_id == first.tier_id
+
+
+def test_legacy_tiers_are_rekeyed_from_their_stored_content(tmp_path: Path) -> None:
+    unit = _unit(3)
+    built = cm.build_tier(unit, 1)
+    legacy = built._replace(tier_id=cm.tier_id_for(built.unit_id, 1))
+    cm.write_tiers([legacy], tmp_path / cm.TIERS_FILE)
+    old_answers = [a._replace(tier_id=legacy.tier_id) for a in _answers(unit, 1, {"NCT00000002"})]
+    cm.append_answers(old_answers, tmp_path / cm.ANSWERS_FILE)
+    assert cm.migrate_legacy_ids(tmp_path) == 3
+    assert cm.migrate_legacy_ids(tmp_path) == 0
+    assert list(cm.read_tiers(tmp_path / cm.TIERS_FILE)) == [built.tier_id]
+    answers = cm.read_answers(tmp_path / cm.ANSWERS_FILE)
+    decision = cm.decide(unit, answers)
+    assert decision is not None and decision.final == "NCT00000002"
+
+
+def test_a_decision_on_changed_tiers_is_recorded_anew(tmp_path: Path) -> None:
+    path = tmp_path / "identify_verdicts.jsonl"
+    first = cm.Decision("U1", "NCT00000001", 1, 1, ("U1#T1@aaa",))
+    allowed = {"U1": {"NCT00000001", "NCT00000002"}}
+    assert cm.record_decisions([first], allowed, path, {}) == (1, 0)
+    already = cm.recorded_bases(path)
+    assert already == {"U1": ("U1#T1@aaa",)}
+    assert cm.record_decisions([first], allowed, path, already) == (0, 0)
+    again = cm.Decision("U1", "NCT00000002", 1, 1, ("U1#T1@bbb",))
+    assert cm.record_decisions([again], allowed, path, already) == (1, 0)
+    assert identification.read_verdicts(path)["U1"].final == "NCT00000002"
+
+
+def test_a_superseded_tier_is_not_batched_again(tmp_path: Path) -> None:
+    unit = _unit(3)
+    cm.prepare_round([unit], tmp_path)
+    changed = {**unit, "excerpt": "A different excerpt."}
+    report = cm.prepare_round([changed], tmp_path)
+    assert "tiers awaiting answers                         1" in report
+    batch = sorted((tmp_path / cm.BATCH_DIR).glob("round-02/*.ids"))[0].read_text().split("\n")
+    assert batch[0] == cm.build_tier(changed, 1).tier_id
+
+
+# ---- D37: literature tiers first, judged with abstracts ------------------------------
+
+def _lit_unit(lit: int, reg: int, case: str = "B") -> dict[str, object]:
+    unit = _unit(reg)
+    unit["case"] = case
+    unit["subsection"] = "In KEYNOTE-1, 500 patients were randomized."
+    unit["drug"] = "KEYTRUDA (pembrolizumab)"
+    unit["literature"] = [
+        {"nct_id": f"NCT9{i:07d}", "brief_title": f"Lit {i}", "pmids": "11",
+         "abstracts": [{"pmid": "11", "title": "Paper", "abstract": "We tested pembrolizumab."}]}
+        for i in range(1, lit + 1)
+    ]
+    return unit
+
+
+def test_literature_tiers_come_first_with_their_own_prompt() -> None:
+    unit = _lit_unit(3, 12)
+    assert cm.total_tiers(unit) == 3 and cm.literature_tiers(unit) == 1
+    first, second = cm.build_tier(unit, 1), cm.build_tier(unit, 2)
+    assert first.prompt == cm.LITERATURE_PROMPT
+    assert first.candidate_ids == ("NCT90000001", "NCT90000002", "NCT90000003")
+    assert "PMID 11 — Paper" in first.candidates and "We tested pembrolizumab." in first.candidates
+    assert "<section_14>\nIn KEYNOTE-1, 500 patients were randomized.\n</section_14>" in first.label_block
+    assert first.approval.startswith("KEYTRUDA (pembrolizumab) · ")
+    assert second.prompt == cm.EXCERPT_PROMPT
+    assert second.candidate_ids[0] == "NCT00000001"
+    assert second.excerpt == "In KEYNOTE-1, 500 patients were randomized."
+
+
+def test_a_literature_yes_stops_the_unit_before_the_shortlist() -> None:
+    unit = _lit_unit(3, 12)
+    answers = _answers(unit, 1, {"NCT90000002"})
+    decision = cm.decide(unit, answers)
+    assert decision is not None and decision.final == "NCT90000002" and decision.route == "B+"
+    assert cm.next_tier(unit, answers) is None
+
+
+def test_an_all_no_literature_tier_moves_to_the_registry() -> None:
+    unit = _lit_unit(3, 12)
+    answers = _answers(unit, 1, set())
+    assert cm.next_tier(unit, answers) == 2
+    answers += _answers(unit, 2, {"NCT00000004"})
+    decision = cm.decide(unit, answers)
+    assert decision is not None and decision.route == "B-" and decision.tier == 2
+
+
+def test_case_c_and_d_literature_blocks_say_what_is_known() -> None:
+    c = cm.build_tier({**_lit_unit(1, 0, "C"), "indication_text": "provides for asthma"}, 1)
+    assert c.label_block.endswith("Approved for: provides for asthma")
+    assert "section 14 heading" not in c.approval
+    d = _lit_unit(2, 0, "D")
+    assert cm.route_of(d, 1) == "D" and cm.total_tiers(d) == 1
+
+
+def test_select_units_attaches_abstracts_and_keeps_literature_only_units(tmp_path: Path) -> None:
+    from service import graph_trials
+
+    unit = {**_lit_unit(1, 0, "D"), "unit_id": "NDA1|ORIG|1|drug_only"}
+    for c in unit["literature"]:  # type: ignore[attr-defined]
+        c.pop("abstracts")
+    (tmp_path / "candidates.jsonl").write_text(json.dumps(unit) + "\n", encoding="utf-8")
+    (tmp_path / graph_trials.ABSTRACTS_FILE).write_text(
+        json.dumps({"pmid": "11", "title": "T", "abstract": "A"}) + "\n", encoding="utf-8")
+    [got] = cm.select_units(tmp_path / "candidates.jsonl", tmp_path / "x", tmp_path / "y", None, "D")
+    assert got["literature"][0]["abstracts"] == [{"pmid": "11", "title": "T", "abstract": "A"}]  # type: ignore[index]

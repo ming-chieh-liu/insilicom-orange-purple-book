@@ -87,6 +87,15 @@ def test_make_dry_run_without_a_makefile(tmp_path: Path) -> None:
     assert freshness.make_dry_run("all", tmp_path) is None
 
 
+def test_make_dry_run_ignores_a_parent_makes_flags(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "Makefile").write_text("out.txt: in.txt\n\techo --mode stepx\n")
+    (tmp_path / "in.txt").write_text("")
+    monkeypatch.setenv("MAKEFLAGS", "q")
+    assert "--mode stepx" in (freshness.make_dry_run("out.txt", tmp_path) or "")
+
+
 def test_make_dry_run_reads_make(tmp_path: Path) -> None:
     (tmp_path / "Makefile").write_text("out.txt: in.txt\n\techo --mode stepx\n")
     (tmp_path / "in.txt").write_text("")

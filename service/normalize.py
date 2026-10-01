@@ -37,6 +37,7 @@ reason, that :mod:`source.mesh_descriptors` applies to disease entry terms.
 
 from __future__ import annotations
 
+import re
 from collections import Counter
 from collections.abc import Iterable
 from typing import NamedTuple
@@ -76,6 +77,9 @@ DESIGN_WORDS: frozenset[str] = frozenset(
         "saline", "carrier", "urine", "water",
     }
 )
+
+#: ``basis`` of a trial string matched only after :func:`dose_stripped`.
+BASIS_DOSE_STRIPPED: str = "synonym_dose_stripped"
 
 #: Shortest synonym that may be matched. Below this the graph's abbreviations
 #: collide with arm labels, units and initials.
@@ -441,6 +445,134 @@ def normalise(
     return out, coverage
 
 
+#: A dose, a strength or a frequency: a number with its unit ("0.5 mcg/kg",
+#: "1%", "100 U/mL", "x 2") or a schedule word. None of them changes which
+#: drug is meant, so stripping them cannot change the id a name resolves to.
+_DOSE = re.compile(
+    r"""
+    \b\d+(?:[.,]\d+)?\s*(?:-\s*\d+(?:[.,]\d+)?\s*)?
+      (?:mg|mcg|µg|μg|ug|ng|g|kg|ml|l|iu|miu|u|units?|mmol|µmol|umol|mol|meq|%|
+         mg/kg|mcg/kg|µg/kg|ug/kg|mg/m2|mg/m²|mg/ml|mcg/ml|u/ml|iu/ml|mg/day|mg/d)
+      (?:\s*/\s*(?:kg|m2|m²|ml|day|d|dose|week|wk|h|hr))?
+    (?![a-z])
+    | \b\d+(?:[.,]\d+)?\s*%
+    | \bx\s*\d+\b
+    | \b(?:once|twice|three\s+times|four\s+times)\s+(?:a\s+)?(?:daily|weekly|monthly|day|week)\b
+    | \b(?:every|q)\s*\d+\s*(?:hours?|h|days?|d|weeks?|w|months?)\b
+    | \b(?:qd|bid|tid|qid|qw|q2w|q3w|q4w|qod|prn|daily|weekly|monthly)\b
+    """,
+    re.IGNORECASE | re.VERBOSE,
+)
+
+#: Routes and dosage forms. Each names how a drug is given, never which drug.
+_FORM_WORDS: frozenset[str] = frozenset({
+    "oral", "orally", "po", "intravenous", "intravenously", "iv", "subcutaneous",
+    "subcutaneously", "sc", "sq", "intramuscular", "im", "topical", "topically",
+    "inhaled", "inhalation", "intranasal", "nasal", "ophthalmic", "transdermal",
+    "sublingual", "intravitreal", "intrathecal", "vaginal", "rectal",
+    "tablet", "tablets", "tab", "tabs", "capsule", "capsules", "cap", "caps",
+    "injection", "injections", "injectable", "infusion", "ointment", "cream",
+    "gel", "solution", "suspension", "patch", "patches", "spray", "film",
+    "foam", "lotion", "drops", "inhaler", "powder", "sachet", "syrup", "elixir",
+    "emulsion", "implant", "pen", "vial", "prefilled", "syringe", "formulation",
+    "extended-release", "extended", "release", "delayed-release", "modified-release",
+    "er", "xr", "sr", "xl", "cr", "dr", "odt", "ir", "dose", "doses", "dosing",
+    "continuous", "bolus",
+    "mg", "mcg",
+})
+
+#: Joining words left dangling once a dose is removed ("10 mg in 2 mL").
+_DANGLING: frozenset[str] = frozenset({"in", "of", "per", "and", "or", "with", "at", "by", "for"})
+
+
+def dose_stripped(name: str) -> str:
+    """``name`` without its dose, schedule, route or dosage form; "" if unchanged.
+
+    Only removals, never rewrites: what is left must be a run of the original
+    words, so a lookup on it can only find a synonym the string already
+    contained. A result that is a study-design word, or shorter than
+    :data:`MIN_SYNONYM_LENGTH`, is refused.
+
+    >>> dose_stripped("CR845 0.5 mcg/kg")
+    'CR845'
+    >>> dose_stripped("KX2-391 Ointment 1%")
+    'KX2-391'
+    >>> dose_stripped("Lecanemab 10 mg/kg IV every 2 weeks")
+    'Lecanemab'
+    >>> dose_stripped("Insulin glargine 100 U/mL")
+    'Insulin glargine'
+    >>> dose_stripped("Zanubrutinib")
+    ''
+    >>> dose_stripped("Placebo tablets")
+    ''
+    >>> dose_stripped("Continuous Dose")
+    ''
+    >>> dose_stripped("Drug A 10 mg + Drug B 5 mg")
+    'Drug A + Drug B'
+    """
+    text = _DOSE.sub(" ", name)
+    words = [w for w in re.split(r"\s+", text) if w]
+    kept = [w for w in words if w.strip(",;:()[]").casefold() not in _FORM_WORDS]
+    while kept and kept[-1].strip(",;:()[]-").casefold() in _DANGLING | {""}:
+        kept.pop()
+    while kept and kept[0].strip(",;:()[]-").casefold() in _DANGLING | {""}:
+        kept.pop(0)
+    result = " ".join(kept).strip(" ,;:-/")
+    if result.endswith("(") or result.count("(") != result.count(")"):
+        result = result.replace("(", " ").replace(")", " ")
+        result = " ".join(result.split())
+    if (not result or result.casefold() == " ".join(name.split()).casefold()
+            or len(result) < MIN_SYNONYM_LENGTH or result.casefold() in DESIGN_WORDS):
+        return ""
+    return result
+
+
+#: Shortest name a dose-stripped string may be looked up by. Longer than
+#: :data:`MIN_SYNONYM_LENGTH`: in a 200-row check every short leftover that
+#: resolved ("NaCl", "MSCs", "site", "Salt") resolved to the wrong drug.
+MIN_STRIPPED_LENGTH: int = 5
+
+
+def nlm_agrees(mesh_id: str, nlm_mesh: set[str] | None) -> bool:
+    """Whether NLM's coding of the same trials leaves ``mesh_id`` standing.
+
+    True when there is nothing to contradict it — a non-MeSH id, or no trial
+    naming the string has NLM coding — and otherwise only if NLM assigned it.
+
+    >>> nlm_agrees("MESH:D005902", {"MESH:D008103"}), nlm_agrees("MESH:D008103", {"MESH:D008103"})
+    (False, True)
+    >>> nlm_agrees("MESH:D005902", None), nlm_agrees("PubChem:CID1", {"MESH:D1"})
+    (True, True)
+    """
+    if mesh_id.startswith("MESH:") and nlm_mesh:
+        return mesh_id in nlm_mesh
+    return True
+
+
+def stripped_match_ok(stripped: str, mesh_id: str, nlm_mesh: set[str] | None) -> bool:
+    """Whether a dose-stripped name may keep the id it resolved to.
+
+    Two guards, both from the 200-row precision check of 2026-09-30. A short
+    leftover is refused. And where NLM coded the interventions of the trials
+    naming this string, a MeSH id NLM never assigned is refused: every wrong
+    match in the check ("surgery" → Sulfur, "Abatacept" → Belatacept) sat on
+    trials NLM had coded correctly and differently. A non-MeSH id, or a string
+    no trial has NLM coding for, has nothing to be contradicted by.
+
+    >>> stripped_match_ok("CR845", "PubChem:CID24794466", {"MESH:D000700"})
+    True
+    >>> stripped_match_ok("NaCl", "MESH:D000111", None)
+    False
+    >>> stripped_match_ok("surgery", "MESH:D013455", {"MESH:D013514"})
+    False
+    >>> stripped_match_ok("Lecanemab", "MESH:C000710711", {"MESH:C000710711"})
+    True
+    """
+    if len(stripped) < MIN_STRIPPED_LENGTH:
+        return False
+    return nlm_agrees(mesh_id, nlm_mesh)
+
+
 def synonym_index(
     mesh_ids: list[str], repository: BiokdeRepository, concepts: dict[str, str]
 ) -> dict[str, str]:
@@ -540,6 +672,8 @@ def _match_trial_strings(
     label: str,
     biokdeids: dict[str, str] | None = None,
     names: dict[str, str] | None = None,
+    nlm_of: dict[str, set[str]] | None = None,
+    strip_doses: bool = False,
 ) -> tuple[tuple[Mapping, ...], Coverage]:
     """Map distinct trial strings through a synonym index.
 
@@ -547,6 +681,10 @@ def _match_trial_strings(
     against the graph would be a round trip each; expanding the few thousand
     ids the FDA side actually uses into every spelling the graph knows and
     matching locally is one pass over the archive.
+
+    ``strip_doses`` (interventions only) retries an unmatched string without
+    its dose, route and form — never for conditions, where "Oral Mucositis" or
+    "Nasal Polyps" lose their meaning without the first word.
     """
     distinct: dict[str, None] = {}
     for group in values:
@@ -556,6 +694,15 @@ def _match_trial_strings(
     rows: list[Mapping] = []
     for value in distinct:
         mesh_id = index.get(value.casefold())
+        basis = "synonym"
+        if not mesh_id and strip_doses:
+            # The same name with its dose, route or form removed ("CR845 0.5
+            # mcg/kg" -> "CR845"); none of those changes which drug it is.
+            stripped = dose_stripped(value)
+            mesh_id = index.get(stripped.casefold()) if stripped else None
+            basis = BASIS_DOSE_STRIPPED
+            if mesh_id and not stripped_match_ok(stripped, mesh_id, (nlm_of or {}).get(value)):
+                mesh_id = None
         if mesh_id:
             rows.append(
                 Mapping(
@@ -567,7 +714,7 @@ def _match_trial_strings(
                     # without this the column is blank on every trial row.
                     official_name=(names or {}).get(mesh_id, ""),
                     entity_type="",
-                    basis="synonym",
+                    basis=basis,
                 )
             )
     coverage = Coverage(
@@ -655,9 +802,16 @@ def build(
     )
     # One pass over the archive feeds both trial-side passes.
     interventions: list[tuple[str, ...]] = []
+    #: Intervention string → the NLM intervention MeSH of every trial naming it
+    #: that has any, for the dose-stripped guard (2026-09-30).
+    nlm_of: dict[str, set[str]] = {}
+
     conditions: list[tuple[str, ...]] = []
     for facts in trial_studies.read_study_facts(archive):
         interventions.append(facts.interventions)
+        if facts.derived_drug_mesh:
+            for name in facts.interventions:
+                nlm_of.setdefault(name, set()).update(facts.derived_drug_mesh)
         conditions.append(facts.conditions)
     # The graph's internal id, keyed by the external one, so a trial-side row
     # inherits the biokdeid its FDA-side counterpart already resolved.
@@ -666,7 +820,8 @@ def build(
         m.mesh_id: m.official_name for m in drugs.values() if m.official_name
     }
     trial_drugs, trial_drug_coverage = _match_trial_strings(
-        interventions, drug_index, "trial intervention", drug_biokdeids, drug_names
+        interventions, drug_index, "trial intervention", drug_biokdeids, drug_names,
+        nlm_of, strip_doses=True
     )
     condition_biokdeids = {
         m.mesh_id: m.biokdeid for m in rolled_indications.values() if m.biokdeid

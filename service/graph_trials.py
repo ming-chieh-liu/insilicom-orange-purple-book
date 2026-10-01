@@ -30,13 +30,14 @@ whether to wait or to narrow the scope.
 from __future__ import annotations
 
 import csv
+import json
 import time
 from collections import defaultdict
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from pathlib import Path
-from typing import NamedTuple
+from typing import Any, NamedTuple
 
-from dao.graph_evidence import ABSTRACT_BUDGET, GraphEvidenceRepository
+from dao.graph_evidence import ABSTRACT_BUDGET, Abstract, GraphEvidenceRepository
 from service import indication_normalize
 from utility.logging import get_logger
 
@@ -54,6 +55,10 @@ MAX_DISEASES: int = 5
 #: cannot be told from a stuck one.
 PROGRESS_EVERY: int = 100
 
+#: PMIDs kept per trial for the judge (D37): enough to show what the trial
+#: tested, few enough to keep a tier of ten readable.
+ABSTRACTS_KEPT: int = 3
+
 
 class GraphTrial(NamedTuple):
     """One trial the literature connects to one application."""
@@ -66,6 +71,12 @@ class GraphTrial(NamedTuple):
     #: ``nct`` when an abstract printed the registry id, ``protocol`` when the
     #: trial was reached only through a sponsor protocol id (D35).
     via: str = "nct"
+    #: Up to :data:`ABSTRACTS_KEPT` PMIDs naming the trial, trial reports first
+    #: (D37): what the literature-route judge reads.
+    pmids: str = ""
+    #: The disease biokdeids whose drug x disease edges led to it (D37), so a
+    #: submission is offered only trials found under its own indication.
+    found_under: str = ""
 
 
 class GraphTrialsReport(NamedTuple):
@@ -170,23 +181,34 @@ def build(
         if not (drugs and diseases):
             continue
         pmids: set[str] = set()
+        disease_of_pmid: dict[str, set[str]] = defaultdict(set)
         for drug in sorted(drugs)[:MAX_DRUGS]:
             for disease in sorted(diseases)[:MAX_DISEASES]:
-                pmids.update(repository.pmids_for(drug, disease))
+                for pmid in repository.pmids_for(drug, disease):
+                    pmids.add(pmid)
+                    disease_of_pmid[pmid].add(disease)
         if not pmids:
             continue
         with_edge += 1
         counts: dict[str, int] = defaultdict(int)
         by_id: set[str] = set()
+        papers: dict[str, list[tuple[bool, str]]] = defaultdict(list)
+        under: dict[str, set[str]] = defaultdict(set)
         for mention in repository.mentions_in(sorted(pmids)[:budget], resolve):
             counts[mention.nct_id] += 1
             if not mention.protocol_id:
                 by_id.add(mention.nct_id)
+            papers[mention.nct_id].append((not mention.is_trial_report, mention.pmid))
+            under[mention.nct_id].update(disease_of_pmid.get(mention.pmid, ()))
         if not counts:
             continue
         with_trials += 1
         rows.extend(
-            GraphTrial(application, nct, mentions, "nct" if nct in by_id else "protocol")
+            GraphTrial(
+                application, nct, mentions, "nct" if nct in by_id else "protocol",
+                pmids=";".join(p for _, p in sorted(set(papers[nct]))[:ABSTRACTS_KEPT]),
+                found_under=";".join(sorted(under[nct])),
+            )
             for nct, mentions in sorted(counts.items())
         )
     _log.info(
@@ -204,6 +226,51 @@ def build(
         with_edge=with_edge,
         with_trials=with_trials,
     )
+
+
+#: Abstracts the literature routes show their judges (D37), one JSON object per
+#: PMID: ``pmid``, ``title``, ``abstract``, ``publication_types``.
+ABSTRACTS_FILE = "literature_abstracts.jsonl"
+
+
+def pmids_of(rows: Iterable[Any]) -> list[str]:
+    """Every PMID the rows keep, in first-seen order.
+
+    >>> pmids_of([GraphTrial("NDA1", "NCT1", 2, pmids="3;1"), GraphTrial("NDA1", "NCT2", 1, pmids="1")])
+    ['3', '1']
+    """
+    seen: dict[str, None] = {}
+    for row in rows:
+        for pmid in str(getattr(row, "pmids", "") or "").split(";"):
+            if pmid:
+                seen.setdefault(pmid, None)
+    return list(seen)
+
+
+def save_abstracts(abstracts: Iterable[Abstract], path: Path) -> int:
+    """Write the abstracts file; returns how many records were written."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    written = 0
+    with path.open("w", encoding="utf-8") as handle:
+        for item in abstracts:
+            handle.write(json.dumps({**item._asdict(),
+                                     "publication_types": list(item.publication_types)}) + "\n")
+            written += 1
+    return written
+
+
+def read_abstracts(*paths: Path) -> dict[str, dict[str, Any]]:
+    """PMID → its record, from one or more abstracts files; absent files skipped."""
+    out: dict[str, dict[str, Any]] = {}
+    for path in paths:
+        if not path.is_file():
+            continue
+        with path.open(encoding="utf-8") as handle:
+            for line in handle:
+                if line.strip():
+                    record = json.loads(line)
+                    out.setdefault(str(record.get("pmid")), record)
+    return out
 
 
 def render(report: GraphTrialsReport) -> str:
@@ -225,6 +292,11 @@ def render(report: GraphTrialsReport) -> str:
 
 
 __all__ = [
+    "ABSTRACTS_FILE",
+    "ABSTRACTS_KEPT",
+    "pmids_of",
+    "read_abstracts",
+    "save_abstracts",
     "MAX_DISEASES",
     "MAX_DRUGS",
     "GraphTrial",

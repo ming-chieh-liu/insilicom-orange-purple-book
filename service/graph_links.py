@@ -109,7 +109,13 @@ class GraphCandidate(NamedTuple):
     #: The protocol id an abstract used for it, when no abstract printed the
     #: NCT id (D35); empty otherwise.
     protocol_id: str = ""
+    #: PMIDs naming it, trial reports first, at most three (D37).
+    pmids: str = ""
 
+
+#: Abstracts naming case D's trials (D37), in the format of
+#: :data:`service.graph_trials.ABSTRACTS_FILE`.
+DRUG_ONLY_ABSTRACTS_FILE = "drug_only_abstracts.jsonl"
 
 #: How a unit's candidates were gathered.
 BASIS_INDICATION = "indication"
@@ -185,6 +191,7 @@ def rank(mentions: list[Mention]) -> list[GraphCandidate]:
     for nct, group in grouped.items():
         typed = next((m for m in group if m.is_trial_report), group[0])
         by_protocol = "" if any(not m.protocol_id for m in group) else group[0].protocol_id
+        ordered = sorted({(not m.is_trial_report, m.pmid) for m in group})
         out.append(
             GraphCandidate(
                 nct_id=nct,
@@ -196,6 +203,7 @@ def rank(mentions: list[Mention]) -> list[GraphCandidate]:
                 enrollment="",
                 phases="",
                 protocol_id=by_protocol,
+                pmids=";".join(p for _, p in ordered[:3]),
             )
         )
     return sorted(out, key=lambda c: (not c.trial_report, -c.mentions, c.nct_id))
@@ -219,7 +227,7 @@ def within_date(
     ]
 
 
-def completed_by(
+def completed_by(  # unused since D37; kept for the measurement it records
     candidates: list[GraphCandidate], approval_date: str
 ) -> list[GraphCandidate]:
     """Drop trials whose primary completion postdates the approval (D31).
@@ -279,6 +287,7 @@ def _read_tsv(path: Path) -> list[dict[str, str]]:
 
 
 __all__ = [
+    "DRUG_ONLY_ABSTRACTS_FILE",
     "ABSTRACT_BUDGET",
     "EXHAUSTED",
     "GraphCandidate",
@@ -498,13 +507,14 @@ class DrugOnlyTrial(NamedTuple):
     mentions: int
     diseases: str
     protocol_id: str
+    pmids: str = ""
 
 
 def drug_only_rows(units: Iterable[GraphUnit]) -> list[DrugOnlyTrial]:
     """The drug-only units' candidates, flattened for P3, best first."""
     return [
         DrugOnlyTrial(u.application, u.submission_type, u.submission_no, c.nct_id,
-                      c.mentions, c.diseases, c.protocol_id)
+                      c.mentions, c.diseases, c.protocol_id, c.pmids)
         for u in units if u.basis == BASIS_DRUG_ONLY
         for c in u.candidates
     ]
@@ -570,8 +580,10 @@ def _drug_only_unit(
         _with_registry(c, studies)._replace(diseases="; ".join(found_under[c.nct_id][:5]))
         for c in rank(mentions) if c.nct_id in studies
     ]
-    candidates = completed_by(within_date(candidates, row["approval_date"]),
-                              row["approval_date"])
+    # D37: start <= approval stays a hard filter; primary completion is no
+    # longer one (9% of label-stated trials show a primary completion after
+    # their approval). It is shown to the judge instead.
+    candidates = within_date(candidates, row["approval_date"])
     if not candidates:
         return None
     return GraphUnit(

@@ -1,6 +1,6 @@
 # Evidence tiers — what each tier claims
 
-**Decision:** D35 (2026-09-29), refining D10, D14, D27, D32. **Status:** implemented in code
+**Decision:** D35 (2026-09-29), refining D10, D14, D27, D32; **D37 (2026-10-01) splits B and C by candidate source**. **Status:** implemented in code
 2026-09-29 (`service/assemble.py`); `output/` not yet rebuilt, so the current map still has the
 pre-D35 tiers.
 
@@ -8,6 +8,32 @@ Every row of `trial_submission_map.tsv` carries one tier. The tier says **how th
 identity was established** for that approval, not how confident a judge felt. A tier is never
 promoted. When several routes find the same trial for the same approval, the highest tier is
 kept and the other routes are listed in `sources`.
+
+## Since D37 (2026-10-01): six routes, A > B+ > {B−, C+, C−, D}
+
+Routes are named by what the FDA documents give (the letter) and where the candidates came from
+(`+` the literature, judged with the abstracts that name the trial; `−` the registry shortlist).
+Only A and B+ are ranked; the four in braces are not ordered against each other, because no
+stage ever has to choose between them — different trials from different routes are all kept, and
+one trial on one submission found by several routes is one row with every route in `sources`.
+
+| Tier | What we had | Candidates | What the judge is asked | Stage |
+|---|---|---|---|---|
+| **A** | an FDA document **names** the trial: label NCT, review protocol id, label name = review id | none — the document gives it | its **role** only (pivotal, supporting, or not) | S4 → S6 / S9 label role |
+| **B+** | a **§14 description** with no identifier | trials the **literature** names for this drug × indication, drug- and indication-checked | "is this the trial the description describes?", **with the abstracts** | S7 → S8 → S9 literature template |
+| **B−** | same | the **registry** shortlist: drug pool → indication filter → top 100 | same question, registry record only | S8 → S9 registry template |
+| **C+** | an **indication**, no §14 description | literature trials, as for B+ | "is this the evidence for this approval?", with abstracts | S7 → S8 → S9 literature template |
+| **C−** | same | registry shortlist, as for B− | same, registry record only | S8 → S9 no-label template |
+| **D** | **no indication** | trials named in the drug's treats literature (D31) | same, indication "not recorded" | S7 → S8 → S9 literature template |
+
+Every route: trials that never ran (WITHDRAWN, NOT_YET_RECRUITING) are excluded and start ≤
+approval is required; status, why stopped and primary completion are shown to the judge, not
+filtered. `+` runs before `−`: a Yes in B+ (C+) stops the unit, otherwise B− (C−) runs.
+
+**Status of this table:** implemented in code 2026-10-01 (D37); `trial_submission_map.tsv` is not
+rebuilt yet, so the file on disk still has older tiers.
+
+## D35 (2026-09-29) — four tiers, kept for the record
 
 | Tier | Case | What we had | How the trial was found | What the judge was asked | Where |
 |---|---|---|---|---|---|

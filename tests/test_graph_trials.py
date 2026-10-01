@@ -231,3 +231,36 @@ def test_a_trial_reached_only_by_protocol_id_is_marked_so(tmp_path: Path) -> Non
     )
     assert [(r.nct_id, r.mentions, r.via) for r in report.rows] == [
         ("NCT00000009", 1, "protocol"), ("NCT02578680", 2, "nct")]
+
+
+# ---- D37: PMIDs, found-under diseases and the abstracts file ------------------------
+
+def test_rows_keep_their_pmids_trial_reports_first_and_the_diseases_they_came_from(
+    tmp_path: Path,
+) -> None:
+    out = _workspace(tmp_path)
+    report_paper = Mention(nct_id="NCT1", pmid="999", title="t",
+                           publication_types=("Randomized Controlled Trial",))
+    graph = _FakeGraph(
+        {("bk-drug", "bk-dis"): ["111", "222", "333", "999"]},
+        {p: [_mention("NCT1", p)] for p in ("111", "222", "333")} | {"999": [report_paper]},
+    )
+    [row] = graph_trials.build(
+        out, cast(GraphEvidenceRepository, graph), frozenset({"BLA1"}),
+        {"BLA1": frozenset({"PEMBROLIZUMAB"})},
+    ).rows
+    assert row.pmids == "999;111;222"          # the trial report first, three kept
+    assert row.found_under == "bk-dis"
+
+
+def test_abstracts_round_trip_through_their_file(tmp_path: Path) -> None:
+    from dao.graph_evidence import Abstract
+
+    path = tmp_path / "a" / graph_trials.ABSTRACTS_FILE
+    written = graph_trials.save_abstracts(
+        [Abstract("1", "T", "text", ("Review",)), Abstract("2", "U", "", ())], path)
+    assert written == 2
+    got = graph_trials.read_abstracts(path, tmp_path / "missing.jsonl")
+    assert got["1"] == {"pmid": "1", "title": "T", "abstract": "text",
+                        "publication_types": ["Review"]}
+    assert set(got) == {"1", "2"}

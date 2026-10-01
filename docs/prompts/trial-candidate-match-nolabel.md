@@ -1,6 +1,6 @@
 # Prompt — is this candidate the evidence for an approval with no trial text? (per-candidate Yes/No)
 
-**Version:** 1 · **Created:** 2026-09-29 · **Decision:** D35 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
+**Version:** 2 · **Created:** 2026-09-29 · **v2:** 2026-09-30 (D37) · **Decision:** D35 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
 
 The case C and case D counterpart of `docs/prompts/trial-candidate-match.md` (case B). Used where
 the FDA documents give **no §14 description** of the trial:
@@ -46,8 +46,8 @@ RULES:
 - Judge ONLY from the text above. Do not use outside knowledge of this drug,
   trial or disease. Do not look anything up.
 - Answer Yes only if the candidate is an interventional efficacy study of this
-  drug, in the approved disease and population, that finished (primary
-  completion) before the date of approval.
+  drug, in the approved disease and population, whose primary results could
+  have been available by the date of approval.
 - If "APPROVED FOR" says not recorded, the approval could be for any disease;
   use the "Named in literature on" line to see what the trial is about, and
   answer Yes only for an interventional efficacy study of this drug that could
@@ -55,9 +55,14 @@ RULES:
 - Answer No for observational studies, registries, extensions and long-term
   safety follow-ups, pharmacokinetic or bioequivalence studies in healthy
   volunteers, studies of a different drug or a different disease, and trials
-  that could not have finished before the date of approval.
+  that could not have produced results before the date of approval.
 - An enrollment in the tens of thousands is almost always a registry or an
   observational cohort, not a pivotal trial.
+- Each candidate's Status and Why stopped are the registry's today, not as of
+  the approval. A trial still running today may have reported its primary
+  results before the approval. A trial stopped early because it met its goal,
+  or after its primary analysis, can support an approval; one stopped for
+  safety, futility, poor enrollment, or before it produced results cannot.
 - Answer No if the text does not give you enough to tell. A wrong Yes invents
   a link between a trial and an approval that does not exist, which is far
   worse than a missed one.
@@ -73,10 +78,18 @@ Output exactly one line per candidate, in the order shown, and nothing else:
 
 | Field | Built from |
 |---|---|
-| `{{drug}}` | the application's approved ingredient names, `; `-joined |
-| `{{indication}}` | case C: the submission's chosen indication text (`submission_indications.tsv`, `chosen = true`); case D: `not recorded` |
+| `{{drug}}` | the approved drug as `<brand> (<generic>)` from P1's `drug_names.tsv` (v2); the ingredient names where the table has none |
+| `{{indication}}` | case C: the submission's chosen indication text (`submission_indications.tsv`, `chosen = true`, up to 2,000 characters); when that is the drug's **current** openFDA label rather than a document of this submission, it is prefixed `(no document of this submission states its indication; this is the drug's current label, which may include indications approved later)` (2026-09-30 — field content, not prompt wording); case D: `not recorded` |
 | `{{approval_date}}` | the submission's approval date |
-| `{{candidates}}` | one block per candidate, in rank order: the same fields as the excerpt prompt, plus `Named in literature on:` for case D |
+| `{{candidates}}` | one block per candidate, in rank order: the same fields as the excerpt prompt v2 (status and why stopped included), plus `Named in literature on:` for case D |
+
+## Changes in v2 (2026-09-30, D37)
+
+- `{{drug}}` is the brand and generic name; candidates show **status** and **why stopped**, with
+  the status rule above.
+- "Finished (primary completion) before the date" became "primary results could have been
+  available by the date": registry completion dates are revised later, and 9% of the trials FDA
+  labels name show a primary completion after their approval.
 
 ## Why it is worded this way
 
@@ -84,5 +97,6 @@ Output exactly one line per candidate, in the order shown, and nothing else:
 cannot tell *which* of several fitting trials the FDA relied on; it can only rule out trials that
 could not have been the evidence. That is why a Yes here is tier C or D, below an excerpt match.
 
-**Primary completion before the date is a rule, not a hint.** The candidate block shows it, and a
-trial still collecting its primary endpoint cannot have supported the approval.
+**Primary completion is shown, not enforced (v2).** A trial still collecting its primary endpoint
+cannot have supported the approval, but the registry's dates are revised after the fact, so the
+judge weighs the date with the status instead of a hard cut.

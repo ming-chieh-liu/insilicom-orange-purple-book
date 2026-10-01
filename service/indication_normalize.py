@@ -59,7 +59,7 @@ PRECEDENCE: tuple[str, ...] = (
 )
 
 #: Characters of source text kept per row.
-TEXT_KEEP: int = 600
+TEXT_KEEP: int = 2000
 
 MESH_PREFIX = "MESH:"
 

@@ -32,26 +32,42 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from service import identification
+from service import graph_links, graph_trials, identification
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
 
 #: Bumped whenever ``docs/prompts/trial-candidate-match.md`` changes, and stamped
 #: on every row this module writes.
-PROMPT_VERSION: int = 1
+PROMPT_VERSION: int = 2
 
 #: The no-label prompt (D35) — cases C and D, where there is no §14 excerpt —
 #: ``docs/prompts/trial-candidate-match-nolabel.md``, with its own version.
 NOLABEL_PROMPT: str = "trial-candidate-match-nolabel"
-NOLABEL_PROMPT_VERSION: int = 1
+NOLABEL_PROMPT_VERSION: int = 2
 #: The excerpt prompt's name, stamped beside its version.
 EXCERPT_PROMPT: str = "trial-candidate-match"
 
+#: The literature prompt (D37) — routes B+, C+ and D, whose candidates the
+#: literature names and are shown with their abstracts —
+#: ``docs/prompts/trial-literature-match.md``.
+LITERATURE_PROMPT: str = "trial-literature-match"
+LITERATURE_PROMPT_VERSION: int = 1
+
+#: Every prompt's current version, for stamping answers.
+PROMPT_VERSIONS: dict[str, int] = {
+    EXCERPT_PROMPT: PROMPT_VERSION,
+    NOLABEL_PROMPT: NOLABEL_PROMPT_VERSION,
+    LITERATURE_PROMPT: LITERATURE_PROMPT_VERSION,
+}
+
 #: The (prompt, version) pairs whose answers are current.
-CURRENT_PROMPTS: frozenset[tuple[str, int]] = frozenset(
-    {(EXCERPT_PROMPT, PROMPT_VERSION), (NOLABEL_PROMPT, NOLABEL_PROMPT_VERSION)}
-)
+CURRENT_PROMPTS: frozenset[tuple[str, int]] = frozenset(PROMPT_VERSIONS.items())
+
+#: Abstracts shown per literature candidate (D37).
+ABSTRACTS_SHOWN: int = 3
+#: Characters of one abstract shown.
+ABSTRACT_KEEP: int = 2500
 
 #: What a decided description is stamped with in ``identify_verdicts.jsonl``,
 #: which P5 reads. Above the pick-one prompt's version 1, so a D33 decision
@@ -90,6 +106,9 @@ class TierUnit(NamedTuple):
     drug: str = ""
     indication: str = ""
     approval_date: str = ""
+    #: :data:`LITERATURE_PROMPT` tiers: what the FDA documents say about the
+    #: approval — the §14 subsection (B+), the indication (C+) or nothing (D).
+    label_block: str = ""
 
 
 class CandidateAnswer(NamedTuple):
@@ -113,15 +132,62 @@ class Decision(NamedTuple):
     final: str
     tier: int
     tiers_judged: int
+    #: The tier ids (content digests included) the outcome was read from, so a
+    #: decision reached on tiers that have since changed can be told apart.
+    basis: tuple[str, ...] = ()
+    #: D37 route of the deciding tier: ``B+``, ``B-``, ``C+``, ``C-`` or ``D``;
+    #: empty for NONE.
+    route: str = ""
 
 
-def tier_id_for(unit_id: str, tier: int) -> str:
+def tier_id_for(unit_id: str, tier: int, digest: str = "") -> str:
     """The key one tier is recorded against.
 
+    ``digest`` is :func:`input_digest` of what the judge is shown. It is part
+    of the key so that an answer given to one version of a tier can never be
+    read as the answer to another: when P3 rebuilds a shortlist or P2i changes
+    an indication, the tier gets a new id and is judged again, while an
+    unchanged tier keeps its id and its answers.
+
+    >>> tier_id_for("BLA125514|SUPPL|35|KEYNOTE-189", 2, "0123abcd")
+    'BLA125514|SUPPL|35|KEYNOTE-189#T2@0123abcd'
     >>> tier_id_for("BLA125514|SUPPL|35|KEYNOTE-189", 2)
     'BLA125514|SUPPL|35|KEYNOTE-189#T2'
     """
-    return f"{unit_id}#T{tier}"
+    return f"{unit_id}#T{tier}" + (f"@{digest}" if digest else "")
+
+
+#: Length of the content digest carried in a tier id.
+DIGEST_LENGTH: int = 12
+
+#: The tier fields each prompt shows its judge — the only ones the digest reads.
+VISIBLE_FIELDS: dict[str, tuple[str, ...]] = {
+    EXCERPT_PROMPT: ("approval", "excerpt", "trial_name", "enrollment", "candidates"),
+    NOLABEL_PROMPT: ("drug", "indication", "approval_date", "candidates"),
+    LITERATURE_PROMPT: ("approval", "label_block", "candidates"),
+}
+
+
+def input_digest(tier: "TierUnit") -> str:
+    """A digest of exactly what the judge of ``tier`` reads, prompt version included.
+
+    >>> base = dict(tier_id="", unit_id="u", tier=1, approval="a", excerpt="e",
+    ...             trial_name="t", enrollment="n", candidate_ids=("NCT00000001",),
+    ...             candidates="c", prompt=NOLABEL_PROMPT, drug="d",
+    ...             indication="i", approval_date="2020-01-01")
+    >>> one = input_digest(TierUnit(**base))
+    >>> one == input_digest(TierUnit(**{**base, "excerpt": "unseen by this prompt"}))
+    True
+    >>> one == input_digest(TierUnit(**{**base, "indication": "changed"}))
+    False
+    """
+    fields = {name: getattr(tier, name) for name in VISIBLE_FIELDS[tier.prompt]}
+    payload = json.dumps(
+        {"prompt": tier.prompt, "version": PROMPT_VERSIONS[tier.prompt],
+         "candidate_ids": list(tier.candidate_ids), **fields},
+        sort_keys=True, ensure_ascii=False,
+    )
+    return hashlib.sha256(payload.encode("utf-8")).hexdigest()[:DIGEST_LENGTH]
 
 
 def tier_count(candidates: int) -> int:
@@ -136,7 +202,7 @@ def tier_count(candidates: int) -> int:
 def render_candidate(index: int, candidate: dict[str, object]) -> str:
     """One candidate block, fields in the order the prompt lists them."""
 
-    def field(key: str, width: int = 300) -> str:
+    def field(key: str, width: int = 1000) -> str:
         return str(candidate.get(key) or "not stated")[:width]
 
     return "\n".join(
@@ -152,7 +218,13 @@ def render_candidate(index: int, candidate: dict[str, object]) -> str:
             f"   Enrolled: {field('enrollment')}",
             f"   Start date: {field('start_date')}",
             f"   Primary completion: {field('primary_completion')}",
+            f"   Status: {field('overall_status')}",
         ]
+        + (
+            [f"   Why stopped: {field('why_stopped')}"]
+            if candidate.get("why_stopped")
+            else []
+        )
         + (
             [f"   Named in literature on: {field('found_under')}"]
             if candidate.get("found_under")
@@ -168,33 +240,133 @@ def approval_line(unit: dict[str, object]) -> str:
     ...                "submission_no": "35", "approval_date": "2017-05-10",
     ...                "heading": "Non-Small Cell Lung Cancer"})
     'BLA125514 SUPPL 35 · approved 2017-05-10 · section 14 heading: Non-Small Cell Lung Cancer'
+    >>> approval_line({"application": "BLA125514", "drug": "KEYTRUDA (pembrolizumab)"})
+    'KEYTRUDA (pembrolizumab) · BLA125514   · approved unknown · section 14 heading: none'
     """
+    drug = str(unit.get("drug") or "")
     return (
-        f"{unit.get('application') or ''} {unit.get('submission_type') or ''} "
+        (f"{drug} · " if drug else "")
+        + f"{unit.get('application') or ''} {unit.get('submission_type') or ''} "
         f"{unit.get('submission_no') or ''} · approved {unit.get('approval_date') or 'unknown'}"
         f" · section 14 heading: {unit.get('heading') or 'none'}"
     )
 
 
+def _listed(unit: dict[str, object], key: str) -> list[dict[str, object]]:
+    raw = unit.get(key)
+    return [c for c in raw if isinstance(c, dict)] if isinstance(raw, list) else []
+
+
+def literature_tiers(unit: dict[str, object]) -> int:
+    """How many tiers the unit's literature set ("+" route) fills (D37)."""
+    return tier_count(len(_listed(unit, "literature")))
+
+
+def total_tiers(unit: dict[str, object]) -> int:
+    """Literature tiers, then registry-shortlist tiers ("+" before "−", D37).
+
+    >>> total_tiers({"literature": [{}] * 3, "candidates": [{}] * 25})
+    4
+    """
+    return literature_tiers(unit) + tier_count(len(_listed(unit, "candidates")))
+
+
+def route_of(unit: dict[str, object], tier: int) -> str:
+    """The D37 route a tier belongs to.
+
+    >>> route_of({"case": "B", "literature": [{}]}, 1), route_of({"case": "B", "literature": [{}]}, 2)
+    ('B+', 'B-')
+    >>> route_of({"case": "D", "literature": [{}]}, 1)
+    'D'
+    """
+    case = str(unit.get("case") or "B")
+    if case == "D":
+        return "D"
+    return f"{case}+" if tier <= literature_tiers(unit) else f"{case}-"
+
+
+def label_block(unit: dict[str, object]) -> str:
+    """What the FDA documents say about the approval, for the literature prompt.
+
+    >>> label_block({"case": "D"})
+    'No description of the trial is available. Approved for: not recorded.'
+    >>> label_block({"case": "C", "indication_text": "provides for asthma"})
+    'No description of the trial is available. Approved for: provides for asthma'
+    """
+    case = str(unit.get("case") or "B")
+    if case == "D":
+        return "No description of the trial is available. Approved for: not recorded."
+    if case == "C":
+        return ("No description of the trial is available. Approved for: "
+                + str(unit.get("indication_text") or "not recorded"))
+    text = str(unit.get("subsection") or unit.get("excerpt") or "")
+    name = str(unit.get("acronym") or "(none found)")
+    size = str(unit.get("enrollment") or "(none found)")
+    return (
+        "Section 14 (Clinical Studies) of this approval's label describes the trial:\n"
+        f"<section_14>\n{text}\n</section_14>\n"
+        f"A program read the trial's name in it as: {name} (may be wrong)\n"
+        f"and its size as: {size} patients (may be wrong)"
+    )
+
+
+def render_literature_candidate(index: int, candidate: dict[str, object]) -> str:
+    """A registry block followed by the abstracts naming the trial (D37)."""
+    raw = candidate.get("abstracts")
+    papers = [p for p in raw if isinstance(p, dict)] if isinstance(raw, list) else []
+    lines = [render_candidate(index, candidate),
+             f"   Abstracts naming this trial ({len(papers)} shown):"]
+    for paper in papers[:ABSTRACTS_SHOWN]:
+        lines.append(f"     PMID {paper.get('pmid')} — {paper.get('title') or ''}")
+        text = " ".join(str(paper.get("abstract") or "(no abstract)").split())
+        lines.append(f"     {text[:ABSTRACT_KEEP]}")
+    return "\n".join(lines)
+
+
 def build_tier(unit: dict[str, object], tier: int) -> TierUnit:
-    """Tier ``tier`` (1-based) of a description."""
-    raw = unit.get("candidates")
-    candidates: list[dict[str, object]] = raw if isinstance(raw, list) else []
-    start = (tier - 1) * TIER_SIZE
-    chosen = candidates[start : start + TIER_SIZE]
+    """Tier ``tier`` (1-based) of a unit: literature tiers first, then registry (D37)."""
     unit_id = str(unit.get("unit_id") or "")
+    literature = _listed(unit, "literature")
+    lit_tiers = tier_count(len(literature))
+    if tier <= lit_tiers:
+        start = (tier - 1) * TIER_SIZE
+        chosen = literature[start : start + TIER_SIZE]
+        approval = approval_line(unit)
+        if str(unit.get("case") or "B") != "B":
+            approval = approval.rsplit(" · section 14 heading:", 1)[0]
+        built = TierUnit(
+            prompt=LITERATURE_PROMPT,
+            label_block=label_block(unit),
+            tier_id="",
+            unit_id=unit_id,
+            tier=tier,
+            approval=approval,
+            excerpt="",
+            trial_name="",
+            enrollment="",
+            candidate_ids=tuple(str(c["nct_id"]) for c in chosen),
+            candidates="\n\n".join(
+                render_literature_candidate(start + offset + 1, candidate)
+                for offset, candidate in enumerate(chosen)
+            ),
+        )
+        return built._replace(tier_id=tier_id_for(unit_id, tier, input_digest(built)))
+    candidates = _listed(unit, "candidates")
+    start = (tier - lit_tiers - 1) * TIER_SIZE
+    chosen = candidates[start : start + TIER_SIZE]
     no_label = str(unit.get("case") or "B") in ("C", "D")
-    return TierUnit(
+    built = TierUnit(
         prompt=NOLABEL_PROMPT if no_label else EXCERPT_PROMPT,
         drug=str(unit.get("drug") or "") if no_label else "",
         indication=(str(unit.get("indication_text") or "not recorded")
                     if no_label else ""),
         approval_date=str(unit.get("approval_date") or "unknown") if no_label else "",
-        tier_id=tier_id_for(unit_id, tier),
+        tier_id="",
         unit_id=unit_id,
         tier=tier,
         approval=approval_line(unit),
-        excerpt=str(unit.get("excerpt") or ""),
+        # D37: the whole §14 subsection where S4 kept it, else the sentence.
+        excerpt=str(unit.get("subsection") or unit.get("excerpt") or ""),
         trial_name=str(unit.get("acronym") or "(the label gives no name)"),
         enrollment=str(unit.get("enrollment") or "(the label gives no count)"),
         candidate_ids=tuple(str(c["nct_id"]) for c in chosen),
@@ -203,6 +375,7 @@ def build_tier(unit: dict[str, object], tier: int) -> TierUnit:
             for offset, candidate in enumerate(chosen)
         ),
     )
+    return built._replace(tier_id=tier_id_for(unit_id, tier, input_digest(built)))
 
 
 def sample_order(units: list[dict[str, object]], limit: int | None) -> list[dict[str, object]]:
@@ -249,46 +422,42 @@ def decide(
 
     Tiers are read in order. The first tier with any Yes decides: the answer
     is its highest-ranked Yes. A tier is only read once every candidate in it
-    has a final answer. Every tier No means NONE.
+    has a final answer. Every tier No means NONE. D37: the literature tiers
+    ("+") come before the registry tiers ("−"), so a Yes in the literature
+    stops the unit before its shortlist is read.
     """
-    raw = unit.get("candidates")
-    candidates: list[dict[str, object]] = raw if isinstance(raw, list) else []
     unit_id = str(unit.get("unit_id") or "")
-    by_tier: dict[int, dict[str, CandidateAnswer]] = {}
+    by_tier_id: dict[str, dict[str, CandidateAnswer]] = {}
     for answer in answers:
         if answer.unit_id == unit_id:
-            by_tier.setdefault(answer.tier, {})[answer.nct_id] = answer
-    tiers = tier_count(len(candidates))
+            by_tier_id.setdefault(answer.tier_id, {})[answer.nct_id] = answer
+    tiers = total_tiers(unit)
+    basis: list[str] = []
     for tier in range(1, tiers + 1):
-        expected = [
-            str(c["nct_id"])
-            for c in candidates[(tier - 1) * TIER_SIZE : tier * TIER_SIZE]
-        ]
-        got = by_tier.get(tier, {})
+        built = build_tier(unit, tier)
+        basis.append(built.tier_id)
+        expected = list(built.candidate_ids)
+        # Only answers given to this exact version of the tier count.
+        got = by_tier_id.get(built.tier_id, {})
         if any(got.get(nct) is None or not got[nct].final for nct in expected):
             return None
         yes = [nct for nct in expected if got[nct].final == YES]
         if yes:
-            return Decision(unit_id, yes[0], tier, tier)
-    return Decision(unit_id, identification.NONE, 0, tiers)
+            return Decision(unit_id, yes[0], tier, tier, tuple(basis), route_of(unit, tier))
+    return Decision(unit_id, identification.NONE, 0, tiers, tuple(basis))
 
 
 def next_tier(unit: dict[str, object], answers: Iterable[CandidateAnswer]) -> int | None:
     """The tier this description needs judged next, or None if decided."""
-    raw = unit.get("candidates")
-    candidates: list[dict[str, object]] = raw if isinstance(raw, list) else []
     unit_id = str(unit.get("unit_id") or "")
     final = {
-        (answer.tier, answer.nct_id): answer.final
+        (answer.tier_id, answer.nct_id): answer.final
         for answer in answers
         if answer.unit_id == unit_id and answer.final
     }
-    for tier in range(1, tier_count(len(candidates)) + 1):
-        expected = [
-            str(c["nct_id"])
-            for c in candidates[(tier - 1) * TIER_SIZE : tier * TIER_SIZE]
-        ]
-        got = [final.get((tier, nct)) for nct in expected]
+    for tier in range(1, total_tiers(unit) + 1):
+        built = build_tier(unit, tier)
+        got = [final.get((built.tier_id, nct)) for nct in built.candidate_ids]
         if any(value is None for value in got):
             return tier
         if YES in got:
@@ -326,6 +495,7 @@ def read_tiers(path: Path) -> dict[str, TierUnit]:
             drug=str(row.get("drug") or ""),
             indication=str(row.get("indication") or ""),
             approval_date=str(row.get("approval_date") or ""),
+            label_block=str(row.get("label_block") or ""),
         )
     return out
 
@@ -423,7 +593,7 @@ def append_answers(
     from it was judged with the excerpt prompt.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
-    versions = {EXCERPT_PROMPT: PROMPT_VERSION, NOLABEL_PROMPT: NOLABEL_PROMPT_VERSION}
+    versions = PROMPT_VERSIONS
     written = 0
     with path.open("a", encoding="utf-8") as handle:
         for answer in answers:
@@ -440,19 +610,21 @@ def record_decisions(
     decisions: Iterable[Decision],
     candidate_ids: dict[str, set[str]],
     path: Path,
-    already: set[str],
+    already: dict[str, tuple[str, ...]],
 ) -> tuple[int, int]:
     """Append decided descriptions to ``identify_verdicts.jsonl`` for P5.
 
     Each answer is checked against the description's own shortlist, as the
-    pick-one route does. ``already`` holds units recorded under this version,
-    so a re-run appends nothing twice. Returns ``(written, refused)``.
+    pick-one route does. ``already`` maps each unit recorded under this
+    version to the tiers its latest decision was read from: a re-run appends
+    nothing twice, while a unit whose tiers changed and were judged again is
+    recorded anew (last row wins for P5). Returns ``(written, refused)``.
     """
     path.parent.mkdir(parents=True, exist_ok=True)
     written = refused = 0
     with path.open("a", encoding="utf-8") as handle:
         for decision in decisions:
-            if decision.unit_id in already:
+            if already.get(decision.unit_id) == decision.basis:
                 continue
             if not identification.is_allowed(
                 decision.final, candidate_ids.get(decision.unit_id, set())
@@ -471,6 +643,8 @@ def record_decisions(
                         "method": "candidate_match",
                         "tier": decision.tier,
                         "tiers_judged": decision.tiers_judged,
+                        "route": decision.route,
+                        "basis": list(decision.basis),
                     }
                 )
                 + "\n"
@@ -509,22 +683,106 @@ def select_units(
         wanted = set(case)
         units = [
             row for row in identification.iter_json_lines(candidates_path)
-            if str(row.get("case") or "B") in wanted and row.get("candidates")
+            if str(row.get("case") or "B") in wanted
+            and (row.get("candidates") or row.get("literature"))
         ]
-        return sample_order(units, limit)
-    units = identification.read_units(
-        candidates_path,
-        identification.borrowed_ids(drug_map),
-        identification.guard_submissions(approval_events),
+    else:
+        units = identification.read_units(
+            candidates_path,
+            identification.borrowed_ids(drug_map),
+            identification.guard_submissions(approval_events),
+        )
+    ordered = sample_order(units, limit)
+    attach_abstracts(ordered, candidates_path.parent)
+    return ordered
+
+
+def attach_abstracts(units: list[dict[str, object]], out_dir: Path) -> None:
+    """Give each literature candidate the abstracts its PMIDs name (D37).
+
+    Read from S7's abstracts files beside ``candidates.jsonl``. A PMID with no
+    record is left out; the judge sees how many were shown.
+    """
+    papers = graph_trials.read_abstracts(
+        out_dir / graph_trials.ABSTRACTS_FILE,
+        out_dir / graph_links.DRUG_ONLY_ABSTRACTS_FILE,
     )
-    return sample_order(units, limit)
+    for unit in units:
+        for candidate in _listed(unit, "literature"):
+            pmids = [p for p in str(candidate.get("pmids") or "").split(";") if p]
+            candidate["abstracts"] = [papers[p] for p in pmids if p in papers]
+
+
+def recorded_bases(path: Path) -> dict[str, tuple[str, ...]]:
+    """Unit → the tiers its latest decision at :data:`IDENTIFY_VERSION` was read from.
+
+    A decision recorded before tiers carried digests has an empty basis, so
+    it is superseded by the first decision reached on digest-keyed tiers.
+    """
+    out: dict[str, tuple[str, ...]] = {}
+    for row in identification.iter_json_lines(path):
+        if row.get("prompt_version") != IDENTIFY_VERSION:
+            continue
+        raw = row.get("basis")
+        out[str(row.get("unit_id") or "")] = (
+            tuple(str(v) for v in raw) if isinstance(raw, list) else ()
+        )
+    return out
+
+
+def migrate_legacy_ids(adjudication: Path) -> int:
+    """Give tiers written before digests existed their digest-keyed id.
+
+    A legacy tier (id without ``@``) is re-keyed from its own stored content —
+    exactly what its judges were shown — and each of its recorded answers is
+    appended again under the new id, marked ``migrated_from``. Answers are
+    never rewritten. Idempotent: a tier already migrated is skipped. Returns
+    the number of answers carried over.
+    """
+    tiers_path = adjudication / TIERS_FILE
+    answers_path = adjudication / ANSWERS_FILE
+    known = read_tiers(tiers_path)
+    legacy = {tid: t for tid, t in known.items() if tid and "@" not in tid}
+    if not legacy:
+        return 0
+    renamed = {
+        tid: tier._replace(tier_id=tier_id_for(tier.unit_id, tier.tier, input_digest(tier)))
+        for tid, tier in legacy.items()
+    }
+    rows = list(identification.iter_json_lines(answers_path))
+    have = {(str(r.get("tier_id")), str(r.get("nct_id"))) for r in rows}
+    carried = 0
+    answers_path.parent.mkdir(parents=True, exist_ok=True)
+    with answers_path.open("a", encoding="utf-8") as handle:
+        for row in rows:
+            old = str(row.get("tier_id") or "")
+            if old not in renamed:
+                continue
+            new = renamed[old].tier_id
+            if (new, str(row.get("nct_id"))) in have:
+                continue
+            handle.write(json.dumps({**row, "tier_id": new, "migrated_from": old}) + "\n")
+            have.add((new, str(row.get("nct_id"))))
+            carried += 1
+    kept = {tid: t for tid, t in known.items() if tid not in legacy}
+    for tier in renamed.values():
+        kept[tier.tier_id] = tier
+    write_tiers(kept.values(), tiers_path)
+    return carried
 
 
 def prepare_round(units: list[dict[str, object]], adjudication: Path) -> str:
-    """Write every undecided description's next tier and the judge batches."""
+    """Write every undecided description's next tier and the judge batches.
+
+    Only each description's *current* next tier is batched. A tier written
+    earlier whose content has since changed keeps its old id in the tiers
+    file, as the record of what was judged, but is never batched again.
+    """
+    migrate_legacy_ids(adjudication)
     answers = read_answers(adjudication / ANSWERS_FILE)
     known = read_tiers(adjudication / TIERS_FILE)
     fresh: list[TierUnit] = []
+    current: list[TierUnit] = []
     decided = 0
     for unit in units:
         tier = next_tier(unit, answers)
@@ -535,11 +793,10 @@ def prepare_round(units: list[dict[str, object]], adjudication: Path) -> str:
         if built.tier_id not in known:
             fresh.append(built)
         known[built.tier_id] = built
+        current.append(built)
     write_tiers(known.values(), adjudication / TIERS_FILE)
     pending_ids = [
-        tier.tier_id
-        for tier in known.values()
-        if not _tier_recorded(tier, answers)
+        tier.tier_id for tier in current if not _tier_recorded(tier, answers)
     ]
     batch_root = adjudication / BATCH_DIR
     round_no = len(list(batch_root.glob("round-*"))) + 1
@@ -549,7 +806,8 @@ def prepare_round(units: list[dict[str, object]], adjudication: Path) -> str:
         round_dir.mkdir(parents=True, exist_ok=True)
         # One prompt per batch file, so each judge is given exactly one prompt:
         # ``batch-NNN`` for §14 descriptions, ``nolabel-NNN`` for cases C/D.
-        for prefix, prompt in (("batch", EXCERPT_PROMPT), ("nolabel", NOLABEL_PROMPT)):
+        for prefix, prompt in (("batch", EXCERPT_PROMPT), ("nolabel", NOLABEL_PROMPT),
+                               ("literature", LITERATURE_PROMPT)):
             ids = [t for t in pending_ids if known[t].prompt == prompt]
             for number, chunk in enumerate(batches(ids, BATCH_TIERS), 1):
                 (round_dir / f"{prefix}-{number:03d}.ids").write_text(
@@ -582,6 +840,7 @@ def _merge(paths: Iterable[Path]) -> dict[tuple[str, str], str]:
 
 def combine_round(adjudication: Path, judges: int) -> str:
     """Record every tier whose answers are complete; list tiebreaks needed."""
+    migrate_legacy_ids(adjudication)
     raw = adjudication / RAW_DIR
     tiers = read_tiers(adjudication / TIERS_FILE)
     existing = read_answers(adjudication / ANSWERS_FILE)
@@ -614,20 +873,15 @@ def combine_round(adjudication: Path, judges: int) -> str:
 
 def record_round(units: list[dict[str, object]], adjudication: Path) -> str:
     """Append every newly decided description to ``identify_verdicts.jsonl``."""
-    answers = read_answers(adjudication / ANSWERS_FILE)
     verdicts_path = adjudication / "identify_verdicts.jsonl"
-    already = {
-        row_id
-        for row_id, verdict in identification.read_verdicts(verdicts_path).items()
-        if verdict.prompt_version == IDENTIFY_VERSION
-    }
+    migrate_legacy_ids(adjudication)
+    answers = read_answers(adjudication / ANSWERS_FILE)
+    already = recorded_bases(verdicts_path)
     decisions = [d for d in (decide(u, answers) for u in units) if d is not None]
     allowed: dict[str, set[str]] = {}
     for unit in units:
-        raw = unit.get("candidates")
-        listed = raw if isinstance(raw, list) else []
         allowed[str(unit.get("unit_id") or "")] = {
-            str(c["nct_id"]) for c in listed if isinstance(c, dict)
+            str(c["nct_id"]) for c in _listed(unit, "candidates") + _listed(unit, "literature")
         }
     written, refused = record_decisions(decisions, allowed, verdicts_path, already)
     identified = [d for d in decisions if d.final != identification.NONE]
@@ -664,6 +918,14 @@ __all__ = [
     "Decision",
     "CURRENT_PROMPTS",
     "EXCERPT_PROMPT",
+    "LITERATURE_PROMPT",
+    "LITERATURE_PROMPT_VERSION",
+    "PROMPT_VERSIONS",
+    "attach_abstracts",
+    "label_block",
+    "literature_tiers",
+    "route_of",
+    "total_tiers",
     "IDENTIFY_VERSION",
     "NOLABEL_PROMPT",
     "NOLABEL_PROMPT_VERSION",
@@ -679,6 +941,9 @@ __all__ = [
     "combine",
     "combine_round",
     "decide",
+    "input_digest",
+    "migrate_legacy_ids",
+    "recorded_bases",
     "prepare_round",
     "record_round",
     "select_units",

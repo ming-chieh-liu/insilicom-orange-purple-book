@@ -42,12 +42,12 @@ from __future__ import annotations
 import csv
 import re
 from collections import Counter
-from collections.abc import Iterable, Iterator, Mapping
+from collections.abc import Callable, Iterable, Iterator, Mapping
 from pathlib import Path
 from typing import NamedTuple
 
 from config.settings import RawData, TrialArchive
-from service import approval_events, normalize, section14
+from service import approval_events, drug_names, indications, normalize, section14
 from source import trial_studies
 from utility.logging import get_logger
 
@@ -77,6 +77,11 @@ _log = get_logger(__name__)
 #: Raising this without re-running that pilot was a deliberate call, not an
 #: oversight.
 CANDIDATE_CAP: int = 100
+
+#: Characters of a candidate's conditions or interventions kept. 300 cut the
+#: comparator off trials with many arms; the comparator is one of the things
+#: the judge is told to match on (D37).
+FIELD_LIMIT: int = 1000
 
 #: D35 cases: a §14 description (B), an indication with no judgeable §14
 #: description (C), no indication at all (D). Case A needs no unit of its own:
@@ -131,6 +136,17 @@ class Candidate(NamedTuple):
     #: so a judge sees what it is about when the approval's indication is not
     #: recorded.
     found_under: str = ""
+    #: The registry's status today and, for a stopped trial, why (D37). Shown
+    #: to the judge: a trial stopped for efficacy can support an approval, one
+    #: stopped for safety or futility cannot.
+    overall_status: str = ""
+    why_stopped: str = ""
+    #: Literature routes (D37): the PMIDs naming this trial, trial reports
+    #: first, at most three — the abstracts the judge reads.
+    pmids: str = ""
+    #: Literature routes: ``same``, ``unresolved`` — what the drug check found
+    #: (an ``other`` trial never reaches a unit). Information for the record.
+    drug_check: str = ""
 
 
 class Unit(NamedTuple):
@@ -167,6 +183,14 @@ class Unit(NamedTuple):
     #: submission's chosen indication text, and the approved ingredient names.
     indication_text: str = ""
     drug: str = ""
+    #: D37: the trials the literature names for this unit, drug- and (B+, C+)
+    #: indication-checked — the "+" route's candidates, judged with abstracts
+    #: before :attr:`candidates` (the registry shortlist, the "−" route). For
+    #: case D this holds the drug-only literature and ``candidates`` is empty.
+    literature: tuple[Candidate, ...] = ()
+    #: D37: the whole §14 subsection the description came from (B routes),
+    #: up to :data:`service.section14.SUBSECTION_KEEP` characters.
+    subsection: str = ""
 
     @property
     def needs_judgement(self) -> bool:
@@ -468,22 +492,188 @@ def route(
     return out
 
 
+#: ``submission_indications.tsv`` source for the drug's label as it stands today.
+CURRENT_LABEL_SOURCE: str = "openfda_current"
+#: What a case-C judge is told before text taken from today's label.
+CURRENT_LABEL_NOTE: str = (
+    "(no document of this submission states its indication; this is the drug's "
+    "current label, which may include indications approved later) "
+)
+
+
 def read_chosen_text(out_dir: Path) -> dict[str, str]:
     """The text of each submission's chosen indication, for a case-C judge."""
     out: dict[str, str] = {}
     for row in _read_tsv(out_dir / "submission_indications.tsv"):
         if row.get("chosen") == "true" and row.get("text"):
             key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
-            out.setdefault(key, row["text"])
+            text = row["text"]
+            if row.get("source") == CURRENT_LABEL_SOURCE:
+                # Today's label, not this submission's: it can carry indications
+                # approved years later, and the judge must know that.
+                text = CURRENT_LABEL_NOTE + text
+            out.setdefault(key, text)
     return out
 
 
-def read_drug_only(out_dir: Path) -> dict[str, list[tuple[str, str]]]:
-    """Case D's literature candidates per submission, best first (D35)."""
-    out: dict[str, list[tuple[str, str]]] = {}
+#: Arm names that are never "the approved drug or another drug": a control,
+#: a background regimen, a procedure. An arm written this way neither makes a
+#: literature trial "another drug's" nor leaves it unresolved (D37).
+GENERIC_ARMS: frozenset[str] = frozenset({
+    "chemotherapy", "chemoimmunotherapy", "standard chemotherapy", "standard of care",
+    "standard care", "best supportive care", "supportive care", "usual care",
+    "radiotherapy", "radiation", "radiation therapy", "surgery", "observation",
+    "no treatment", "no intervention", "investigator's choice", "physician's choice",
+    "control", "placebo", "vehicle", "sham", "active comparator", "comparator",
+})
+
+#: Salt and form words left out when an approved drug's names are matched
+#: against a trial's text.
+_SALT_WORDS: frozenset[str] = frozenset({
+    "sodium", "hydrochloride", "sulfate", "acetate", "citrate", "phosphate",
+    "potassium", "calcium", "maleate", "tartrate", "mesylate", "succinate",
+    "fumarate", "bromide", "chloride", "besylate", "magnesium", "monohydrate",
+    "dihydrate", "trihydrate", "anhydrous", "hydrobromide", "disodium", "hyclate",
+    "tosylate", "malate", "lactate", "tablets", "injection", "capsules", "extended",
+    "release", "solution", "preservative", "free",
+})
+
+
+def name_words(names: Iterable[str]) -> frozenset[str]:
+    """Distinctive lower-case words of an approved drug's names (D37).
+
+    >>> sorted(name_words(["NURTEC ODT", "RIMEGEPANT SULFATE"]))
+    ['nurtec', 'rimegepant']
+    """
+    return frozenset(
+        word
+        for name in names
+        for word in re.findall(r"[a-z][a-z0-9-]{4,}", name.casefold())
+        if word not in _SALT_WORDS
+    )
+
+
+def _is_generic_arm(arm: str) -> bool:
+    folded = arm.strip().casefold()
+    return (not folded or folded in GENERIC_ARMS or folded in normalize.DESIGN_WORDS
+            or "placebo" in folded)
+
+
+def drug_check(
+    candidate: Candidate,
+    trial_ids: frozenset[str],
+    approved_ids: frozenset[str],
+    approved_words: frozenset[str],
+    fda_ids: frozenset[str],
+    drug_of: Mapping[str, str],
+) -> str:
+    """``same``, ``other`` or ``unresolved``: is a literature trial of this drug? (D37)
+
+    **same** — its title or interventions name the approved drug (any of its
+    names), or one of its drug ids is the approved drug's. **other** — every
+    arm that is not a control resolves to a drug id, and those ids belong to
+    other FDA-approved ingredients only (SAMURAI's "Lasmiditan" for an
+    approval of rimegepant). **unresolved** — anything else: an arm no
+    dictionary knows ("BGB-3111") might be the approved drug under a code
+    name, so the judge decides from the abstract. Measured on 224
+    literature-only known answers: the rule drops none of them.
+
+    >>> c = Candidate("NCT1", "Lasmiditan in migraine", "", "", "", "", "", "",
+    ...               "Lasmiditan 100 mg;Placebo")
+    >>> drug_check(c, frozenset({"MESH:L"}), frozenset({"MESH:R"}),
+    ...            frozenset({"rimegepant"}), frozenset({"MESH:L", "MESH:R"}),
+    ...            {"lasmiditan 100 mg": "MESH:L"})
+    'other'
+    >>> drug_check(c._replace(interventions="BGB-3111;Placebo"), frozenset(),
+    ...            frozenset({"MESH:Z"}), frozenset({"zanubrutinib"}),
+    ...            frozenset({"MESH:Z"}), {})
+    'unresolved'
+    >>> drug_check(c._replace(brief_title="Rimegepant vs placebo"), frozenset(),
+    ...            frozenset({"MESH:R"}), frozenset({"rimegepant"}), frozenset(), {})
+    'same'
+    """
+    text = f"{candidate.brief_title} {candidate.interventions}".casefold()
+    if trial_ids & approved_ids or any(word in text for word in approved_words):
+        return "same"
+    arms = [a for a in candidate.interventions.split(";") if not _is_generic_arm(a)]
+    resolved = [drug_of.get(a.strip().casefold()) for a in arms]
+    others = (trial_ids | {r for r in resolved if r}) & fda_ids
+    if others and arms and all(resolved):
+        return "other"
+    return "unresolved"
+
+
+def literature_set(
+    found: Iterable[tuple[str, str]],
+    approval_date: str,
+    studies: Mapping[str, Candidate],
+    check: Callable[[Candidate], str],
+    indication_ids: Iterable[str] = (),
+    condition_ids: Mapping[str, frozenset[str]] | None = None,
+    ancestors: Mapping[str, frozenset[str]] | None = None,
+) -> tuple[Candidate, ...]:
+    """The "+" route's candidates: literature trials that pass every check (D37).
+
+    ``found`` is ``(nct_id, pmids)`` in the literature's order (best attested
+    first). A trial is kept when the registry has it (so it ran: never-ran
+    trials are not in ``studies``), it started by the approval date (or the
+    date is unrecorded), the drug check is not ``other``, and — given
+    ``indication_ids`` and the tree — its conditions pass the same MeSH-tree
+    test as the drug pool (:func:`indication_allows`; id-less kept).
+    """
+    wanted = [i for i in indication_ids if i]
+    empty: frozenset[str] = frozenset()
+    out: list[Candidate] = []
+    seen: set[str] = set()
+    for nct, pmids in found:
+        study = studies.get(nct)
+        if study is None or nct in seen:
+            continue
+        if approval_date and study.start_date and study.start_date > approval_date:
+            continue
+        verdict = check(study)
+        if verdict == "other":
+            continue
+        if (wanted and condition_ids is not None and ancestors is not None
+                and not indication_allows(wanted, condition_ids.get(nct, empty), ancestors)):
+            continue
+        seen.add(nct)
+        out.append(study._replace(pmids=pmids, drug_check=verdict))
+    return tuple(out)
+
+
+def read_literature(out_dir: Path) -> dict[str, list[tuple[str, str]]]:
+    """Application → ``(nct_id, pmids)`` from ``graph_trials.tsv``, best attested first."""
+    rows: dict[str, list[tuple[int, str, str]]] = {}
+    for row in _read_tsv(out_dir / "graph_trials.tsv"):
+        rows.setdefault(row["application"], []).append(
+            (-int(row.get("mentions") or 0), row["nct_id"], row.get("pmids") or ""))
+    return {app: [(nct, pmids) for _, nct, pmids in sorted(found)]
+            for app, found in rows.items()}
+
+
+def read_drug_display(out_dir: Path) -> dict[str, str]:
+    """Application → ``BRUKINSA (zanubrutinib)``, from P1's ``drug_names.tsv``.
+
+    What every judge is shown as the approved drug (D37). An absent table
+    yields nothing, and callers fall back to the ingredient names.
+    """
+    out: dict[str, str] = {}
+    fields = drug_names.DrugNames._fields
+    for row in _read_tsv(out_dir / "drug_names.tsv"):
+        names = drug_names.DrugNames(**{field: row.get(field, "") for field in fields})
+        out[names.application] = names.display
+    return out
+
+
+def read_drug_only(out_dir: Path) -> dict[str, list[tuple[str, str, str]]]:
+    """Case D's literature candidates per submission, best first (D35):
+    ``(nct_id, diseases found under, pmids)``."""
+    out: dict[str, list[tuple[str, str, str]]] = {}
     for row in _read_tsv(out_dir / DRUG_ONLY_FILE):
         key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
-        out.setdefault(key, []).append((row["nct_id"], row.get("diseases") or ""))
+        out.setdefault(key, []).append(
+            (row["nct_id"], row.get("diseases") or "", row.get("pmids") or ""))
     return out
 
 
@@ -744,6 +934,15 @@ def collapse(rows: list[dict[str, str]]) -> list[dict[str, str]]:
     return list(best.values())
 
 
+def _non_indication(mesh_id: str) -> bool:
+    """Whether a condition id is one that never names an indication.
+
+    >>> _non_indication("MESH:D012008"), _non_indication("MESH:D001249")
+    (True, False)
+    """
+    return mesh_id.removeprefix("MESH:") in indications.NON_INDICATION
+
+
 def index_studies(
     archive: TrialArchive,
     drug_of: dict[str, str],
@@ -769,6 +968,11 @@ def index_studies(
     for facts in trial_studies.read_study_facts(archive):
         if facts.phases and not (set(facts.phases) & PHASES_KEPT):
             continue
+        # D37: a trial that never ran (withdrawn, not yet recruiting) can
+        # support no approval. Leaving it out of ``studies`` keeps it off every
+        # route that reads it: the drug pool and the literature trials alike.
+        if facts.never_ran:
+            continue
         studies[facts.nct_id] = Candidate(
             nct_id=facts.nct_id,
             brief_title=facts.brief_title,
@@ -777,11 +981,13 @@ def index_studies(
             phases=";".join(facts.phases),
             enrollment=facts.enrollment,
             start_date=facts.start_date,
-            conditions=";".join(facts.conditions)[:300],
-            interventions=";".join(facts.interventions)[:300],
+            conditions=";".join(facts.conditions)[:FIELD_LIMIT],
+            interventions=";".join(facts.interventions)[:FIELD_LIMIT],
             biosimilar=looks_biosimilar(facts.brief_title, facts.interventions),
             lead_sponsor=facts.lead_sponsor,
             primary_completion=facts.primary_completion,
+            overall_status=facts.overall_status,
+            why_stopped=facts.why_stopped,
         )
         # CT.gov's own curation first, the synonym index only where it is
         # absent. NLM assigns MeSH to 46% of studies' interventions and 79% of
@@ -803,11 +1009,16 @@ def index_studies(
             mesh_id = drug_of.get(name.casefold())
             if mesh_id:
                 by_drug.setdefault(mesh_id, set()).add(facts.nct_id)
+        # D37: a never-an-indication descriptor ("Recurrence", "Disease") is
+        # dropped on the trial side as it already is on the FDA side, or a
+        # trial registered as "Recurrent or Metastatic NPC" carries no disease
+        # id but Recurrence and is filtered out against its own indication.
         for mesh in facts.derived_condition_mesh:
-            by_condition.setdefault(mesh, set()).add(facts.nct_id)
+            if not _non_indication(mesh):
+                by_condition.setdefault(mesh, set()).add(facts.nct_id)
         for name in facts.conditions:
             mesh_id = condition_of.get(name.casefold())
-            if mesh_id:
+            if mesh_id and not _non_indication(mesh_id):
                 by_condition.setdefault(mesh_id, set()).add(facts.nct_id)
     _log.info(
         "%d studies indexed; %d drug keys, %d condition keys",
@@ -944,25 +1155,19 @@ def shortlist(
     pool: set[str] = set()
     for mesh in drug_mesh:
         pool |= by_drug.get(mesh, set())
-    # Trials the literature names for this application, whether or not the drug
-    # filter could reach them. **This is the only route to them.** 53% of the
-    # drug map is keyed on PubChem while the trial index is keyed on MeSH —
-    # biokde gives an entity one external id, never both, so those two id
-    # spaces cannot be bridged. Measured: of 339 units whose answer the pool
-    # lacked entirely, 337 were this. Injected candidates are marked, because
-    # they skipped the drug filter.
-    injected = {nct for nct in from_graph if nct in studies} - pool
-    if not (pool or injected):
+    # D37: literature trials are no longer injected here — they are their own
+    # route (:func:`literature_set`). ``from_graph`` only removes them from the
+    # registry shortlist, so a trial is judged once, on the "+" route.
+    pool -= set(from_graph)
+    if not pool:
         return ()
     if approval_date:
-        started_before = {
+        pool = {
             nct
-            for nct in pool | injected
+            for nct in pool
             if not studies[nct].start_date
             or studies[nct].start_date <= approval_date
         }
-        pool &= started_before
-        injected &= started_before
     # One id or several (D34): a candidate matching any of them is a match.
     wanted = (
         {indication_mesh} if isinstance(indication_mesh, str) else set(indication_mesh)
@@ -988,7 +1193,7 @@ def shortlist(
         return (
             0 if prefer_biosimilar and candidate.biosimilar else 1,
             0 if names_match(label_name, candidate) else 1,
-            0 if nct in from_graph else 1,
+            1,  # D37: was "named by the literature"; literature is its own route now
             0 if nct in matching else 1,
             0 if "PHASE3" in candidate.phases else 1,
             _years_before(candidate.start_date, approval_date),
@@ -998,21 +1203,10 @@ def shortlist(
 
     if len(pool) > CANDIDATE_CAP:
         pool = set(sorted(pool, key=rank)[:CANDIDATE_CAP])
-    # Injected candidates are **exempt from the cap, never in competition for
-    # it**. They are the only route to a drug whose id space the trial index
-    # cannot be joined to, and making them fight for the same 100 slots evicted
-    # the right answer from 48 units that previously had it -- a 456/48 trade
-    # that is positive but needlessly lossy. Exempting them costs little: the
-    # graph names a median of 5 trials per application, p99 38, max 87.
-    pool |= injected
     # The shortlist is returned **in rank order**, every candidate included,
     # so a judge can work down it in tiers (1-10, 11-20, ...) and stop at the
-    # first tier holding a match. Injected candidates are ranked by the same key
-    # as everything else; being named by the literature is key 3, so they rise.
-    return tuple(
-        studies[nct]._replace(injected=nct in injected)
-        for nct in sorted(pool, key=rank)
-    )
+    # first tier holding a match.
+    return tuple(studies[nct] for nct in sorted(pool, key=rank))
 
 
 __all__ = [
@@ -1028,6 +1222,7 @@ __all__ = [
     "indication_allows",
     "owned_submissions",
     "read_chosen_text",
+    "read_drug_display",
     "read_drug_only",
     "route",
     "SubmissionRoute",
@@ -1088,7 +1283,6 @@ def build(
         row["source_name"].casefold(): row["mesh_id"]
         for row in _read_tsv(out_dir / "trial_condition_map.tsv")
     }
-    from_graph_by_app = graph_supported(out_dir)
     drug_rows = list(_read_tsv(out_dir / "drug_map.tsv"))
     fda_drug = {row["source_name"]: row["mesh_id"] for row in drug_rows}
     # Ingredients whose id came from the suffix-stripped stem rather than the
@@ -1119,6 +1313,28 @@ def build(
                      "--mode indication-normalize first; units get no indication")
     studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of)
     reviewed = review_names(out_dir)
+    display_of = read_drug_display(out_dir)
+    # D37: the literature routes. Each trial's drug ids (NLM's and the name
+    # index's), every FDA ingredient's id, and each application's names.
+    trial_drug_ids: dict[str, set[str]] = {}
+    for mesh, ncts in by_drug.items():
+        for nct in ncts:
+            trial_drug_ids.setdefault(nct, set()).add(mesh)
+    fda_ids = frozenset(fda_drug.values())
+    literature_of = read_literature(out_dir)
+    words_of: dict[str, frozenset[str]] = {}
+    for names_row in _read_tsv(out_dir / "drug_names.tsv"):
+        words_of[names_row["application"]] = name_words(
+            part
+            for field in ("brand_names", "generic_name", "active_ingredients", "moieties")
+            for part in (names_row.get(field) or "").split(";")
+        )
+
+    def checker(application: str, approved: set[str]) -> Callable[[Candidate], str]:
+        words = words_of.get(application) or name_words(ingredients.get(application, ()))
+        frozen = frozenset(approved)
+        return lambda c: drug_check(
+            c, frozenset(trial_drug_ids.get(c.nct_id, ())), frozen, words, fda_ids, drug_of)
     condition_ids: dict[str, frozenset[str]] | None = None
     if ancestors is not None:
         inverted: dict[str, set[str]] = {}
@@ -1152,6 +1368,18 @@ def build(
         # A unit already identified (stated id, or D29) still gets a shortlist:
         # P4 skips it, but P6 scores shortlist recall on exactly these units
         # (D18) -- they are the only ones whose answer is known for free.
+        # D37 B+: the literature's trials for this application, checked. Built
+        # whether or not a drug id resolved — the literature is the only route
+        # to a drug whose id space the registry cannot be joined to.
+        literature = literature_set(
+            literature_of.get(row["application"], []),
+            approval_of.get(key, ""),
+            studies,
+            checker(row["application"], drug_mesh),
+            indication_ids,
+            condition_ids,
+            ancestors,
+        )
         if not drug_mesh:
             no_drug += 1
             shortlisted: tuple[Candidate, ...] = ()
@@ -1173,7 +1401,7 @@ def build(
                 # study's title and promotes it over the right answer. Passing
                 # the key instead of the acronym cost 4.2 points of recall.
                 label_name=row.get("acronym", ""),
-                from_graph=from_graph_by_app.get(row["application"], frozenset()),
+                from_graph=frozenset(c.nct_id for c in literature),
                 condition_ids=condition_ids,
                 ancestors=ancestors,
             )
@@ -1181,7 +1409,7 @@ def build(
             already += 1
         elif resolved:
             from_review += 1
-        elif not shortlisted:
+        elif not (shortlisted or literature):
             no_candidates += 1
         else:
             sizes.append(len(shortlisted))
@@ -1206,6 +1434,10 @@ def build(
                 label_sha=row.get("label_sha", ""),
                 review_nct=resolved,
                 indication_ids=indication_ids,
+                drug=display_of.get(row["application"], "")
+                or "; ".join(sorted(ingredients.get(row["application"], ()))),
+                literature=literature,
+                subsection=row.get("subsection", ""),
             )
         )
     # D35: route every trial-relevant submission, then add the C and D units.
@@ -1234,26 +1466,38 @@ def build(
             continue
         event = events[key]
         drugs = drug_of_app.get(event.application, set())
-        names = "; ".join(sorted(ingredients.get(event.application, ())))
+        names = display_of.get(event.application, "") or "; ".join(
+            sorted(ingredients.get(event.application, ())))
+        check = checker(event.application, drugs)
         if case == CASE_C:
             ids = pick_indications([], chosen_ids.get(key, []) + document_ids.get(key, []))
+            # D37 C+: the literature's trials, drug- and indication-checked.
+            literature = literature_set(
+                literature_of.get(event.application, []), event.approval_date,
+                studies, check, ids, condition_ids, ancestors,
+            )
             listed = shortlist(
                 drugs, ids, event.approval_date, studies, by_drug, by_condition,
                 prefer_biosimilar=False,
-                from_graph=from_graph_by_app.get(event.application, frozenset()),
+                from_graph=frozenset(c.nct_id for c in literature),
                 condition_ids=condition_ids, ancestors=ancestors,
             ) if drugs else ()
-            with_c += bool(listed)
+            with_c += bool(listed or literature)
             text = chosen_text.get(key, "")
             suffix = "indication"
         else:
             ids = ()
-            listed = tuple(
-                studies[nct]._replace(injected=True, found_under=diseases)
-                for nct, diseases in drug_only.get(key, [])
-                if nct in studies
-            )[:CANDIDATE_CAP]
-            with_d += bool(listed)
+            # D37 D: the drug-only literature, drug-checked; no registry route.
+            found = drug_only.get(key, [])
+            diseases_of = {nct: diseases for nct, diseases, _ in found}
+            literature = tuple(
+                c._replace(found_under=diseases_of.get(c.nct_id, ""))
+                for c in literature_set(
+                    [(nct, pmids) for nct, _, pmids in found], event.approval_date,
+                    studies, check)
+            )
+            listed = ()
+            with_d += bool(literature)
             text = ""
             suffix = "drug_only"
         units.append(
@@ -1275,6 +1519,7 @@ def build(
                 case=case,
                 indication_text=text,
                 drug=names,
+                literature=literature,
             )
         )
     sizes.sort()

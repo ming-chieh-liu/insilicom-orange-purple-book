@@ -145,6 +145,10 @@ DESIGN = re.compile(
 )
 
 
+#: Characters of a §14 subsection kept per description (D37).
+SUBSECTION_KEEP: int = 3000
+
+
 class TrialDescription(NamedTuple):
     """One trial as a label describes it, with the facts P3 and P4 use."""
 
@@ -175,6 +179,10 @@ class TrialDescription(NamedTuple):
     #: disease. ``heading`` is kept as it was because unit ids are built from
     #: it; this is what the indication coder reads.
     heading_full: str = ""
+    #: D37: the whole §14 subsection this description came from, up to
+    #: :data:`SUBSECTION_KEEP` characters — what a B-route judge reads, since
+    #: one sentence rarely states the design, population and comparator.
+    subsection: str = ""
 
 
 class LabelReading(NamedTuple):
@@ -438,6 +446,7 @@ def describe_trials(
                         design=design,
                         excerpt=sentence[:600],
                         heading_full=continued_heading(heading, block),
+                        subsection=" ".join(block.split())[:SUBSECTION_KEEP],
                     )
                 )
     return tuple(out)
@@ -544,6 +553,7 @@ def render(report: LabelsReport) -> str:
 
 
 __all__ = [
+    "SUBSECTION_KEEP",
     "ACRONYM",
     "DESIGN",
     "ENROLLMENT",

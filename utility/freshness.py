@@ -22,6 +22,11 @@ from pathlib import Path
 
 _MODE = re.compile(r"--mode ([a-z0-9-]+)")
 
+#: Variables a parent make exports that must not reach a fresh dry run.
+_PARENT_MAKE_VARS: frozenset[str] = frozenset(
+    {"MAKEFLAGS", "MFLAGS", "MAKELEVEL", "MAKE_RESTARTS", "MAKEOVERRIDES"}
+)
+
 #: ``make -n`` output for a target, or None when make cannot be asked.
 DryRun = Callable[[str], "str | None"]
 
@@ -30,9 +35,12 @@ def make_dry_run(target: str, root: Path = Path(".")) -> str | None:
     """What ``make -n target`` would run, or None if there is no make or Makefile."""
     if not (root / "Makefile").is_file() or shutil.which("make") is None:
         return None
+    # A parent make's flags would change what this dry run reports (a
+    # `make status` once listed only one stale step of five), so drop them.
+    env = {k: v for k, v in os.environ.items() if k not in _PARENT_MAKE_VARS}
     result = subprocess.run(
         ["make", "--no-print-directory", "-n", target],
-        cwd=root, capture_output=True, text=True, check=False,
+        cwd=root, capture_output=True, text=True, check=False, env=env,
     )
     if result.returncode != 0:
         return None

@@ -149,7 +149,10 @@ def read_units(
         if row.get("case") not in (None, "", "B"):
             continue
         candidates = row.get("candidates")
-        if not isinstance(candidates, list) or not candidates:
+        literature = row.get("literature")
+        # D37: a unit is judged when either route has candidates.
+        if not (isinstance(candidates, list) and candidates) and not (
+                isinstance(literature, list) and literature):
             continue
         if borrowed and set(str(row.get("drug_mesh") or "").split(";")) & borrowed:
             skipped += 1

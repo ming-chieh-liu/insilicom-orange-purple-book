@@ -23,17 +23,27 @@ reuse; nothing about them changed.
 
 ## What a unit is
 
-A **tier**: one section-14 description plus up to 10 of its candidates, taken in P3's rank order
-(tier 1 = ranks 1–10, tier 2 = 11–20, …, through the whole shortlist; there is no cap, so
-literature-injected candidates beyond 100 are reached too). `tier_id = <unit_id>#T<k>`.
+A **tier**: one unit (a section-14 description, or a case C/D submission) plus up to 10 of its
+candidates. **Since D37 a unit has two candidate sets, judged in this order:**
+
+1. the **literature set** (`literature` in `candidates.jsonl`; routes B+, C+, D) — trials the
+   literature names, drug- and indication-checked, each shown with up to 3 abstracts — judged
+   with `docs/prompts/trial-literature-match.md`; batch files `literature-NNN.ids`;
+2. the **registry shortlist** (`candidates`; routes B−, C−) — judged with
+   `trial-candidate-match.md` (B) or `-nolabel.md` (C), batch files `batch-NNN.ids` /
+   `nolabel-NNN.ids`.
+
+Tier 1 is the literature set's first ten; registry tiers follow. `tier_id =
+<unit_id>#T<k>@<digest>`. A decision records its **route** (`B+`, `B-`, `C+`, `C-`, `D`), which S10
+uses as the tier (`docs/TIERS.md`).
 
 The descriptions are the same set the pick-one route judged (`identification.read_units`:
 earliest submission only, no label-stated NCT, no borrowed biosimilar section 14, no D24 guard).
 
 ## The stop rule
 
-Per description, tiers are judged in order. The first tier holding any **Yes** decides, and the
-answer is its **highest-ranked Yes**. A tier is read only once every candidate in it has a final
+Per unit, tiers are judged in order — literature first, then registry ("+" before "−", D37).
+The first tier holding any **Yes** decides, and the answer is its **highest-ranked Yes**. A tier is read only once every candidate in it has a final
 answer. Every tier No means **NONE**. Measured on the 11,792 known answers: median rank 2, 74% of
 shortlisted answers in tier 1.
 
@@ -50,7 +60,7 @@ shortlisted answers in tier 1.
 
 ```bash
 PY=/data/mliu/miniforge3/envs/clinical-trials-claude/bin/python
-$PY main.py --mode match-prepare [--limit 50]     # pilot: a hash-ordered sample of 50
+$PY main.py --mode match-prepare --case B|C|D|CD [--limit 50]   # or: make judge-prepare TASK=identify CASE=B
 #   -> adjudication/candidate_match_tiers.jsonl (every tier issued)
 #   -> adjudication/candidate_match_batches/round-RR/batch-NNN.ids (10 tiers each)
 #   judges write adjudication/candidate_match_raw/round-RR/batch-NNN-{A,B}.txt
@@ -84,8 +94,31 @@ Write one line per candidate, in the order shown, to <raw file>:
 Do not look anything up, search the web, or open any other file.
 ```
 
+**Which fields per batch file** (the message names them; copy the prompt of that file):
+
+| Batch file | Prompt | Fields the judge uses |
+|---|---|---|
+| `batch-NNN.ids` | `trial-candidate-match.md` v2 | `approval`, `excerpt`, `trial_name`, `enrollment`, `candidates` |
+| `nolabel-NNN.ids` | `trial-candidate-match-nolabel.md` v2 | `drug`, `indication`, `approval_date`, `candidates` |
+| `literature-NNN.ids` | `trial-literature-match.md` v1 | `approval`, `label_block`, `candidates` (abstracts included) |
+
+On the agent pool (`http://galaxy4:8093`, `no_tools: true`) the judge cannot read files, so the
+submitting code renders the prompt with the tier's fields and sends it whole; the orchestrator
+still never reads it.
+
 A tiebreak judge gets the same message plus the `"<tier_id> | <nct>"` lines it must answer, and
 answers only those candidates.
+
+## Answers are bound to what the judge saw (2026-09-30)
+
+A tier id carries a digest of every field its prompt shows the judge, and the prompt version:
+`<unit_id>#T<n>@<12 hex>` (`candidate_match.input_digest`). When P3 or P2i changes a unit's
+candidates, their order, its excerpt or its indication text, the tier gets a new id: the old answers
+stay on file under the old id but no longer count, and `match-prepare` batches the new version.
+An unchanged tier keeps its id and its answers. Tiers written before digests existed are re-keyed
+once from their own stored content (`migrate_legacy_ids`; the carried answers are appended with
+`migrated_from`, never rewritten). A decision is recorded again when the tiers it was read from
+change (`basis` on each `identify_verdicts.jsonl` row; last row wins).
 
 ## Rules carried over
 

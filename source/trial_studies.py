@@ -97,6 +97,31 @@ class StudyFacts(NamedTuple):
     #: whose primary completion postdates an approval cannot have been its
     #: evidence; the drug-only graph fallback uses it as a hard filter (D31).
     primary_completion: str = ""
+    #: ``statusModule.overallStatus`` (``COMPLETED``, ``TERMINATED``, …) as of
+    #: the archive, not as of any approval — so it is shown to a judge, and
+    #: only :data:`NEVER_RAN` is filtered on.
+    overall_status: str = ""
+    #: ``statusModule.whyStopped``: why a terminated or suspended trial stopped.
+    why_stopped: str = ""
+
+    @property
+    def never_ran(self) -> bool:
+        """Whether the registry says the trial never enrolled anyone.
+
+        >>> StudyFacts("NCT1", "", "", "", "", (), "", (), (), overall_status="WITHDRAWN").never_ran
+        True
+        >>> StudyFacts("NCT1", "", "", "", "", (), "", (), (), overall_status="TERMINATED").never_ran
+        False
+        """
+        return self.overall_status in NEVER_RAN
+
+
+#: Statuses of a trial that never ran, and so can support no approval: a
+#: withdrawn study stopped before enrolling its first participant, and a
+#: not-yet-recruiting one has not started. Excluded from every candidate route
+#: (B+, B-, C+, C-, D). Terminated, active and recruiting trials are kept: 14%
+#: of the trials FDA labels name were not COMPLETED in the registry (D37).
+NEVER_RAN: frozenset[str] = frozenset({"WITHDRAWN", "NOT_YET_RECRUITING"})
 
 
 def _facts_of(document: dict[str, object]) -> StudyFacts | None:
@@ -159,6 +184,8 @@ def _facts_of(document: dict[str, object]) -> StudyFacts | None:
         lead_sponsor=str(lead.get("name") or "") if isinstance(lead, dict) else "",
         primary_completion=str(completion.get("date") or "")
         if isinstance(completion, dict) else "",
+        overall_status=str(section("statusModule").get("overallStatus") or ""),
+        why_stopped=str(section("statusModule").get("whyStopped") or ""),
     )
 
 
@@ -249,4 +276,5 @@ def read_start_dates(archive: TrialArchive) -> dict[str, str]:
     return dates
 
 
-__all__ = ["StudyFacts", "read_start_dates", "read_study_facts"]
+__all__ = [
+    "NEVER_RAN","StudyFacts", "read_start_dates", "read_study_facts"]

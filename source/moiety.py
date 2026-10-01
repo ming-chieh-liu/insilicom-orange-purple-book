@@ -116,6 +116,27 @@ def read(path: Path) -> dict[str, Moiety]:
     return out
 
 
+def read_generic_names(path: Path) -> dict[str, str]:
+    """Application (``NDA208215``) → the generic name its labels give, by majority.
+
+    The extract names each label's product by ``generic_name`` (``EMTRICITABINE
+    AND TENOFOVIR ALAFENAMIDE``) and lists the applications it was marketed
+    under. Absent file yields nothing, like :func:`read`.
+    """
+    if not path.is_file():
+        return {}
+    csv.field_size_limit(FIELD_LIMIT)
+    seen: dict[str, Counter[str]] = defaultdict(Counter)
+    with gzip.open(path, "rt", encoding="utf-8") as handle:
+        for row in csv.DictReader(handle):
+            generic = (row.get("generic_name") or "").strip()
+            if not generic:
+                continue
+            for application in _split(row.get("application_numbers")):
+                seen[application.upper()][generic.upper()] += 1
+    return {app: counted.most_common(1)[0][0] for app, counted in seen.items()}
+
+
 def _split(value: str | None) -> list[str]:
     """A semicolon-joined field as a list, blanks dropped.
 

@@ -350,3 +350,25 @@ def test_withheld_units_are_earliest_appearances_only(tmp_path: Path) -> None:
     truth = validate.withhold(path, tmp_path / "units.jsonl", 10)
     assert truth == {"A|ORIG|1|X": "NCT00000001"}
     assert validate.PRECISION_DIR == "precision_d35"
+
+
+def test_first_appearances_follow_moiety_groups_and_skip_generic_names() -> None:
+    """D37: same moiety → one group; "Study 1" is not a trial's name."""
+    rows: list[dict[str, object]] = [
+        {"unit_id": "orig", "application": "A", "approval_date": "2011", "stated_nct": "NCT1"},
+        {"unit_id": "newform", "application": "B", "approval_date": "2021", "stated_nct": "NCT1"},
+        {"unit_id": "s1a", "application": "A", "approval_date": "2012", "acronym": "Study 1"},
+        {"unit_id": "s1b", "application": "A", "approval_date": "2015", "acronym": "Study 1",
+         "stated_nct": "NCT2"},
+    ]
+    assert validate.first_appearances(rows, {"A": "X", "B": "X"}) == {"orig", "s1b"}
+    assert validate.first_appearances(rows, {}) == {"orig", "newform", "s1b"}
+
+
+def test_recall_counts_the_literature_route_too(tmp_path: Path) -> None:
+    path = tmp_path / "candidates.jsonl"
+    path.write_text(json.dumps({"unit_id": "u", "application": "A", "approval_date": "2020",
+                                "stated_nct": "NCT1", "candidates": [],
+                                "literature": [{"nct_id": "NCT1"}]}) + "\n", encoding="utf-8")
+    got = validate.shortlist_recall(path)
+    assert (got.checked, got.present) == (1, 1)

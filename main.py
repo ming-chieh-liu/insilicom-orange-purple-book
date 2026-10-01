@@ -45,6 +45,7 @@ from service import (
     assemble,
     candidates,
     approval_events,
+    drug_names as drug_names_table,
     approval_map,
     attribution,
     identity_census,
@@ -447,19 +448,28 @@ def main(argv: list[str] | None = None) -> int:
             serverSelectionTimeoutMS=connection.timeout_ms,
         )
         try:
+            gt_repository = GraphEvidenceRepository(gt_client, connection)
             gt_report = graph_trials.build(
                 out_dir,
-                GraphEvidenceRepository(gt_client, connection),
+                gt_repository,
                 gt_apps,
                 gt_ingredients,
                 resolve=gt_resolve,
+            )
+            # D37: the abstracts the literature routes' judges read.
+            gt_abstracts = graph_trials.save_abstracts(
+                gt_repository.abstracts(graph_trials.pmids_of(gt_report.rows)),
+                out_dir / graph_trials.ABSTRACTS_FILE,
             )
         finally:
             gt_client.close()
         repository_gt = TsvRepository(out_dir)
         repository_gt.save(
-            "graph_trials", ("application", "nct_id", "mentions", "via"), gt_report.rows
+            "graph_trials",
+            ("application", "nct_id", "mentions", "via", "pmids", "found_under"),
+            gt_report.rows,
         )
+        print(f"{gt_abstracts:,} abstracts -> {out_dir / graph_trials.ABSTRACTS_FILE}")
         print(graph_trials.render(gt_report))
         return 0
 
@@ -488,6 +498,7 @@ def main(argv: list[str] | None = None) -> int:
             facts.nct_id: (facts.start_date, facts.enrollment, ";".join(facts.phases),
                            facts.primary_completion)
             for facts in facts_all
+            if not facts.never_ran  # D37: withdrawn / not yet recruiting
         }
         gl_protocols = review_trials.build_index(facts_all)
         del facts_all
@@ -511,21 +522,29 @@ def main(argv: list[str] | None = None) -> int:
             serverSelectionTimeoutMS=connection.timeout_ms,
         )
         try:
+            gl_repository = GraphEvidenceRepository(graph_client, connection)
             graph_report = graph_links.build(
                 out_dir,
-                GraphEvidenceRepository(graph_client, connection),
+                gl_repository,
                 studies,
                 unserved,
                 ingredients,
                 limit=args.limit,
                 resolve=gl_resolve,
             )
+            # D37: case D's judges read the abstracts naming each trial.
+            gl_abstracts = graph_trials.save_abstracts(
+                gl_repository.abstracts(
+                    graph_trials.pmids_of(graph_links.drug_only_rows(graph_report.units))),
+                out_dir / graph_links.DRUG_ONLY_ABSTRACTS_FILE,
+            )
         finally:
             graph_client.close()
+        print(f"{gl_abstracts:,} abstracts -> {out_dir / graph_links.DRUG_ONLY_ABSTRACTS_FILE}")
         TsvRepository(args.out).save(
             "drug_only_trials",
             ("application", "submission_type", "submission_no", "nct_id", "mentions",
-             "diseases", "protocol_id"),
+             "diseases", "protocol_id", "pmids"),
             graph_links.drug_only_rows(graph_report.units),
         )
         units_path = Path(args.adjudication) / "graph_units.jsonl"
@@ -776,6 +795,7 @@ def main(argv: list[str] | None = None) -> int:
                         {
                             **unit._asdict(),
                             "candidates": [c._asdict() for c in unit.candidates],
+                            "literature": [c._asdict() for c in unit.literature],
                         }
                     )
                     + "\n"
@@ -1091,7 +1111,10 @@ def main(argv: list[str] | None = None) -> int:
             (facts.conditions, facts.derived_condition_mesh)
             for facts in trial_studies.read_study_facts(in_archive)
         ) if in_archive.study_shards else {}
+        # D37: only the registry aliases (our D34 rule over NLM's coding) must
+        # share a word with their descriptor; P1's biokde names go in as given.
         extra_terms = list(aliases.items()) + list(exact.items())
+        checked_terms = frozenset(aliases)
         import pymongo
 
         in_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
@@ -1108,7 +1131,8 @@ def main(argv: list[str] | None = None) -> int:
                 openfda=openfda,
                 exact=exact,
                 known_biokdeids=known,
-                index=indications.build_index(vocabulary, extra=extra_terms),
+                index=indications.build_index(vocabulary, extra=extra_terms,
+                                              checked=checked_terms),
                 internal_ids=BiokdeRepository(in_client, connection).internal_ids,
                 heading_text=heading_text,
                 openfda_text=openfda_text,
@@ -1143,7 +1167,7 @@ def main(argv: list[str] | None = None) -> int:
             "label_trials",
             ("application", "submission_type", "submission_no", "section",
              "heading", "nct_id", "acronym", "enrollment", "design", "excerpt",
-             "label_sha", "heading_full"),
+             "label_sha", "heading_full", "subsection"),
             labels_report.descriptions,
         )
         repository.save(
@@ -1222,7 +1246,22 @@ def main(argv: list[str] | None = None) -> int:
         repository_out.save(
             "trial_condition_map", columns, normalize_report.trial_conditions
         )
+        # Every name each application's drug goes by: brand, generic,
+        # ingredient (salt), moiety, UNIIs — for the judge and the drug check.
+        names_rows = drug_names_table.build(
+            data,
+            frozenset(r.application for r in approval_events.build(data).rows
+                      if r.trial_relevant == "true"),
+            folded,
+            moiety.read_generic_names(Path(args.moiety)),
+            drug_names_table.unii_index(data),
+        )
+        repository_out.save("drug_names", drug_names_table.DrugNames._fields, names_rows)
         print(normalize.render(normalize_report))
+        print(f"drug_names: {len(names_rows):,} applications, "
+              f"{sum(1 for r in names_rows if r.brand_names):,} with a brand, "
+              f"{sum(1 for r in names_rows if r.generic_name):,} with a generic name, "
+              f"{sum(1 for r in names_rows if r.moiety_uniis.strip('; ')):,} with a moiety UNII")
         print(f"\nwritten to {repository_out.out_dir}/")
         return 0
 

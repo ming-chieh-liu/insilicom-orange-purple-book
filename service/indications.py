@@ -255,24 +255,61 @@ def registry_aliases(
     return out
 
 
+#: Words too common across disease names to show that an outside term and a
+#: descriptor mean the same thing: "upper tract urothelial cancer" shares only
+#: "tract" with Respiratory Tract Infections.
+SHARED_GENERIC: frozenset[str] = frozenset({
+    "tract", "disease", "diseases", "disorder", "disorders", "syndrome",
+    "syndromes", "infection", "infections", "chronic", "acute", "primary",
+    "secondary", "type", "stage", "advanced", "severe", "condition",
+    "conditions", "of", "and", "or", "the", "with", "in", "due", "to", "for",
+    "a", "an", "by", "on", "not", "other", "unspecified", "patients", "adult",
+    "adults", "pediatric", "children", "human", "induced", "associated",
+})
+
+
+def shares_a_word(term: str, descriptor_terms: Iterable[str]) -> bool:
+    """Whether ``term`` and any of a descriptor's names share a distinctive word.
+
+    A crude stem (first 6 letters) lets "carcinomas" meet "carcinoma".
+
+    >>> shares_a_word("urothelial carcinoma", ["carcinoma, transitional cell"])
+    True
+    >>> shares_a_word("upper tract urothelial cancer", ["respiratory tract infections"])
+    False
+    >>> shares_a_word("neurogenic detrusor overactivity", ["meningomyelocele", "spina bifida cystica"])
+    False
+    """
+    def stems(text: str) -> set[str]:
+        return {w[:6] for w in normalise(text).split() if w not in SHARED_GENERIC and len(w) > 2}
+    mine = stems(term)
+    return any(mine & stems(other) for other in descriptor_terms)
+
+
 def build_index(
-    vocabulary: MeshVocabulary, extra: Iterable[tuple[str, str]] = ()
+    vocabulary: MeshVocabulary,
+    extra: Iterable[tuple[str, str]] = (),
+    checked: frozenset[str] = frozenset(),
 ) -> TermIndex:
     """Index every disease descriptor's entry terms for matching.
 
     ``extra`` adds ``(text, descriptor ui)`` terms from outside MeSH, in
     precedence order. One is taken only when it has two or more words, names a
-    disease descriptor, is not :data:`NON_INDICATION`, and no MeSH entry term
+    disease descriptor, is not :data:`NON_INDICATION`, shares a distinctive
+    word with that descriptor's names when listed in ``checked`` (the registry
+    aliases, :func:`shares_a_word`), and no MeSH entry term
     (or earlier extra term) already claims it — so it can widen the sweep but
     never overrule MeSH.
     """
     by_term: dict[str, str] = {}
     names: dict[str, str] = {}
+    terms_of: dict[str, list[str]] = {}
     generic: set[str] = set(GENERIC_EXTRA)
     max_words = 1
     collisions = 0
     for descriptor in diseases(vocabulary):
         names[descriptor.ui] = descriptor.name
+        terms_of[descriptor.ui] = [descriptor.name, *descriptor.terms]
         if descriptor.tree_numbers and all(
             number.count(".") + 1 <= GENERIC_DEPTH for number in descriptor.tree_numbers
         ):
@@ -294,7 +331,11 @@ def build_index(
         term = normalise(raw)
         ui = raw_ui.removeprefix("MESH:")
         if (len(term.split()) < 2 or term in by_term or ui not in names
-                or ui in NON_INDICATION):
+                or ui in NON_INDICATION
+                # D37: a registry alias must share a distinctive word with the
+                # descriptor it claims ("neurogenic detrusor overactivity" ->
+                # Meningomyelocele shares none and is refused).
+                or (raw in checked and not shares_a_word(term, terms_of.get(ui, ())))):
             continue
         by_term[term] = ui
         max_words = max(max_words, len(term.split()))
@@ -553,6 +594,8 @@ __all__ = [
     "IndicationTextRow",
     "TermIndex",
     "NON_INDICATION",
+    "SHARED_GENERIC",
+    "shares_a_word",
     "GENERIC_DEPTH",
     "GENERIC_EXTRA",
     "registry_aliases",
