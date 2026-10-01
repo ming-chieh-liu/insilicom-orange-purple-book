@@ -483,7 +483,7 @@ unlinked event — this is what keeps recall auditable).
 | MeSH | `/data/mliu/ontology_normalization_tp/external_data/MeSH/desc2026.xml` |
 | Moiety extract | `/space/feng/share/drug_label/drug_indication_market.csv.gz` (another team's; current labels only) |
 | CT.gov archive | `/data/mliu/insilicom-clinical_trials/final/output_raw` (manifest + 25 shards) |
-| Insilicom KG (iKraph1) | `mongodb://galaxy3:27017`, db `biokde`, creds in `creds.json` (gitignored) | — since D43 the abstracts (`pubmedDocs`) only |
+| Insilicom KG (iKraph1) | `mongodb://galaxy3:27017`, db `biokde`, creds in `creds.json` (gitignored) — since D43 the abstracts (`pubmedDocs`) only |
 | iKraph2 API | `http://127.0.0.1:8971` (loopback, reachable from this host; doc `/space/shared/IKRAPH2_API_REFERENCE.md`), release `v1_2` — drug–disease edges and PMIDs (D42) |
 | iKraph2 store | `mongodb://jupiter2:27017`, db `biokde`, `ikraph2_*_v1_2`, same `creds.json` — read-only `db_id` → entity lookup (D42) |
 
