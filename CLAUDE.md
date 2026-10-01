@@ -301,7 +301,7 @@ code says `not yet implemented` until it lands.
   B units were this submission's own A trial; C units never overlap on the same submission (D36).
   **Rebuilt 2026-10-01:** judged units B 3,660 (1,644 lose 5,491 trials), C 2,234 (392 lose 1,746,
   named on an earlier same-moiety submission), D 153; recall unchanged at 81.6%.
-- **D42 — iKraph2 replaces iKraph1 for drug identity and literature edges** (2026-10-01, **implemented
+- **[PARTIALLY SUPERSEDED by D43, 2026-10-01 — S3 and S5 move to iKraph2 too; iKraph1's name fallback in S2 is removed]** **D42 — iKraph2 replaces iKraph1 for drug identity and literature edges** (2026-10-01, **implemented
   in code 2026-10-01; S2 rebuilt**). (1) FDA ingredient → UNII → **MeSH by MeSH's own `RegistryNumber`**: kept only where the
   UNII sits on exactly one MeSH record and the two share a name; salts may share a record (D11). iKraph1
   name resolution is the fallback only where no record exists (`basis` says which). (2) Graph node = the
@@ -317,6 +317,16 @@ code says `not yet implemented` until it lands.
   Chemical one, 245 none; iKraph1's spellings carry over to the new id (`normalize.renamed_ids`), so the
   trial-side name index keeps 19,398 strings (19,408 before). S7 PMIDs are fetched best evidence first up to
   the 400-abstract budget (a cold API evidence page reads ~10 ms per row), prefetched 4 drugs at a time.
+- **D43 — iKraph2 everywhere except abstracts; FDA drugs by exact ids only** (2026-10-01, **implemented in
+  code 2026-10-01; S2/S3 rebuilt**). S2 drug rows come only from D42's exact ids (UNII → MeSH registry,
+  iKraph2 node by `db_id`); the iKraph1 name resolution and its fallback are removed, so an ingredient no
+  exact id identifies has no row (2,498 of 2,670 have one; applications with a drug id 98.5% → 96.5%). S3
+  matches trial strings on iKraph2's entity names + FDA UNII names (brand and code names) + MeSH entry
+  terms; S5 takes indication internal ids from iKraph2 by exact `db_id`. iKraph1 keeps only S7's abstracts.
+  Why: the user's rule — everything but abstracts on iKraph2. Measured against NLM's own coding of the same
+  strings: drugs 94.0% → 94.5% exact (16,548 → 17,463 checkable); conditions 62.9% → 93.0% exact,
+  76.1% → 96.2% within the MeSH tree (13,690 → 8,113 strings: ~2,800 wrong matches gone, ~1,500 right ones
+  lost, and an uncoded trial stays in the pool).
 
 ## Current status and to-do
 
@@ -349,7 +359,7 @@ update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026
 S1  SPINE          Drugs@FDA -> 87,055 approved NDA|BLA events -> 11,295 trial-relevant (D23, D24)
 S2  DRUGS          per application: brand, generic, ingredient(s), moiety(ies), UNII(s)
                    (drug_names.tsv) + normalised drug id and its graph biokdeid (drug_map.tsv)
-S3  REGISTRY       every CT.gov study: interventions -> drug ids (NLM MeSH, then biokde names,
+S3  REGISTRY       every CT.gov study: interventions -> drug ids (NLM MeSH, then iKraph2/UNII/MeSH names,
                    dose stripped), conditions -> disease ids, status, why stopped, dates;
                    WITHDRAWN / NOT_YET_RECRUITING dropped (trial_drug_map, trial_condition_map)
 S4  DOCUMENTS      fetched by hand at 1 req/s, never by make:
@@ -473,7 +483,7 @@ unlinked event — this is what keeps recall auditable).
 | MeSH | `/data/mliu/ontology_normalization_tp/external_data/MeSH/desc2026.xml` |
 | Moiety extract | `/space/feng/share/drug_label/drug_indication_market.csv.gz` (another team's; current labels only) |
 | CT.gov archive | `/data/mliu/insilicom-clinical_trials/final/output_raw` (manifest + 25 shards) |
-| Insilicom KG (iKraph1) | `mongodb://galaxy3:27017`, db `biokde`, creds in `creds.json` (gitignored) | — since D42 synonyms, disease ids and abstracts (`pubmedDocs`) only |
+| Insilicom KG (iKraph1) | `mongodb://galaxy3:27017`, db `biokde`, creds in `creds.json` (gitignored) | — since D43 the abstracts (`pubmedDocs`) only |
 | iKraph2 API | `http://127.0.0.1:8971` (loopback, reachable from this host; doc `/space/shared/IKRAPH2_API_REFERENCE.md`), release `v1_2` — drug–disease edges and PMIDs (D42) |
 | iKraph2 store | `mongodb://jupiter2:27017`, db `biokde`, `ikraph2_*_v1_2`, same `creds.json` — read-only `db_id` → entity lookup (D42) |
 
