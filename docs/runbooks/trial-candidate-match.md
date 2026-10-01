@@ -123,6 +123,28 @@ $PY main.py --mode render-prompts --batch adjudication/candidate_match_batches/r
 - Judges A and B are separate requests; C is sent only for the `tiebreak_needed` candidates'
   tiers. The orchestrator passes batch paths only and never reads the rendered text.
 
+Sending them (`service/pool_judging.py`, 2026-10-01):
+
+```bash
+$PY main.py --mode render-prompts --batch $ADJ/candidate_match_batches/round-RR/batch-NNN.ids
+$PY main.py --mode pool-judge --judge A --requests $ADJ/candidate_match_batches/round-RR/batch-NNN.requests.jsonl \
+    --raw-file $ADJ/candidate_match_raw/round-RR/batch-NNN-A.txt
+$PY main.py --mode pool-judge --judge B ...  --raw-file .../batch-NNN-B.txt
+$PY main.py --mode match-combine                       # writes candidate_match_tiebreak_needed.txt
+$PY main.py --mode render-prompts --batch $ADJ/candidate_match_tiebreak_needed.txt
+$PY main.py --mode pool-judge --judge C --requests $ADJ/candidate_match_tiebreak_needed.requests.jsonl \
+    --raw-file $ADJ/candidate_match_raw/round-RR/tiebreak-NN-C.txt
+```
+
+- One job per tier, model `opus`, no tools, 600 s; at most 32 in flight **and never more than the
+  pool's free `job_slots`** read at the start (a job waiting for a seat fails after the pool's
+  900 s and is sent again on the next run). No free seat → nothing is sent.
+- Each job is logged to `<raw file>.jobs.jsonl` (status, outcome, cost — never the prompt).
+- Re-running the same command sends only what is still unanswered. The raw file must end in the
+  judge's letter (`-A.txt`), or the run refuses.
+- Live test 2026-10-01: job 23460 answered all 10 candidates in the required format; job 23461
+  failed "no seats available" and was left undecided.
+
 A tiebreak judge gets the same message plus the `"<tier_id> | <nct>"` lines it must answer, and
 answers only those candidates.
 

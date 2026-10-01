@@ -44,6 +44,12 @@ trials), C 2,234 (392 lose 1,746, all named on an earlier same-moiety submission
 7). 73 units left with no candidate; S10 `candidates_already_linked` 108 rows. Shortlist recall
 unchanged at 81.6%. Map: 4,110 links on 2,039 submissions (no judging yet under v3/v4).
 
+**Agent-pool client 2026-10-01:** `--mode pool-judge` (`config/agent_pool.py`, `dao/agent_pool.py`,
+`service/pool_judging.py`) sends rendered prompts, at most min(32, free job slots) at a time,
+records only valid replies. Live: 1 of 2 test jobs answered correctly, the other hit "no seats
+available". **Capacity is the constraint:** on 2026-10-01 afternoon 1 of 19 seats was eligible
+(2 job slots); most were at weekly or 5-hour quota walls.
+
 Next: commit D39 → `make candidates` → pilots per route (two
 judges + third) → full runs (two judges + third, D40) → S10 → D28 label roles → S10 → S11.
 

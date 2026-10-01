@@ -181,8 +181,16 @@ def role_reply_line(rendered: Rendered, reply: str,
 
 
 def _ids(batch_file: Path) -> list[str]:
-    return [line.strip() for line in batch_file.read_text(encoding="utf-8").splitlines()
-            if line.strip()]
+    """The ids a batch file names, in order, once each.
+
+    Takes ``.ids`` files (one id per line) and the matching tiebreak list
+    (``<tier_id> | <NCT>`` per line), whose tier ids are kept once each: the
+    third judge is sent the whole tier, and combine reads its answer only for
+    the disagreed candidates.
+    """
+    ids = (line.split(" | ", 1)[0].strip()
+           for line in batch_file.read_text(encoding="utf-8").splitlines())
+    return list(dict.fromkeys(i for i in ids if i))
 
 
 def render_tier_batch(batch_file: Path, tiers_path: Path,

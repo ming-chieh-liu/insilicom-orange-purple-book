@@ -54,6 +54,7 @@ from service import (
     indications,
     label_role,
     letter_locate,
+    pool_judging,
     precision_check,
     prompt_render,
     letters,
@@ -66,6 +67,8 @@ from service import (
     section14,
     validate,
 )
+from config.agent_pool import AgentPoolConnection
+from dao.agent_pool import AgentPool, PoolError
 from utility import freshness
 from utility.logging import configure
 
@@ -133,6 +136,9 @@ MODES: dict[str, str] = {
     "match-combine": "record every tier whose judge answers are complete "
     "(--judges 2, the default: two judges + a third on disagreement, D40)",
     "match-record": "append newly decided descriptions to identify_verdicts.jsonl",
+    "pool-judge": "send a requests file (--requests) to the agent pool as one judge "
+    "(--judge A|B|C), at most 32 jobs in flight, and append valid answers to "
+    "--raw-file (see the runbooks' 'Delivery without files')",
     "render-prompts": "render every unit of one judge batch file (--batch, --task) as a "
     "complete, file-independent prompt -> <batch>.requests.jsonl, for judges with no "
     "file access (the agent pool)",
@@ -208,6 +214,28 @@ def build_parser() -> argparse.ArgumentParser:
         default="B",
         help="match-prepare/-record: which D35 case to judge — B (section-14 "
         "descriptions) or C/D (per-submission units with no excerpt)",
+    )
+    parser.add_argument(
+        "--requests",
+        default=None,
+        help="pool-judge: the <batch>.requests.jsonl written by render-prompts",
+    )
+    parser.add_argument(
+        "--judge",
+        choices=pool_judging.JUDGES,
+        default=None,
+        help="pool-judge: which independent judge this run is",
+    )
+    parser.add_argument(
+        "--raw-file",
+        default=None,
+        help="pool-judge: the judge's raw answer file, ending in -<judge>.txt",
+    )
+    parser.add_argument(
+        "--max-in-flight",
+        type=int,
+        default=AgentPoolConnection().max_in_flight,
+        help="pool-judge: jobs in flight at once (the user's cap is 32)",
     )
     parser.add_argument(
         "--batch",
@@ -682,6 +710,37 @@ def main(argv: list[str] | None = None) -> int:
             print(candidate_match.prepare_round(match_units, Path(args.adjudication)))
         else:
             print(candidate_match.record_round(match_units, Path(args.adjudication)))
+        return 0
+
+    if args.mode == "pool-judge":
+        if not (args.requests and args.judge and args.raw_file):
+            print("pool-judge needs --requests, --judge and --raw-file")
+            return 1
+        pool_connection = AgentPoolConnection()
+        cap = min(args.max_in_flight, pool_connection.max_in_flight)
+        try:
+            pool = AgentPool(pool_connection, pool_connection.api_key())
+            capacity = pool.capacity()
+        except PoolError as error:
+            print(f"not sent: {error}")
+            return 1
+        # Never queue more jobs than the pool can start: a job waiting for a
+        # seat fails after the pool's own 900 s and must be sent again.
+        slots = int(capacity.get("job_slots") or 0)
+        if not capacity.get("available") or slots < 1:
+            print(f"not sent: the pool has no free seat for us now "
+                  f"({capacity.get('eligible_accounts', 0)} eligible); try again later")
+            return 1
+        cap = min(cap, slots)
+        print(f"pool: {slots} job slot(s) free; sending at most {cap} at a time")
+        try:
+            pool_report = pool_judging.judge(
+                prompt_render.read_requests(Path(args.requests)), pool,
+                Path(args.raw_file), args.judge, cap, args.limit)
+        except ValueError as error:
+            print(f"not sent: {error}")
+            return 1
+        print(pool_judging.render(pool_report, args.judge, Path(args.raw_file)))
         return 0
 
     if args.mode == "render-prompts":
