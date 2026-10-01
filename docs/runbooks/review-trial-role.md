@@ -89,6 +89,16 @@ Same rules as `docs/runbooks/adjudicate-section-14.md`:
    else.
 4. Raw answers are saved as `adjudication/review_role_raw/batch-NNN-{A,B,C}.txt`.
 
+### Delivery without files (agent pool, 2026-10-01)
+
+A pool job (`no_tools: true`) cannot read the units file, so the prompt is rendered in code:
+`main.py --mode render-prompts --task review-role --batch <role-…-NNN.ids>` writes
+`<batch>.requests.jsonl`, one complete prompt per unit (`service/prompt_render.py`: template read
+verbatim from `docs/prompts/review-trial-role.md`, version checked against the code, every field filled, an
+empty field refuses). A reply counts only if it is exactly one of the six roles on one line
+(`prompt_render.role_reply_line`); the code then writes `<unit_id> = <ROLE>` to the judge's raw
+file. Anything else writes nothing and the unit stays undecided.
+
 ## Step 8 — combine and tiebreak
 
 | judge A | judge B | final |

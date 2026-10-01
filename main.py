@@ -55,6 +55,7 @@ from service import (
     label_role,
     letter_locate,
     precision_check,
+    prompt_render,
     letters,
     review_role,
     review_trials,
@@ -132,6 +133,9 @@ MODES: dict[str, str] = {
     "match-combine": "record every tier whose judge answers are complete "
     "(--judges 2, the default: two judges + a third on disagreement, D40)",
     "match-record": "append newly decided descriptions to identify_verdicts.jsonl",
+    "render-prompts": "render every unit of one judge batch file (--batch, --task) as a "
+    "complete, file-independent prompt -> <batch>.requests.jsonl, for judges with no "
+    "file access (the agent pool)",
     "assemble": "join the units, the verdicts and the spine into "
     "trial_submission_map.tsv and unlinked_submissions.tsv",
     "validate": "score the map against the links the FDA states outright: "
@@ -204,6 +208,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="B",
         help="match-prepare/-record: which D35 case to judge — B (section-14 "
         "descriptions) or C/D (per-submission units with no excerpt)",
+    )
+    parser.add_argument(
+        "--batch",
+        default=None,
+        help="render-prompts: the judge batch file (.ids) whose units to render",
+    )
+    parser.add_argument(
+        "--task",
+        choices=("match", "review-role", "label-role"),
+        default="match",
+        help="render-prompts: which judging task the batch belongs to",
     )
     parser.add_argument(
         "--from",
@@ -667,6 +682,32 @@ def main(argv: list[str] | None = None) -> int:
             print(candidate_match.prepare_round(match_units, Path(args.adjudication)))
         else:
             print(candidate_match.record_round(match_units, Path(args.adjudication)))
+        return 0
+
+    if args.mode == "render-prompts":
+        if not args.batch:
+            print("render-prompts needs --batch <file.ids>")
+            return 1
+        batch = Path(args.batch)
+        adjudication_dir = Path(args.adjudication)
+        try:
+            if args.task == "match":
+                rendered = prompt_render.render_tier_batch(
+                    batch, adjudication_dir / candidate_match.TIERS_FILE)
+            elif args.task == "review-role":
+                rendered = prompt_render.render_unit_batch(
+                    batch, adjudication_dir / "review_role_units.jsonl",
+                    "review-trial-role", review_role.PROMPT_VERSION)
+            else:
+                rendered = prompt_render.render_unit_batch(
+                    batch, adjudication_dir / "label_role_units.jsonl",
+                    "label-trial-role", label_role.PROMPT_VERSION)
+        except prompt_render.RenderError as error:
+            print(f"not rendered: {error}")
+            return 1
+        out = batch.with_suffix(".requests.jsonl")
+        count = prompt_render.write_requests(rendered, out)
+        print(f"{count} complete prompt(s) -> {out}")
         return 0
 
     if args.mode == "match-combine":

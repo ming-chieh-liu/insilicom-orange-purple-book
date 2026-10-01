@@ -82,7 +82,7 @@ v3 additions (D39): `{{approval}}` gains `Drug (normalised): …` and `Indicatio
 
 | Field | Built from |
 |---|---|
-| `{{approval}}` | `<brand> (<generic>) · <application> <submission type> <number> · approved <date>` — the drug from P1's `drug_names.tsv` |
+| `{{approval}}` | `<brand> (<generic>) · <application> <submission type> <number> · approved <date>` — the drug from S2's `drug_names.tsv`; then `Drug (normalised): …` and `Indication (normalised): …` (v2). No §14 heading on any route (2026-10-01): B+'s subsection opens with it |
 | `{{label_block}}` | **B+:** `Section 14 (Clinical Studies) of this approval's label describes the trial:` + the §14 subsection (up to 3,000 characters), then `A program read its name as: <name>` and `and its size as: <count> patients`, each marked "(may be wrong)" · **C+:** `No description of the trial is available. Approved for: <indication text>` (prefixed as in `-nolabel.md` when it is today's label) · **D:** `No description of the trial is available. Approved for: not recorded.` |
 | `{{candidates}}` | one block per candidate: the registry fields of `trial-candidate-match.md` v2 (status and why stopped included), then `Abstracts naming this trial (<n> found, up to 3 shown):` and for each: `PMID <pmid> — <title>` and the abstract; trial reports (publication type clinical trial / RCT) first, then by PMID. **D** adds `Named in literature on: <diseases>` |
 

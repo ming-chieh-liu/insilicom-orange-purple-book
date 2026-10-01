@@ -98,13 +98,30 @@ Do not look anything up, search the web, or open any other file.
 
 | Batch file | Prompt | Fields the judge uses |
 |---|---|---|
-| `batch-NNN.ids` | `trial-candidate-match.md` v2 | `approval`, `excerpt`, `trial_name`, `enrollment`, `candidates` |
-| `nolabel-NNN.ids` | `trial-candidate-match-nolabel.md` v2 | `drug`, `indication`, `approval_date`, `candidates` |
-| `literature-NNN.ids` | `trial-literature-match.md` v1 | `approval`, `label_block`, `candidates` (abstracts included) |
+| `batch-NNN.ids` | `trial-candidate-match.md` v3 | `approval`, `excerpt`, `trial_name`, `enrollment`, `candidates` |
+| `nolabel-NNN.ids` | `trial-candidate-match-nolabel.md` v4 | `drug`, `indication`, `approval_date`, `candidates` |
+| `literature-NNN.ids` | `trial-literature-match.md` v2 | `approval`, `label_block`, `candidates` (abstracts included) |
+
+### Delivery without files (agent pool, 2026-10-01)
 
 On the agent pool (`http://galaxy4:8093`, `no_tools: true`) the judge cannot read files, so the
-submitting code renders the prompt with the tier's fields and sends it whole; the orchestrator
-still never reads it.
+prompt is rendered **in code** and sent whole (`service/prompt_render.py`):
+
+```bash
+$PY main.py --mode render-prompts --batch adjudication/candidate_match_batches/round-RR/batch-NNN.ids
+#   -> batch-NNN.requests.jsonl: one request per tier {request_id, prompt, version, text, expects}
+```
+
+- The template is read verbatim from `docs/prompts/<name>.md`; its `**Version:**` must equal the
+  version the code stamps on answers, or nothing renders.
+- Every `{{field}}` is filled in one pass from the stored tier; an empty field refuses to render.
+- **One tier per request.** The judge sees one tier and nothing else — no batch context.
+- The reply must answer every expected NCT id exactly once, `Yes` or `No`, and nothing else
+  (`prompt_render.tier_reply_lines`); the code then appends `<tier_id> | <NCT> = Yes|No` to
+  `candidate_match_raw/round-RR/batch-NNN-{A,B,C}.txt`, the files `match-combine` already reads.
+  An incomplete or malformed reply writes nothing; the tier stays undecided for a re-run.
+- Judges A and B are separate requests; C is sent only for the `tiebreak_needed` candidates'
+  tiers. The orchestrator passes batch paths only and never reads the rendered text.
 
 A tiebreak judge gets the same message plus the `"<tier_id> | <nct>"` lines it must answer, and
 answers only those candidates.

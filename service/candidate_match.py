@@ -44,7 +44,7 @@ PROMPT_VERSION: int = 3
 #: The no-label prompt (D35) — cases C and D, where there is no §14 excerpt —
 #: ``docs/prompts/trial-candidate-match-nolabel.md``, with its own version.
 NOLABEL_PROMPT: str = "trial-candidate-match-nolabel"
-NOLABEL_PROMPT_VERSION: int = 3
+NOLABEL_PROMPT_VERSION: int = 4
 #: The excerpt prompt's name, stamped beside its version.
 EXCERPT_PROMPT: str = "trial-candidate-match"
 
@@ -255,18 +255,22 @@ def _normalised(label: str, codes: object) -> list[str]:
     return [f"   {label} (normalised): {str(codes)[:1000]}"] if codes else []
 
 
-def approval_line(unit: dict[str, object], heading: bool = True) -> str:
-    """The APPROVAL field.
+def approval_line(unit: dict[str, object]) -> str:
+    """The APPROVAL field: drug, submission, date and their codes.
+
+    The §14 heading is not repeated here (2026-10-01): B+ and B− show the
+    whole subsection, which opens with its heading, and the indication's code
+    follows on its own line.
 
     >>> approval_line({"application": "BLA125514", "submission_type": "SUPPL",
     ...                "submission_no": "35", "approval_date": "2017-05-10",
     ...                "heading": "Non-Small Cell Lung Cancer"})
-    'BLA125514 SUPPL 35 · approved 2017-05-10 · section 14 heading: Non-Small Cell Lung Cancer'
+    'BLA125514 SUPPL 35 · approved 2017-05-10'
     >>> approval_line({"application": "BLA125514", "drug": "KEYTRUDA (pembrolizumab)"})
-    'KEYTRUDA (pembrolizumab) · BLA125514   · approved unknown · section 14 heading: none'
+    'KEYTRUDA (pembrolizumab) · BLA125514   · approved unknown'
     >>> print(approval_line({"application": "NDA1", "drug_codes": "Zanubrutinib [MeSH C000629551]",
     ...                      "indication_codes": "Waldenstrom Macroglobulinemia [MeSH D008258]"}))
-    NDA1   · approved unknown · section 14 heading: none
+    NDA1   · approved unknown
     Drug (normalised): Zanubrutinib [MeSH C000629551]
     Indication (normalised): Waldenstrom Macroglobulinemia [MeSH D008258]
     """
@@ -275,7 +279,6 @@ def approval_line(unit: dict[str, object], heading: bool = True) -> str:
         (f"{drug} · " if drug else "")
         + f"{unit.get('application') or ''} {unit.get('submission_type') or ''} "
         f"{unit.get('submission_no') or ''} · approved {unit.get('approval_date') or 'unknown'}"
-        + (f" · section 14 heading: {unit.get('heading') or 'none'}" if heading else "")
     )
     # D39 (prompt v3): our coding of the drug and the indication, beside the text.
     for label, key in (("Drug", "drug_codes"), ("Indication", "indication_codes")):
@@ -363,7 +366,7 @@ def build_tier(unit: dict[str, object], tier: int) -> TierUnit:
     if tier <= lit_tiers:
         start = (tier - 1) * TIER_SIZE
         chosen = literature[start : start + TIER_SIZE]
-        approval = approval_line(unit, heading=str(unit.get("case") or "B") == "B")
+        approval = approval_line(unit)
         built = TierUnit(
             prompt=LITERATURE_PROMPT,
             label_block=label_block(unit),

@@ -65,6 +65,16 @@ Same rules as `docs/runbooks/adjudicate-section-14.md`:
    file, and the output format `<unit_id> = <OPTION>`, one line per unit, nothing else.
 4. Raw answers: `adjudication/label_role_raw/v1/lrole-batch-NNN-{A,B}.txt`.
 
+### Delivery without files (agent pool, 2026-10-01)
+
+A pool job (`no_tools: true`) cannot read the units file, so the prompt is rendered in code:
+`main.py --mode render-prompts --task label-role --batch <lrole-…-NNN.ids>` writes
+`<batch>.requests.jsonl`, one complete prompt per unit (`service/prompt_render.py`: template read
+verbatim from `docs/prompts/label-trial-role.md`, version checked against the code, every field filled, an
+empty field refuses). A reply counts only if it is exactly one of the six roles on one line
+(`prompt_render.role_reply_line`); the code then writes `<unit_id> = <ROLE>` to the judge's raw
+file. Anything else writes nothing and the unit stays undecided.
+
 ## Step 3 — combine and tiebreak
 
 | judge A | judge B | final |

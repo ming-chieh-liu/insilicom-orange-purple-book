@@ -1,21 +1,20 @@
 # Prompt — is this candidate the evidence for an approval with no trial text? (per-candidate Yes/No)
 
-**Version:** 3 · **Created:** 2026-09-29 · **v2:** 2026-09-30 (D37) · **v3:** 2026-10-01 (D39) · **Decision:** D35 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
+**Version:** 4 · **Created:** 2026-09-29 · **v2:** 2026-09-30 (D37) · **v3:** 2026-10-01 (D39) · **v4:** 2026-10-01 · **Decision:** D35 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
 
+**v4 (2026-10-01):** the "APPROVED FOR says not recorded" rule is removed. It served case D, which since D37 is judged with `trial-literature-match.md`; this prompt now serves only C−, which always has an indication.
 **v3 (2026-10-01, D39):** prompt wording unchanged; fields gain our normalised codes beside the raw text — `Conditions (normalised):` / `Interventions (normalised):` lines per candidate and the approved drug's and indication's codes, each as `Name [MeSH D…]` or `PubChem:CID…`. They are NLM's and our coding and may be incomplete; a missing line means no code, not a mismatch.
 
-The case C and case D counterpart of `docs/prompts/trial-candidate-match.md` (case B). Used where
-the FDA documents give **no §14 description** of the trial:
-
-- **Case C** — the submission's approved indication is known (the approval letter's "provides
-  for …" sentence, else its label's section 1); candidates are the drug's registry trials,
-  filtered on that indication, plus trials the literature names for this drug and indication.
-- **Case D** — no indication is recorded; candidates are trials named in the literature on what
-  the drug treats, each shown with the diseases it was found under.
+The route C− counterpart of `docs/prompts/trial-candidate-match.md` (B−). Used where the FDA
+documents give **no §14 description** of the trial but the submission's approved indication is
+known (the approval letter's "provides for …" sentence, else its label's section 1); candidates
+are the drug's registry trials, filtered on that indication. Since D37 the literature's trials for
+this drug and indication (C+) and the no-indication case (D) are judged with
+`docs/prompts/trial-literature-match.md` instead.
 
 One judgement = one **tier** of up to 10 candidates, each answered on its own, exactly as in D33.
 A submission stops at the first tier holding a Yes; its answer is the highest-ranked Yes.
-Results are tier C (case C) or tier D (case D), never promoted (`docs/TIERS.md`).
+Results are tier C−, never promoted (`docs/TIERS.md`).
 
 Changing this file changes what stored answers mean: **bump the version** and stamp it on every
 row rather than editing in place (`candidate_match.NOLABEL_PROMPT_VERSION`).
@@ -50,10 +49,6 @@ RULES:
 - Answer Yes only if the candidate is an interventional efficacy study of this
   drug, in the approved disease and population, whose primary results could
   have been available by the date of approval.
-- If "APPROVED FOR" says not recorded, the approval could be for any disease;
-  use the "Named in literature on" line to see what the trial is about, and
-  answer Yes only for an interventional efficacy study of this drug that could
-  have supported an approval before the date.
 - Answer No for observational studies, registries, extensions and long-term
   safety follow-ups, pharmacokinetic or bioequivalence studies in healthy
   volunteers, studies of a different drug or a different disease, and trials
@@ -83,9 +78,9 @@ v3 additions (D39): `{{approval}}` gains `Drug (normalised): …` and `Indicatio
 | Field | Built from |
 |---|---|
 | `{{drug}}` | the approved drug as `<brand> (<generic>)` from P1's `drug_names.tsv` (v2); the ingredient names where the table has none |
-| `{{indication}}` | case C: the submission's chosen indication text (`submission_indications.tsv`, `chosen = true`, up to 2,000 characters); when that is the drug's **current** openFDA label rather than a document of this submission, it is prefixed `(no document of this submission states its indication; this is the drug's current label, which may include indications approved later)` (2026-09-30 — field content, not prompt wording); case D: `not recorded` |
+| `{{indication}}` | case C: the submission's chosen indication text (`submission_indications.tsv`, `chosen = true`, up to 2,000 characters); when that is the drug's **current** openFDA label rather than a document of this submission, it is prefixed `(no document of this submission states its indication; this is the drug's current label, which may include indications approved later)` (2026-09-30 — field content, not prompt wording); case D no longer uses this prompt (D37) |
 | `{{approval_date}}` | the submission's approval date |
-| `{{candidates}}` | one block per candidate, in rank order: the same fields as the excerpt prompt v2 (status and why stopped included), plus `Named in literature on:` for case D |
+| `{{candidates}}` | one block per candidate, in rank order: the same fields as the excerpt prompt v2 (status and why stopped included), (case C− only since D37; no `Named in literature on:` line) |
 
 ## Changes in v2 (2026-09-30, D37)
 

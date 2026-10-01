@@ -25,6 +25,19 @@ D37 was committed (9aa3db5) and rebuilt (recall 80.0%, 2,206/2,756 first appeara
 
 Biosimilar copied labels stay in the S11 ground truth (user, 2026-10-01).
 
+**D39 rebuilt 2026-10-01** (`make candidates`, d62f9c5; only S10 stale): `id_bridge.tsv` 14,462
+bridges; 159,691 studies indexed after the phase rule; median 44 candidates per unit; units
+needing judgement 18,445, C units with candidates 2,236, D 153. Shortlist recall (S11, units
+with any candidate) 2,236 / 2,739 = **81.6%** (was 80.0%, 2,206 / 2,756); over all 3,093
+first-appearance known answers 72.3%. Of 692 missed trials, the phase rule accounts for 32
+(11 blank, 4 NA, 17 phase 1 under 100), 8 are not in the archive, 653 are drug, date,
+indication or cap.
+
+**File-independent prompts 2026-10-01:** `service/prompt_render.py` and
+`--mode render-prompts --task match|review-role|label-role --batch <ids>` render every unit as a
+complete prompt (`<batch>.requests.jsonl`); APPROVAL line no longer repeats the §14 heading;
+no-label prompt v4 (dead case-D rule removed). The pool client that sends them is not built.
+
 Next: commit D39 → `make candidates` → pilots per route (two
 judges + third) → full runs (two judges + third, D40) → S10 → D28 label roles → S10 → S11.
 

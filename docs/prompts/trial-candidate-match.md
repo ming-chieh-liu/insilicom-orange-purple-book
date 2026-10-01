@@ -77,7 +77,7 @@ v3 additions (D39): `{{approval}}` gains `Drug (normalised): …` and `Indicatio
 
 | Field | Built from |
 |---|---|
-| `{{approval}}` | `<brand> (<generic>) · <application> <submission type> <number> · approved <date> · section 14 heading: <heading>` — the drug from P1's `drug_names.tsv` (v2) |
+| `{{approval}}` | `<brand> (<generic>) · <application> <submission type> <number> · approved <date>` — the drug from S2's `drug_names.tsv` (v2); then `Drug (normalised): …` and `Indication (normalised): …` (v3). The §14 heading is no longer repeated here (2026-10-01, field content only): `{{excerpt}}` is the whole subsection, which opens with it |
 | `{{excerpt}}` | the section-14 excerpt P2 extracted for this description |
 | `{{trial_name}}` | the label's trial name, or `(the label gives no name)` |
 | `{{enrollment}}` | the label's patient count, or `(the label gives no count)` |
