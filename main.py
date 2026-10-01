@@ -37,7 +37,9 @@ from config.settings import (
 from dao.biokde import BiokdeRepository, connection_uri
 from dao.graph_evidence import GraphEvidenceRepository
 from dao.tsv_repository import TsvRepository
-from source import label_pdf, mesh_descriptors, moiety, review_docs, trial_studies, unii_bridge
+from source import (
+    label_pdf, mesh_descriptors, moiety, review_docs, trial_studies, unii_bridge, unii_mesh,
+)
 from source.raw_table import read_rows
 from service import (
     candidate_match,
@@ -45,6 +47,7 @@ from service import (
     assemble,
     candidates,
     approval_events,
+    drug_identity,
     drug_names as drug_names_table,
     approval_map,
     attribution,
@@ -68,6 +71,10 @@ from service import (
     validate,
 )
 from config.agent_pool import AgentPoolConnection
+from config.ikraph2 import Ikraph2Connection
+from dao.ikraph2_api import Ikraph2Api, Ikraph2Literature
+from dao.ikraph2_entities import Ikraph2Entities
+from dao.ikraph2_entities import connection_uri as ikraph2_uri
 from dao.agent_pool import AgentPool, PoolError
 from utility import freshness
 from utility.logging import configure
@@ -492,7 +499,10 @@ def main(argv: list[str] | None = None) -> int:
             serverSelectionTimeoutMS=connection.timeout_ms,
         )
         try:
-            gt_repository = GraphEvidenceRepository(gt_client, connection)
+            # D42: edges and PMIDs from iKraph2, abstracts from iKraph1.
+            gt_repository = Ikraph2Literature(
+                Ikraph2Api(Ikraph2Connection(credentials=Path(args.creds))),
+                GraphEvidenceRepository(gt_client, connection))
             gt_report = graph_trials.build(
                 out_dir,
                 gt_repository,
@@ -566,7 +576,10 @@ def main(argv: list[str] | None = None) -> int:
             serverSelectionTimeoutMS=connection.timeout_ms,
         )
         try:
-            gl_repository = GraphEvidenceRepository(graph_client, connection)
+            # D42: edges and PMIDs from iKraph2, abstracts from iKraph1.
+            gl_repository = Ikraph2Literature(
+                Ikraph2Api(Ikraph2Connection(credentials=Path(args.creds))),
+                GraphEvidenceRepository(graph_client, connection))
             graph_report = graph_links.build(
                 out_dir,
                 gl_repository,
@@ -1308,10 +1321,39 @@ def main(argv: list[str] | None = None) -> int:
                 for row in csv.DictReader(handle, delimiter="\t")
                 if row.get("mesh_id")
             ]
-        # One client per process: MongoClient is the pool. It is built here and
-        # injected, so nothing under service/ knows a host or a credential.
+        # D42: each FDA ingredient's exact ids — UNII -> MeSH by MeSH's own
+        # registry numbers, and its iKraph2 node by exact db_id.
+        folded = moiety.read(Path(args.moiety))
+        uniis_by_name = drug_names_table.unii_index(data)
+        trial_apps = frozenset(r.application for r in approval_events.build(data).rows
+                               if r.trial_relevant == "true")
+        ingredient_names = sorted({n for names in normalize.ingredients_of(
+            data, trial_apps).values() for n in names})
+        ingredient_uniis = drug_identity.uniis_of(ingredient_names, uniis_by_name, folded)
+        fda_names_of: dict[str, set[str]] = {}
+        for name, name_uniis in ingredient_uniis.items():
+            for unii in name_uniis:
+                fda_names_of.setdefault(unii, set()).add(name)
+        mesh_files = [Path(args.mesh), data.mesh_supplementary]
+        unii_mesh_rows, unii_mesh_report = unii_mesh.build(
+            unii_mesh.mesh_records(mesh_files), fda_names_of,
+            unii_mesh.unii_names(read_rows(data.unii_names)))
+        pubchem_of = unii_bridge.unii_to_pubchem(
+            unii_bridge.read_unii_records(data.unii_records))
+        ik2_connection = Ikraph2Connection(credentials=Path(args.creds))
         import pymongo
 
+        ik2_client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
+            ikraph2_uri(ik2_connection), serverSelectionTimeoutMS=ik2_connection.timeout_ms)
+        try:
+            identities, identity_report = drug_identity.build(
+                ingredient_names, ingredient_uniis,
+                {r.unii: (r.mesh_id, r.mesh_name) for r in unii_mesh_rows}, pubchem_of,
+                Ikraph2Entities(ik2_client, ik2_connection).by_db_id)
+        finally:
+            ik2_client.close()
+        # One client per process: MongoClient is the pool. It is built here and
+        # injected, so nothing under service/ knows a host or a credential.
         client: pymongo.MongoClient[dict[str, Any]] = pymongo.MongoClient(
             connection_uri(connection),
             serverSelectionTimeoutMS=connection.timeout_ms,
@@ -1322,7 +1364,6 @@ def main(argv: list[str] | None = None) -> int:
                 vocabulary
             )
             archive = TrialArchive(root=Path(args.trial_archive))
-            folded = moiety.read(Path(args.moiety))
             normalize_report = normalize.build(
                 data,
                 archive,
@@ -1331,10 +1372,16 @@ def main(argv: list[str] | None = None) -> int:
                 indication_ids,
                 folded,
                 descriptor_names,
+                identities,
             )
         finally:
             client.close()
         repository_out = TsvRepository(args.out)
+        repository_out.save("unii_mesh", unii_mesh.UniiMesh._fields, unii_mesh_rows)
+        repository_out.save("drug_identity", drug_identity.DrugIdentity._fields,
+                            [identities[n] for n in sorted(identities)])
+        print(unii_mesh.render(unii_mesh_report))
+        print(drug_identity.render(identity_report))
         # Named so a reader cannot mistake one column for another: the row
         # holds three different identifiers plus two names, and an empty
         # official_name once made 11542 look like the entity's name.
@@ -1360,12 +1407,12 @@ def main(argv: list[str] | None = None) -> int:
                       if r.trial_relevant == "true"),
             folded,
             moiety.read_generic_names(Path(args.moiety)),
-            drug_names_table.unii_index(data),
+            uniis_by_name,
         )
         repository_out.save("drug_names", drug_names_table.DrugNames._fields, names_rows)
         # D39: the exact PubChem <-> MeSH bridge through UNII, one-to-one only.
         bridges = unii_bridge.build(
-            unii_bridge.unii_to_pubchem(unii_bridge.read_unii_records(data.unii_records)),
+            pubchem_of,
             unii_bridge.mesh_to_unii(unii_bridge.mesh_registry(
                 [Path(args.mesh), data.mesh_supplementary])),
         )

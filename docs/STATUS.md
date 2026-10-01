@@ -10,7 +10,7 @@ to-do list in `CLAUDE.md` ("Current status") points here.
 | Stage | State | Notes |
 |---|---|---|
 | S1 spine | done | 11,295 trial-relevant events |
-| S2 drugs | **D39 code changed, not rebuilt** | `id_bridge.tsv` new (UNII PubChem ↔ MeSH, one-to-one, 14,462); `drug_names.tsv` gains `sponsor`; `drug_names.tsv` new (brand, generic, ingredients, moieties, UNIIs); iKraph2 migration pending the user; tie-break (enoxaparin → heparin, 4 drugs) and belatacept roll-up left for the iKraph2 migration (user, 2026-10-01) |
+| S2 drugs | **D42 rebuilt 2026-10-01** | `unii_mesh.tsv` (UNII → MeSH by MeSH RegistryNumber, one record + shared name: 2,557 of 3,068 UNIIs); `drug_identity.tsv` (per ingredient: UNIIs, MeSH, iKraph2 nodes — 2,245 TherapyPreventions, 180 Chemical, 245 none); `drug_map.tsv` mesh ids now 2,353 MeSH / 154 PubChem (was 1,093 / 1,283), `biokdeid` = iKraph2 node(s) `;`-joined; trial name index 19,398 strings (19,408 before). Tie-break (enoxaparin → heparin) and belatacept roll-up: re-check on the D42 ids |
 | S3 registry | **code changed, not rebuilt** | dose-stripped drug names (99.7% precise); status and why-stopped read; WITHDRAWN / NOT_YET_RECRUITING dropped |
 | S4 documents | done | labels 6,423/6,451 PDFs; letters 6,596/6,662; reviews as complete as FDA allows (118 of 131 missing are 404) |
 | S5 indications | **code changed, not rebuilt** | registry aliases must share a word with their descriptor |

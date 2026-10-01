@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from typing import cast
-
+from collections.abc import Iterable
 from pathlib import Path
+from typing import cast
 
 from dao.graph_evidence import GraphEvidenceRepository, Mention
 from service import graph_trials
@@ -22,6 +22,11 @@ class _FakeGraph:
         self._mentions = mentions or {}
         self.pairs_asked: list[tuple[str, str]] = []
         self.pmids_asked: list[str] = []
+
+        self.prefetched: list[tuple[str, str]] = []
+
+    def prefetch(self, pairs: Iterable[tuple[str, str]]) -> None:
+        self.prefetched = list(pairs)
 
     def pmids_for(self, drug: str, disease: str) -> list[str]:
         self.pairs_asked.append((drug, disease))
@@ -264,3 +269,19 @@ def test_abstracts_round_trip_through_their_file(tmp_path: Path) -> None:
     assert got["1"] == {"pmid": "1", "title": "T", "abstract": "text",
                         "publication_types": ["Review"]}
     assert set(got) == {"1", "2"}
+
+
+def test_every_pair_is_prefetched_and_multi_node_drugs_are_split(tmp_path: Path) -> None:
+    """D42: a drug row may carry several iKraph2 nodes, ";"-joined; each is a
+    drug to walk, and the loop's pairs are exactly the ones prefetched."""
+    out = _workspace(tmp_path)
+    (out / "drug_map.tsv").write_text(
+        "source_name\tmesh_id\tbiokdeid\tpreferred_name\tentity_type\tbasis\n"
+        "PEMBROLIZUMAB\tMESH:C582435\tbk-a;bk-b\tPembrolizumab\tChemical\tunii_registry\n",
+        encoding="utf-8",
+    )
+    graph = _FakeGraph()
+    graph_trials.build(out, cast(GraphEvidenceRepository, graph), frozenset({"BLA1"}),
+                       {"BLA1": frozenset({"PEMBROLIZUMAB"})})
+    assert graph.prefetched == [("bk-a", "bk-dis"), ("bk-b", "bk-dis")]
+    assert graph.pairs_asked == graph.prefetched

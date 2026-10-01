@@ -26,7 +26,7 @@ from __future__ import annotations
 
 import re
 from collections.abc import Callable, Iterable
-from typing import Any, NamedTuple
+from typing import Any, NamedTuple, Protocol
 
 from config.settings import BiokdeConnection
 from utility.logging import get_logger
@@ -142,6 +142,25 @@ class Abstract(NamedTuple):
     publication_types: tuple[str, ...]
 
 
+class LiteratureSource(Protocol):
+    """What S7 reads literature through: iKraph1 (:class:`GraphEvidenceRepository`)
+    or iKraph2 edges with iKraph1 abstracts (:class:`dao.ikraph2_api.Ikraph2Literature`, D42)."""
+
+    def pmids_for(self, drug: str, disease: str) -> list[str]: ...
+
+    def treatment_edges(self, drug: str) -> list[TreatmentEdge]: ...
+
+    def mentions_in(self, pmids: Iterable[str],
+                    resolve: Callable[[str], list[tuple[str, str]]] | None = None
+                    ) -> list[Mention]: ...
+
+    def abstracts(self, pmids: Iterable[str]) -> list[Abstract]: ...
+
+    def prefetch(self, pairs: Iterable[tuple[str, str]]) -> None: ...
+
+    def prefetch_treatments(self, drugs: Iterable[str]) -> None: ...
+
+
 class GraphEvidenceRepository:
     """Edge and abstract lookups against one injected, pooled client."""
 
@@ -149,6 +168,12 @@ class GraphEvidenceRepository:
         database = client[connection.database]
         self._relations = database["pubmedRelations"]
         self._documents = database["pubmedDocs"]
+
+    def prefetch(self, pairs: Iterable[tuple[str, str]]) -> None:
+        """Nothing to warm: Mongo answers each pair directly."""
+
+    def prefetch_treatments(self, drugs: Iterable[str]) -> None:
+        """Nothing to warm: Mongo answers each drug directly."""
 
     def pmids_for(self, drug: str, disease: str) -> list[str]:
         """Every PMID supporting the edge between these two internal ids.
@@ -297,6 +322,7 @@ __all__ = [
     "NEGATIVE_CORRELATION",
     "PMID_IN_LOCATION",
     "GraphEvidenceRepository",
+    "LiteratureSource",
     "Mention",
     "TreatmentEdge",
     "points_from",

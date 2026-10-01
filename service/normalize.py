@@ -40,7 +40,7 @@ from __future__ import annotations
 import re
 from collections import Counter
 from collections.abc import Iterable
-from typing import NamedTuple
+from typing import TYPE_CHECKING, NamedTuple
 
 from config.settings import RawData, TrialArchive
 from dao.biokde import BiokdeRepository, Entity
@@ -50,6 +50,9 @@ from source.moiety import BIOSIMILAR_SUFFIX, Moiety
 from source.raw_table import read_rows
 from utility import application_number as appno
 from utility.logging import get_logger
+
+if TYPE_CHECKING:
+    from service.drug_identity import DrugIdentity
 
 _log = get_logger(__name__)
 
@@ -574,7 +577,8 @@ def stripped_match_ok(stripped: str, mesh_id: str, nlm_mesh: set[str] | None) ->
 
 
 def synonym_index(
-    mesh_ids: list[str], repository: BiokdeRepository, concepts: dict[str, str]
+    mesh_ids: list[str], repository: BiokdeRepository, concepts: dict[str, str],
+    alias: dict[str, str] | None = None,
 ) -> dict[str, str]:
     """Case-folded synonym → MeSH id, for matching the trial side.
 
@@ -586,6 +590,10 @@ def synonym_index(
     A synonym claimed by more than one id is dropped, not arbitrated — an
     ambiguous name is not evidence, and keeping the first one seen would make
     the result depend on query order.
+
+    ``alias`` (D42) maps an expanded id to the id its spellings should point
+    to: iKraph1's old id for a drug whose MeSH id now comes from its UNII, so
+    the trial spellings iKraph1 knew under the old id still reach the drug.
     """
     expanded = repository.synonyms(
         [identifier for identifier in mesh_ids if is_identifier(identifier)]
@@ -593,7 +601,7 @@ def synonym_index(
     claims: dict[str, set[str]] = {}
     dropped_design = 0
     for mesh_id, names in expanded.items():
-        rolled = roll_up(mesh_id, concepts)
+        rolled = (alias or {}).get(mesh_id) or roll_up(mesh_id, concepts)
         for name in names:
             folded = name.casefold()
             if folded in DESIGN_WORDS:
@@ -729,6 +737,76 @@ def _match_trial_strings(
     return tuple(sorted(rows)), coverage
 
 
+#: ``basis`` of a drug row whose MeSH id came from its UNII (D42).
+BASIS_UNII_REGISTRY = "unii_registry"
+
+
+def with_identities(
+    drugs: dict[str, Mapping], identities: dict[str, DrugIdentity]
+) -> dict[str, Mapping]:
+    """The FDA drug rows under D42: UNII registry MeSH first, iKraph2 nodes.
+
+    * a UNII-mapped ingredient takes that MeSH id, whatever iKraph1 said;
+    * otherwise iKraph1's id stays, as the recorded fallback (its ``basis``);
+    * an ingredient with neither but with an iKraph2 node is kept under its
+      UNII, so the literature route can still walk it — no trial is coded
+      with a UNII, so it reaches no registry trial;
+    * every row's ``biokdeid`` is its iKraph2 node(s), ``;``-joined, or "".
+
+    >>> from service.drug_identity import DrugIdentity
+    >>> old = {"A": Mapping("A", "MESH:D1", "11", "a", "Chemical", "exact")}
+    >>> ids = {"A": DrugIdentity("A", "U1", "MESH:D9", "Nine", "27", "TherapyPreventions",
+    ...                          "unii_registry"),
+    ...        "B": DrugIdentity("B", "U2", "", "", "28", "TherapyPreventions", "unii_no_mesh")}
+    >>> [(m.mesh_id, m.biokdeid, m.basis) for m in with_identities(old, ids).values()]
+    [('MESH:D9', '27', 'unii_registry'), ('UNII:U2', '28', 'unii_no_mesh')]
+    """
+    out: dict[str, Mapping] = {}
+    for name in dict.fromkeys([*drugs, *identities]):
+        identity = identities.get(name)
+        existing = drugs.get(name)
+        if identity is None:
+            if existing is not None:
+                out[name] = existing._replace(biokdeid="")
+            continue
+        if identity.mesh_id:
+            out[name] = Mapping(name, identity.mesh_id, identity.nodes, identity.mesh_name,
+                                identity.node_type or "Chemical", BASIS_UNII_REGISTRY)
+        elif existing is not None:
+            out[name] = existing._replace(biokdeid=identity.nodes)
+        elif identity.nodes:
+            first = identity.uniis.split(";")[0]
+            out[name] = Mapping(name, f"UNII:{first}", identity.nodes, "",
+                                identity.node_type, identity.basis)
+    return out
+
+
+def renamed_ids(before: dict[str, Mapping], after: dict[str, Mapping]) -> dict[str, str]:
+    """Old id → new id for drug rows whose id changed, where that is one-to-one.
+
+    An old id that would point to two different new ids is left out: its
+    spellings cannot say which drug they mean.
+
+    >>> m = lambda n, i: Mapping(n, i, "", "", "", "")
+    >>> renamed_ids({"A": m("A", "PubChem:CID1"), "B": m("B", "X:1"), "C": m("C", "X:1"),
+    ...              "D": m("D", "MESH:D4")},
+    ...             {"A": m("A", "MESH:D1"), "B": m("B", "MESH:D2"), "C": m("C", "MESH:D3"),
+    ...              "D": m("D", "MESH:D4")})
+    {'PubChem:CID1': 'MESH:D1'}
+    >>> renamed_ids({"A": m("A", "X:9"), "B": m("B", "X:9")},
+    ...             {"A": m("A", "MESH:D1"), "B": m("B", "X:9")})
+    {}
+    """
+    targets: dict[str, set[str]] = {}
+    for name, old in before.items():
+        new = after.get(name)
+        if new is not None and old.mesh_id and new.mesh_id:
+            targets.setdefault(old.mesh_id, set()).add(new.mesh_id)
+    still_used = {m.mesh_id for m in after.values()}
+    return {old: next(iter(new)) for old, new in targets.items()
+            if len(new) == 1 and old not in still_used}
+
+
 def build(
     data: RawData,
     archive: TrialArchive,
@@ -737,8 +815,15 @@ def build(
     indication_ids: list[str],
     moieties: dict[str, Moiety] | None = None,
     descriptor_names: dict[str, str] | None = None,
+    identities: dict[str, DrugIdentity] | None = None,
 ) -> NormalizeReport:
-    """Run all four normalisation passes and report what each covered."""
+    """Run all four normalisation passes and report what each covered.
+
+    ``identities`` (D42, :mod:`service.drug_identity`) overrides the FDA side
+    before the trial side is matched: an ingredient whose UNII maps to MeSH
+    takes that id, and every drug row's ``biokdeid`` becomes its iKraph2
+    node(s). The trial-side synonym index is then built on the new ids.
+    """
     spine = approval_events.build(data)
     applications = frozenset(
         row.application for row in spine.rows if row.trial_relevant == "true"
@@ -754,6 +839,11 @@ def build(
         moieties,
         stems=True,
     )
+    alias: dict[str, str] = {}
+    if identities is not None:
+        previous = drugs
+        drugs = with_identities(drugs, identities)
+        alias = renamed_ids(previous, drugs)
     unresolved_applications = sum(
         1
         for application in applications
@@ -795,7 +885,7 @@ def build(
     )
 
     drug_index = synonym_index(
-        sorted({m.mesh_id for m in drugs.values()}), repository, concepts
+        sorted({m.mesh_id for m in drugs.values()} | set(alias)), repository, concepts, alias
     )
     condition_index = synonym_index(
         sorted({m.mesh_id for m in rolled_indications.values()}), repository, concepts
@@ -895,6 +985,7 @@ def counted(mappings: dict[str, Mapping]) -> tuple[tuple[str, int], ...]:
 
 
 __all__ = [
+    "BASIS_UNII_REGISTRY",
     "DESIGN_WORDS",
     "MIN_SYNONYM_LENGTH",
     "WEAK_SYNONYM_RATIO",
@@ -916,7 +1007,9 @@ __all__ = [
     "normalise",
     "preferred",
     "render_coverage",
+    "renamed_ids",
     "roll_up",
     "source_of",
     "synonym_index",
+    "with_identities",
 ]

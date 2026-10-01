@@ -37,7 +37,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import Any, NamedTuple
 
-from dao.graph_evidence import ABSTRACT_BUDGET, Abstract, GraphEvidenceRepository
+from dao.graph_evidence import ABSTRACT_BUDGET, Abstract, LiteratureSource
 from service import indication_normalize
 from utility.logging import get_logger
 
@@ -110,7 +110,7 @@ def _read_tsv(path: Path) -> list[dict[str, str]]:
 
 def build(
     out_dir: Path,
-    repository: GraphEvidenceRepository,
+    repository: LiteratureSource,
     applications: frozenset[str],
     ingredients: dict[str, frozenset[str]],
     budget: int = ABSTRACT_BUDGET,
@@ -150,6 +150,23 @@ def build(
             if found:
                 by_application[row["application"]].add(found)
 
+    def drugs_of(application: str) -> set[str]:
+        return {
+            node
+            for name in ingredients.get(application, frozenset())
+            if name in drug_of
+            for node in drug_of[name].split(";")
+            if node
+        }
+
+    # D42: the iKraph2 API is slow per cold edge, so every pair the loop below
+    # will ask about is fetched first, several drugs at once.
+    repository.prefetch(
+        (drug, disease)
+        for application in sorted(applications)
+        for drug in sorted(drugs_of(application))[:MAX_DRUGS]
+        for disease in sorted(by_application.get(application, set()))[:MAX_DISEASES]
+    )
     rows: list[GraphTrial] = []
     with_drug = with_disease = with_edge = with_trials = 0
     started = time.monotonic()
@@ -168,11 +185,7 @@ def build(
                 with_edge,
                 with_trials,
             )
-        drugs = {
-            drug_of[name]
-            for name in ingredients.get(application, frozenset())
-            if name in drug_of
-        }
+        drugs = drugs_of(application)
         diseases = by_application.get(application, set())
         if drugs:
             with_drug += 1

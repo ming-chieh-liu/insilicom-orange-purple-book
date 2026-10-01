@@ -34,7 +34,7 @@ from typing import NamedTuple
 
 from dao.graph_evidence import (
     ABSTRACT_BUDGET,
-    GraphEvidenceRepository,
+    LiteratureSource,
     Mention,
     TreatmentEdge,
 )
@@ -310,7 +310,7 @@ __all__ = [
 
 def build(
     out_dir: Path,
-    repository: GraphEvidenceRepository,
+    repository: LiteratureSource,
     studies: Mapping[str, tuple[str, ...]],
     unserved: set[str],
     ingredients: dict[str, frozenset[str]],
@@ -370,19 +370,35 @@ def build(
     sizes: Counter[int] = Counter()
     walked: dict[frozenset[str], tuple[list[Mention], dict[str, list[str]], int]] = {}
 
+    def drugs_of(application: str) -> set[str]:
+        return {
+            node
+            for name in ingredients.get(application, frozenset())
+            if name in drug_of
+            for node in drug_of[name].split(";")
+            if node
+        }
+
+    def diseases_of(key: str, application: str) -> set[tuple[str, str]]:
+        return chosen.get(key, set()) if chosen else by_application.get(application, set())
+
+    # D42: warm the drug-only walks (the iKraph2 API is slow per cold edge),
+    # several drugs at once, for the submissions the loop below will walk.
+    in_scope = [k for k in sorted(unserved) if k in spine][:limit]
+    repository.prefetch_treatments(
+        drug
+        for key in in_scope
+        if not diseases_of(key, spine[key]["application"])
+        for drug in sorted(drugs_of(spine[key]["application"]))[:3]
+    )
+
     for key in sorted(unserved):
         if key not in spine:
             continue
         row = spine[key]
         considered += 1
-        drugs = {
-            drug_of[name]
-            for name in ingredients.get(row["application"], frozenset())
-            if name in drug_of
-        }
-        diseases = chosen.get(key, set()) if chosen else by_application.get(
-            row["application"], set()
-        )
+        drugs = drugs_of(row["application"])
+        diseases = diseases_of(key, row["application"])
         if drugs:
             with_drug += 1
         if diseases:
@@ -541,7 +557,7 @@ def _drug_only_unit(
     key: str,
     row: dict[str, str],
     drugs: set[str],
-    repository: GraphEvidenceRepository,
+    repository: LiteratureSource,
     studies: Mapping[str, tuple[str, ...]],
     budget: int,
     resolve: Callable[[str], list[tuple[str, str]]] | None = None,
