@@ -32,7 +32,6 @@ Prompt: the label rendering of ``docs/prompts/fda-document-trial-role.md``; runb
 
 from __future__ import annotations
 
-import csv
 import re
 from collections import Counter
 from collections.abc import Iterable, Mapping
@@ -263,20 +262,6 @@ def sections_by_submission(records: Iterable[Mapping[str, object]]) -> dict[str,
     return {key: "\n\n".join(parts) for key, parts in texts.items() if parts}
 
 
-def read_sentences(out_dir: Path) -> dict[str, str]:
-    """Each submission's approval-letter indication sentence (D25), if any."""
-    out: dict[str, str] = {}
-    path = out_dir / "letter_indications.tsv"
-    if not path.is_file():
-        return out
-    with path.open(encoding="utf-8") as handle:
-        for row in csv.DictReader(handle, delimiter="\t"):
-            if row.get("sentence"):
-                out[f"{row['application']}|{row['submission_type']}|{row['submission_no']}"] = \
-                    row["sentence"]
-    return out
-
-
 def approval_line(key: str, approval_date: str, brands: Iterable[str],
                   sentence: str) -> str:
     """The APPROVAL BEING JUDGED line, built exactly as the review route builds it.
@@ -378,7 +363,6 @@ __all__ = [
     "approval_line",
     "build_units",
     "target_label",
-    "read_sentences",
     "combine",
     "name_beside_id",
     "passages",

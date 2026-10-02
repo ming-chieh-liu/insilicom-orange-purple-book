@@ -293,6 +293,23 @@ def test_the_shortlist_is_returned_in_rank_order_below_the_cap() -> None:
     assert [c.nct_id for c in got] == ["NCT2", "NCT1"]
 
 
+def test_a_trial_still_running_after_the_approval_ranks_below_one_done_by_it() -> None:
+    """Two groups (2026-10-02): done by approval + 6 months, or undated, first;
+    later after. Phase 3 still outranks it; start date still orders each group."""
+    studies = {
+        "NCT1": _candidate("NCT1", start="2016-01-01")._replace(
+            phases="PHASE3", primary_completion="2021-01-01"),    # late, newer start
+        "NCT2": _candidate("NCT2", start="2012-01-01")._replace(
+            phases="PHASE3", primary_completion="2018-12-01"),    # done within 6 months
+        "NCT3": _candidate("NCT3", start="2013-01-01")._replace(phases="PHASE3"),  # undated
+        "NCT4": _candidate("NCT4", start="2016-06-01")._replace(
+            phases="PHASE2", primary_completion="2017-01-01"),    # done, but phase 2
+    }
+    by_drug = {"MESH:D1": set(studies)}
+    got = candidates.shortlist({"MESH:D1"}, "", "2018-08-20", studies, by_drug, {})
+    assert [c.nct_id for c in got] == ["NCT3", "NCT2", "NCT1", "NCT4"]
+
+
 def test_literature_trials_are_kept_out_of_the_shortlist() -> None:
     """D37: a trial the literature names is judged on the "+" route only."""
     studies = {

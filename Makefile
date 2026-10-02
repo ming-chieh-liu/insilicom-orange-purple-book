@@ -44,7 +44,7 @@ STEPS := \
   normalize=service/normalize.py,service/drug_names.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,source/unii_bridge.py,source/unii_mesh.py,source/substance_ids.py,service/drug_identity.py,service/registry_identity.py,service/approval_events.py,dao/ikraph2_entities.py,dao/tsv_repository.py \
   labels=service/section14.py,dao/tsv_repository.py,dao/jsonl_repository.py \
   letters=service/letters.py,dao/tsv_repository.py \
-  reviews=service/review_trials.py,service/review_role.py,service/label_role.py,service/approval_events.py,source/review_docs.py,source/trial_studies.py,source/raw_table.py,dao/tsv_repository.py \
+  reviews=service/review_trials.py,service/letter_sentences.py,service/approval_events.py,source/review_docs.py,source/trial_studies.py,source/raw_table.py,dao/tsv_repository.py \
   indication_normalize=service/indication_normalize.py,service/indications.py,service/letter_locate.py,service/approval_events.py,source/trial_studies.py,dao/ikraph2_entities.py,dao/tsv_repository.py \
   graph_trials=service/graph_trials.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/ikraph2_api.py,dao/tsv_repository.py \
   graph_links=service/graph_links.py,service/indication_normalize.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/ikraph2_api.py,dao/tsv_repository.py \
@@ -123,7 +123,8 @@ $(OUT)/candidates.jsonl $(OUT)/submission_routes.tsv &: $(CODE_candidates) \
 		$(ADJ)/label_role_verdicts.jsonl \
 		$(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv $(OUT)/drug_map.tsv \
 		$(OUT)/drug_names.tsv $(OUT)/id_bridge.tsv $(OUT)/nlm_id_map.tsv \
-		$(OUT)/drug_identity.tsv
+		$(OUT)/drug_identity.tsv $(ADJ)/review_role_units.jsonl \
+		$(DRUGSFDA) $(TRIAL_MANIFEST) $(MESH_DESC) fda_raw/mesh/supp2026.xml
 	$(MAIN) --mode candidates
 
 # ---- P5 assemble ------------------------------------------------------------------------

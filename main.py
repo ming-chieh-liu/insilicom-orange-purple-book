@@ -59,6 +59,7 @@ from service import (
     indication_normalize,
     indications,
     label_role,
+    letter_sentences,
     letter_locate,
     pool_judging,
     precision_check,
@@ -1020,7 +1021,7 @@ def main(argv: list[str] | None = None) -> int:
                 word = part.strip().upper().split(" ")[0] if part.strip() else ""
                 if len(word) >= 5:
                     drug_names.setdefault(digits, set()).add(word)
-        sentences = label_role.read_sentences(Path(args.out))
+        sentences = letter_sentences.read_sentences(Path(args.out))
         rv_report = review_trials.build(
             [(r.application, r.submission_type, r.submission_no, r.approval_date) for r in in_scope],
             review_texts,
@@ -1084,7 +1085,7 @@ def main(argv: list[str] | None = None) -> int:
             lr_brands.setdefault((product.get("ApplNo") or "").strip().zfill(6), set()).add(
                 (product.get("DrugName") or "").strip()
             )
-        lr_sentences = label_role.read_sentences(Path(args.out))
+        lr_sentences = letter_sentences.read_sentences(Path(args.out))
         lr_approvals = {
             t.key: label_role.approval_line(t.key, lr_dates.get(t.key, ""),
                                             lr_brands.get(t.key.split("|")[0][-6:], set()),

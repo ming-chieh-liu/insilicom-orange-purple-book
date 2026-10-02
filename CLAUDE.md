@@ -405,6 +405,16 @@ code says `not yet implemented` until it lands.
   only on linking vs not; of 256 recorded review disagreements 137 split on linking, 34 were
   PIVOTAL/SUPPORTING and 85 two non-linking reasons.
 
+- **D48 — primary completion is a rank key, in two groups, never a filter** (2026-10-02,
+  **implemented in code 2026-10-02; S8 not yet re-run**). In the registry shortlist, after "phase 3
+  first" and before "nearest start": trials whose primary completion is by approval + 6 months, or
+  that have none, rank ahead of those completing later (`candidates._completed_late`). Two groups so
+  the keys below (start year, sponsor, patient count) still order each. No age cutoff. Why: the
+  user's choice; on 4,419 trials S6 judged PIVOTAL/SUPPORTING, 9.3% complete more than 6 months
+  after their approval (accelerated approvals on interim data, extended follow-up), so a filter would
+  lose them; trials completing more than 10 years before approval are mostly copies citing an
+  original product's trials (biosimilars, 505(b)(2)), so they get no penalty here.
+
 ## Current status and to-do
 
 Full detail, evidence and commands: **`docs/STATUS.md`** — read it at the start of a session and

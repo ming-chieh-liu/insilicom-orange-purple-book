@@ -418,6 +418,35 @@ def _years_before(start: str, approval: str) -> int:
         return 999
 
 
+#: Months after the approval within which a trial's primary completion still
+#: counts as "done by the approval" for ranking (2026-10-02).
+COMPLETION_GRACE_MONTHS: int = 6
+
+
+def _completed_late(primary_completion: str, approval: str) -> int:
+    """1 when a trial's primary completion falls more than
+    :data:`COMPLETION_GRACE_MONTHS` after the approval, else 0 (no date: 0).
+
+    A rank key only, in two groups so the keys below it still decide within
+    each (2026-10-02, the user's choice). Measured on 4,419 trials S6 judged
+    PIVOTAL or SUPPORTING: 9.3% completed later than this — accelerated
+    approvals on interim data, extended follow-up — so they are moved down,
+    never dropped. Compared by calendar month; a month-only date counts as
+    that month.
+
+    >>> _completed_late("2018-12-15", "2018-08-20"), _completed_late("2019-02", "2018-08-20")
+    (0, 0)
+    >>> _completed_late("2019-03-01", "2018-08-20"), _completed_late("", "2018-08-20")
+    (1, 0)
+    """
+    try:
+        done = int(primary_completion[:4]) * 12 + int(primary_completion[5:7] or 1)
+        approved = int(approval[:4]) * 12 + int(approval[5:7] or 1)
+    except ValueError:
+        return 0
+    return 1 if done > approved + COMPLETION_GRACE_MONTHS else 0
+
+
 def graph_supported(out_dir: Path) -> dict[str, frozenset[str]]:
     """Application → the trials the literature connects to its drug.
 
@@ -894,15 +923,15 @@ def _name_of(row: dict[str, str]) -> str:
     return row.get("acronym") or row.get("nct_id") or row.get("heading") or ""
 
 
-#: How close before a registry id a trial name must end to be that id's name.
-#: ``KEYNOTE-087 (NCT02453594)`` is 2 characters; a heading that ran into the
-#: sentence (``… Survival in KEYNOTE-204 KEYNOTE-087 … (NCT02453594)``) is not.
-PAIR_WINDOW: int = 40
-
-
 def paired_name(excerpt: str, nct: str) -> str | None:
     """The trial name written immediately before ``nct``; ``""`` when none is,
     ``None`` when the id is not in the excerpt at all.
+
+    By S4's own rule (2026-10-02): the names and gap of
+    :func:`service.section14.beside_names` and :func:`~service.section14.gap_allows_name`,
+    and every id spelling S4 reads. A different rule here split correct pairs
+    S4 had made — "(ALTA, NCT02094573)" read as unpaired because ALTA has no
+    digit — and sent 515 already-identified trials to S9 as case B.
 
     >>> paired_name("investigated in KEYNOTE-087 (NCT02453594), a trial", "NCT02453594")
     'KEYNOTE-087'
@@ -911,18 +940,18 @@ def paired_name(excerpt: str, nct: str) -> str | None:
     ''
     >>> paired_name("CHECKMATE-577 advanced ESCC CHECKMATE-648 (NCT 03143153) was", "NCT03143153")
     'CHECKMATE-648'
-    >>> paired_name("no id here", "NCT00000001") is None
-    True
+    >>> paired_name("a multicenter trial (ALTA, NCT02094573) in adults", "NCT02094573")
+    'ALTA'
+    >>> paired_name("Trial 4 (NCT #01957163)", "NCT01957163"), paired_name("no id here", "NCT00000001")
+    ('', None)
     """
-    found = re.search(r"NCT\s?" + re.escape(nct[3:]), excerpt)
+    found = re.search(r"NCT[\s:#-]{0,3}" + re.escape(nct[3:]), excerpt)
     if not found:
         return None
-    before = excerpt[: found.start()]
-    names = [
-        m.group(1) for m in section14.ACRONYM.finditer(before)
-        if m.end() >= found.start() - PAIR_WINDOW and not m.group(1).startswith("NCT")
-    ]
-    return names[-1] if names else ""
+    names = [m for m in section14.beside_names(excerpt, frozenset())
+             if m.end() <= found.start()
+             and section14.gap_allows_name(excerpt[m.end():found.start()])]
+    return names[-1].group(0) if names else ""
 
 
 def split_pairings(rows: list[dict[str, str]]) -> list[dict[str, str]]:
@@ -1288,6 +1317,9 @@ def shortlist(
        lifting the attainable ceiling from 77.8% to 84.7%.
     4. Condition match: 22%.
     5. Phase 3 ahead of earlier phases: 70% of true answers are phase 3.
+    5a. **Primary completion by the approval** (2026-10-02): trials completed
+       by approval + 6 months, or undated, before those completing later —
+       two groups, so the keys below still order each (:func:`_completed_late`).
     6. Nearest start date to the approval.
     6a. **The applicant's own trials (D39)** — the lead sponsor is the
        applicant or of its family (:mod:`source.sponsor_families`). After
@@ -1349,7 +1381,7 @@ def shortlist(
         matching |= by_condition.get(mesh, set())
     target = int(stated_enrollment) if stated_enrollment.isdigit() else None
 
-    def rank(nct: str) -> tuple[int, int, int, int, int, int, int, int, str]:
+    def rank(nct: str) -> tuple[int, int, int, int, int, int, int, int, int, str]:
         candidate = studies[nct]
         enrolled = candidate.enrollment
         if target is None or not enrolled.isdigit():
@@ -1362,6 +1394,9 @@ def shortlist(
             1,  # D37: was "named by the literature"; literature is its own route now
             0 if nct in matching else 1,
             0 if "PHASE3" in candidate.phases else 1,
+            # 2026-10-02: done by the approval (+6 months) or undated, before
+            # trials still running after it — two groups, a rank key only.
+            _completed_late(candidate.primary_completion, approval_date),
             _years_before(candidate.start_date, approval_date),
             # D39: the applicant's own (or its family's) trials first, after
             # the start date and before the patient count. A rank key only:
@@ -1381,6 +1416,7 @@ def shortlist(
 
 __all__ = [
     "CANDIDATE_CAP",
+    "COMPLETION_GRACE_MONTHS",
     "CASE_B",
     "Identified",
     "CASE_C",

@@ -92,14 +92,6 @@ def test_units_are_built_or_dropped_with_a_reason() -> None:
     assert "built" in label_role.render_units(report, Path("u.jsonl"))
 
 
-def test_letter_sentences_are_read(tmp_path: Path) -> None:
-    assert label_role.read_sentences(tmp_path) == {}
-    (tmp_path / "letter_indications.tsv").write_text(
-        "application\tsubmission_type\tsubmission_no\tsentence\n"
-        "A\tORIG\t1\tprovides for X\nB\tORIG\t1\t\n", encoding="utf-8")
-    assert label_role.read_sentences(tmp_path) == {"A|ORIG|1": "provides for X"}
-
-
 def test_the_judging_round_trip(tmp_path: Path) -> None:
     units = tmp_path / "units.jsonl"
     units.write_text("\n".join(json.dumps({"unit_id": u}) for u in
