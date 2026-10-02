@@ -54,3 +54,7 @@ adjudication/letter_locate_units.jsonl
 adjudication/letter_verify_units.jsonl
 adjudication/letter_candidate_units.jsonl
 .deps.mk
+
+# Rendered pool prompts — rebuilt from the units by render-prompts
+adjudication/**/*.requests.jsonl
+adjudication/**/*.requests-x*.jsonl
