@@ -1,30 +1,33 @@
-"""Which trials the literature associates with each application's drug.
+"""S7, drug × indication: the trials the literature names for each application.
 
-A **ranking input for the label route**, not a source of links. Tier C already
-walks the same edges to *produce* links where a label yields nothing (see
-:mod:`service.graph_links`); this walks them to *order* the candidates P3 hands
-a judge, which is a different and cheaper job.
+**What it produces** (``graph_trials.tsv``, ``literature_abstracts.jsonl``). For
+every trial-relevant application, the drug's iKraph2 entity (S2, rule R, D45)
+is crossed with the diseases of its submissions' chosen indications (S5, D30);
+each drug–disease edge's evidence PMIDs come from the iKraph2 API (release
+pinned, D42/D43), best evidence first up to :data:`ABSTRACT_BUDGET` abstracts,
+and the abstract text from iKraph1 ``pubmedDocs``. A trial is taken from an
+abstract by its NCT id, or by a full sponsor protocol id that names exactly one
+registry study (D35, :func:`service.review_trials.protocol_trials`). Each row
+keeps up to :data:`ABSTRACTS_KEPT` PMIDs and the disease it was found under; the
+abstracts are saved for the S9 judges.
 
-**Why it is worth a separate pass.** Measured on 60 units whose known answer
-the shortlist missed: 57 resolve both a drug and a disease id, 56 have an edge,
-and **16 — 27% — have the correct trial named in the edge's abstracts**. The
-graph finds those by bibliography rather than by MeSH intervention coding, so
-it fails independently of the drug filter and of the ranking, which is what
-makes it additive rather than redundant.
+**What it is for.** These are the literature candidates of routes **B+** (a
+section 14 description) and **C+** (an indication only), judged with their
+abstracts before the registry shortlist (D37). S8 drops trials that never ran
+or began after the approval, the drug check drops a trial whose every
+non-control arm is another FDA drug, and the MeSH-tree indication check applies
+(id-less trials kept). The literature finds trials by bibliography rather than
+by registry coding, so it fails independently of the registry search: on 60
+known answers the shortlist missed, 27% were named in the edge's abstracts.
 
-**It cannot invent a link on its own.** An abstract mentioning ``NCT02578680``
-beside a drug and a disease says the literature connects them; it says nothing
-about which approval rested on which trial. So this only moves a candidate up a
-list the judge still reads, and a trial the judge rejects is still rejected.
+**It cannot make a link on its own.** An abstract naming ``NCT02578680`` beside
+a drug and a disease says the literature connects them, not that an approval
+rested on that trial; only an S9 judge's Yes does.
 
-Written once to ``graph_trials.tsv`` because the walk is the expensive part —
-one Mongo pass over the applications in scope, then P3 reads a TSV.
-
-**It is latency-bound, so it reports progress.** Measured on the first attempt:
-6% CPU over 16 minutes, i.e. almost entirely waiting on round trips, on a host
-also serving another team's NER job. A pass with no output is indistinguishable
-from a stuck one, and :data:`PROGRESS_EVERY` exists so a caller can decide
-whether to wait or to narrow the scope.
+**It is latency-bound, so it reports progress** every :data:`PROGRESS_EVERY`
+applications, and prefetches each pair's edges several drugs at once. The
+iKraph2 answers are cached per release (``output/ikraph2_cache_<release>``).
+Submissions with no indication are served by :mod:`service.graph_links`.
 """
 
 from __future__ import annotations
@@ -120,8 +123,7 @@ def build(
 
     ``mentions`` counts how many of the edge's abstracts named the trial. A
     trial cited by several papers is not thereby the pivotal one, but it is
-    better attested, and P3 can use that to break ties among graph-supported
-    candidates.
+    better attested; S8 orders a unit's literature candidates with it.
 
     ``resolve`` (D35) also reads full sponsor protocol ids in the abstracts,
     each kept only when it names exactly one registry study; see
@@ -290,7 +292,7 @@ def render(report: GraphTrialsReport) -> str:
     """The pass report, as ``--mode graph-trials`` prints it."""
     return "\n".join(
         [
-            "Graph trials — literature candidates, as a ranking input for P3",
+            "S7 graph trials — literature candidates for routes B+ and C+ (drug × indication)",
             "",
             f"  applications considered            {report.applications:>9,}",
             f"    with a drug id                   {report.with_drug:>9,}",

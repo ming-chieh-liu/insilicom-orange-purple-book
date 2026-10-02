@@ -106,12 +106,13 @@ $(OUT)/submission_indications.tsv: $(CODE_indication_normalize) \
 
 # ---- P2g literature candidates (D35) --------------------------------------------------
 $(OUT)/graph_trials.tsv $(OUT)/literature_abstracts.jsonl &: $(CODE_graph_trials) \
-		$(OUT)/submission_indications.tsv $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv
+		$(OUT)/submission_indications.tsv $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv \
+		$(OUT)/indications.tsv $(DRUGSFDA) $(TRIAL_MANIFEST)
 	$(MAIN) --mode graph-trials
 
 $(OUT)/drug_only_trials.tsv $(OUT)/drug_only_abstracts.jsonl &: $(CODE_graph_links) \
 		$(OUT)/submission_indications.tsv $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv \
-		$(OUT)/approval_events.tsv
+		$(OUT)/approval_events.tsv $(OUT)/indications.tsv $(DRUGSFDA) $(TRIAL_MANIFEST)
 	$(MAIN) --mode graph-links
 
 # ---- P3 route + candidates (D35, D36) -------------------------------------------------

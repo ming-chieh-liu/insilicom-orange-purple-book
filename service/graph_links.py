@@ -1,27 +1,25 @@
-"""Tier C: candidate trials for approvals the label cannot serve.
+"""S7, drug only: literature candidates for submissions with no indication (route D).
 
-4,539 trial-relevant approvals — every one before 2008, 57% of the whole set —
-currently carry no link at all. Their labels are pre-PLR and have no numbered
-Clinical Studies section, or have one that names no trial, and the trials
-behind them predate registration. For those the graph is the only source left.
+**What it produces** (``drug_only_trials.tsv``, ``drug_only_abstracts.jsonl``,
+``adjudication/graph_units.jsonl``). For every trial-relevant, non-guard
+submission with no chosen indication (S5, D30; :func:`no_indication_scope`), the
+drug's iKraph2 entity (S2, rule R) is walked along every "treats" edge to a
+disease (D31), best evidence first up to the abstract budget; evidence PMIDs
+come from the iKraph2 API (D42), abstract text from iKraph1. Trials are taken
+from the abstracts by NCT id or by a protocol id naming exactly one registry
+study (D35); a trial that never ran is dropped (D37) and one that began after
+the approval is dropped (:func:`within_date`). Each candidate keeps the diseases
+it was found under, which the D judge sees.
 
-**What it can and cannot say.** A ``pubmedRelations`` edge means the literature
-associates this drug with this disease. It does not mean any particular paper
-describes the trial that supported the approval, and the papers behind one edge
-include reviews, case reports, other drugs' trials and post-approval studies.
-So this module gathers candidates and a judge decides — the same shape as P4,
-but a weaker question, which is why the result is tier C and not tier A.
+**What it can and cannot say.** An edge means the literature associates the
+drug with a disease, not that a paper describes the trial behind the approval;
+the papers include reviews, case reports and other drugs' trials. So this only
+gathers candidates; S9 judges them with their abstracts (literature template),
+and a link found this way is route **D**, the weakest tier (D35, D37).
 
-**Measured before building, on 150 pre-2008 submissions.** 95% resolve a drug
-id and only 31% a disease id, so the bottleneck is indication coverage rather
-than the graph. 29% have an edge at all and 16% yield at least one registry id,
-with a median of 2 distinct ids where they do — a far easier list to judge than
-P4's median of 40. The 16% is a floor: that measurement read at most 150 of a
-median 461 supporting abstracts per edge.
-
-**The date bound still holds.** A trial cannot have supported an approval
-granted before it began, so a candidate whose start date postdates the approval
-is dropped here rather than shown to a judge.
+The older paths of this module — tier C over ``unlinked_submissions.tsv`` and the
+drug × indication walk (now :mod:`service.graph_trials`) — are kept only as
+documented history and are not run (D35).
 """
 
 from __future__ import annotations
@@ -214,7 +212,7 @@ def within_date(
 ) -> list[GraphCandidate]:
     """Drop trials that began after the approval they would be evidence for.
 
-    The one hard fact available here, and the same rule P3 applies. A candidate
+    The one hard fact available here, and the same rule S8 applies. A candidate
     with no recorded start date is kept: missing data must not hide a real
     answer.
     """
@@ -493,8 +491,8 @@ def no_indication_scope(
     """Case D's search scope (D35): in-scope submissions with no indication.
 
     Every trial-relevant, non-guard submission (D24) whose indication table
-    holds no chosen indication. P3 later keeps a D unit only for a submission
-    the label route does not serve, so this may be wider than the final set.
+    holds no chosen indication. S8 later keeps a D unit only for a submission
+    no FDA document already serves, so this may be wider than the final set.
 
     >>> rows = [{"application": "NDA1", "submission_type": "ORIG", "submission_no": "1",
     ...          "trial_relevant": "true", "trial_scope": "core"},
@@ -527,7 +525,7 @@ class DrugOnlyTrial(NamedTuple):
 
 
 def drug_only_rows(units: Iterable[GraphUnit]) -> list[DrugOnlyTrial]:
-    """The drug-only units' candidates, flattened for P3, best first."""
+    """The drug-only units' candidates, flattened for S8, best first."""
     return [
         DrugOnlyTrial(u.application, u.submission_type, u.submission_no, c.nct_id,
                       c.mentions, c.diseases, c.protocol_id, c.pmids)
@@ -620,7 +618,7 @@ def _drug_only_unit(
 def render(report: GraphReport) -> str:
     """The pass report, as ``--mode graph-links`` prints it."""
     lines = [
-        "Tier C — literature candidates for approvals the label could not serve",
+        "S7 drug-only literature — candidates for route D (no indication)",
         "",
         f"  unserved approvals considered            {report.events_considered:>9,}",
         f"    with a drug id                         {report.with_drug:>9,}",
