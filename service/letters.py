@@ -91,6 +91,27 @@ INDICATION_BEARING = re.compile(
     re.IGNORECASE,
 )
 
+#: A wider net for sentences the strict rule rejects (2026-10-02): a care phrase
+#: anywhere, or a sentence that opens "provide(s) for the use of", unless it
+#: names a labeling, dosing or manufacturing change. Measured against the letter
+#: agent's verdicts on 586 letters the strict rule missed: it flags 322 of the
+#: 372 the agents accepted and 31 they did not, so it is ~9% wrong — too loose
+#: to override a label's section 1 on its own. A sentence it flags is an
+#: **indication candidate**: it goes to the letter agent's verify step
+#: (``docs/runbooks/letter-indication.md``), never straight to S5.
+CANDIDATE_CARE = re.compile(
+    r"\b(?:treatment|prevention|prophylaxis|relief|management|diagnosis|reduction|control"
+    r"|suppression|palliation|therapy)\s+(?:of|for|in)\b",
+    re.IGNORECASE,
+)
+CANDIDATE_USE = re.compile(r"^\s*provides?\s+for\s+the\s+use\s+of\b", re.IGNORECASE)
+CANDIDATE_NOT = re.compile(
+    r"\b(?:revision|revisions|revise|update|updates|changes?\s+to\s+the\s+label|labeling"
+    r"|package\s+insert|USPI|prescribing\s+information|dosage\s+and\s+administration"
+    r"|presentation|autoinjector|manufactur\w*|safety|QT|PREA|Phase\s+4)\b",
+    re.IGNORECASE,
+)
+
 #: A clause longer than this is a failed parse, not an indication.
 MAX_SENTENCE: int = 1_500
 
@@ -137,6 +158,9 @@ class LetterIndication(NamedTuple):
     sentence: str
     #: Whether the sentence states an indication (:data:`INDICATION_BEARING`).
     indication_bearing: str = "false"
+    #: Not bearing by the strict rule, but flagged by :func:`is_candidate`: the
+    #: letter agent verifies it before S5 may use it.
+    indication_candidate: str = "false"
 
 
 class LetterReport(NamedTuple):
@@ -248,6 +272,22 @@ def is_indication(sentence: str) -> bool:
     False
     """
     return bool(INDICATION_BEARING.search(sentence))
+
+
+def is_candidate(sentence: str) -> bool:
+    """Whether a sentence the strict rule rejects may still state an indication.
+
+    >>> is_candidate("provides for the use of Noxafil for prophylaxis of invasive Aspergillus")
+    True
+    >>> is_candidate("provides for the use of Lunesta Tablets in the treatment of insomnia")
+    True
+    >>> is_candidate("provides for revisions to the labeling to include safety data")
+    False
+    >>> is_candidate("provides for a new 250 mg/1.25 mL prefilled autoinjector")
+    False
+    """
+    return ((bool(CANDIDATE_CARE.search(sentence)) or bool(CANDIDATE_USE.search(sentence)))
+            and not CANDIDATE_NOT.search(sentence))
 
 
 def _digits(application: str) -> str:
@@ -380,6 +420,9 @@ def build(
                 status=status,
                 sentence=sentence,
                 indication_bearing="true" if is_indication(sentence) else "false",
+                indication_candidate=(
+                    "true" if status == OK and not is_indication(sentence)
+                    and is_candidate(sentence) else "false"),
             )
         )
     by_status = Counter(r.status for r in rows)
@@ -399,6 +442,7 @@ def render(report: LetterReport) -> str:
     """The pass report, as ``--mode letters`` prints it."""
     total = len(report.rows)
     bearing = sum(1 for r in report.rows if r.indication_bearing == "true")
+    candidates = sum(1 for r in report.rows if r.indication_candidate == "true")
     lines = [
         "Approval letters — the per-submission indication text (D25, D30)",
         "",
@@ -406,6 +450,7 @@ def render(report: LetterReport) -> str:
         f"  distinct letters cached                  {report.distinct_letters:>9,}",
         f"  letters found at a guessed address       {report.guessed_found:>9,}",
         f"  indication-bearing sentences             {bearing:>9,}",
+        f"  indication candidates (agent verifies)   {candidates:>9,}",
         "",
         "  by status:",
     ]
@@ -419,6 +464,9 @@ def render(report: LetterReport) -> str:
 
 __all__ = [
     "ABBREVIATIONS",
+    "CANDIDATE_CARE",
+    "CANDIDATE_NOT",
+    "CANDIDATE_USE",
     "INDICATION_BEARING",
     "BLOCKED",
     "BREAKER",
@@ -435,6 +483,7 @@ __all__ = [
     "LetterReport",
     "build",
     "indication_sentence",
+    "is_candidate",
     "is_indication",
     "render",
 ]

@@ -14,7 +14,7 @@ to-do list in `CLAUDE.md` ("Current status") points here.
 | S1 spine | done | 11,295 trial-relevant events |
 | S2 drugs | **D45 rebuilt 2026-10-02** | `substance_ids.tsv` (133,467 UNIIs); rule R, one entity per ingredient (`drug_identity.tsv` route column): TP 2,508, Chemical 45, none 117; 2,561 `drug_map.tsv` rows, applications with a drug id 98.2%; `id_bridge.tsv` 16,129 |
 | S3 registry | **D45 rebuilt 2026-10-02** | `trial_drug_map.tsv` 108,343 strings (103,115 with an entity, 0 with two), drug MeSH vs NLM 95.5%; `trial_condition_map.tsv` 51,211 (42,382 with an entity, 0 with two); `nlm_id_map.tsv` 20,599 NLM ids (7,498 drug ids with an entity); FDA vs trial same-name disagreement 0/1,624 |
-| S4 documents | done | labels 6,423/6,451 PDFs; letters 6,596/6,662; reviews as complete as FDA allows (118 of 131 missing are 404) |
+| S4 documents | **done, re-run 2026-10-02** | re-fetch: all remaining labels (28), letters (66) and ~130 review files are 404 at FDA; 98 old-style review index pages not followed (future). Labels re-parse byte-identical. Fixes: review protocol ids no longer swallow table-of-contents dot leaders (+2,179 accepted mentions, +8 role units for S6); letters flag 1,332 `indication_candidate` sentences → 979 letter-agent verify units (batches 019–058) |
 | S5 indications | **code changed, not rebuilt** | registry aliases must share a word with their descriptor |
 | S6 review roles | **done** | 4,825/4,825 (2026-09-30) |
 | S7 literature | **code changed, not rebuilt** | PMIDs, found-under diseases and abstracts files; case D start ≤ approval only |

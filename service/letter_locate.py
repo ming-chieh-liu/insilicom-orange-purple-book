@@ -3,7 +3,10 @@
 For letters the keyword rule (:mod:`service.letters`) could not use — no
 recognisable sentence, or a sentence it judged not indication-bearing — two
 judges name the numbered segments that state the indication, **code** copies
-those segments verbatim, and two further judges verify the copied span. An
+those segments verbatim, and two further judges verify the copied span. A
+sentence the wider candidate rule flags (``indication_candidate``, 2026-10-02)
+skips locating: it is already verbatim letter text, so it goes straight to the
+verifiers. An
 agent never writes the indication, so it cannot invent one: a segment id that
 is not in the letter is refused. Protocol: ``docs/runbooks/letter-indication.md``;
 prompts ``docs/prompts/letter-indication-locate.md`` and
@@ -97,15 +100,54 @@ def segments_of(numbered_text: str) -> dict[str, str]:
     return dict(re.findall(r"^\[(S\d+)\] (.*)$", numbered_text, re.M))
 
 
-def needs_agent(status: str, indication_bearing: str) -> bool:
-    """Whether a letter goes to the agents: the keyword rule found nothing usable.
+def needs_agent(status: str, indication_bearing: str, indication_candidate: str = "false") -> bool:
+    """Whether a letter goes to the locators: the keyword rule found nothing
+    usable and the candidate rule flagged nothing to verify instead.
 
     >>> needs_agent("no_sentence", "false"), needs_agent("ok", "false")
     (True, True)
     >>> needs_agent("ok", "true"), needs_agent("scanned", "false"), needs_agent("not_fetched", "false")
     (False, False, False)
+    >>> needs_agent("ok", "false", "true")
+    False
     """
+    if indication_candidate == "true":
+        return False
     return status == "no_sentence" or (status == "ok" and indication_bearing != "true")
+
+
+#: ``located`` on a verdict whose span is the candidate rule's sentence.
+CANDIDATE = "candidate"
+
+
+def candidate_units(letter_rows: Iterable[dict[str, str]], brands: dict[str, set[str]],
+                    decided: Iterable[str] = ()) -> list[dict[str, object]]:
+    """A verify unit per candidate sentence whose letter has no verdict yet.
+
+    >>> rows = [{"application": "NDA000001", "submission_type": "ORIG", "submission_no": "1",
+    ...          "approval_date": "2020-01-01", "indication_candidate": "true",
+    ...          "sentence": "provides for the use of X for prophylaxis of Y"},
+    ...         {"application": "NDA000002", "submission_type": "ORIG", "submission_no": "1",
+    ...          "indication_candidate": "false", "sentence": "z"}]
+    >>> [u["text"] for u in candidate_units(rows, {"000001": {"XBRAND"}})]
+    ['provides for the use of X for prophylaxis of Y']
+    >>> candidate_units(rows, {}, decided={"NDA000001|ORIG|1"})
+    []
+    """
+    done = set(decided)
+    units: list[dict[str, object]] = []
+    for row in letter_rows:
+        key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
+        if row.get("indication_candidate") != "true" or key in done or not row.get("sentence"):
+            continue
+        names = " / ".join(sorted(brands.get(row["application"][-6:], set())))
+        units.append({
+            "unit_id": key,
+            "approval": f"{names} · {row['application']} {row['submission_type']} "
+                        f"{row['submission_no']} · approved {row.get('approval_date', '')}",
+            "text": row["sentence"],
+        })
+    return units
 
 
 def normalise_located(answer: str) -> str:
@@ -255,17 +297,24 @@ def prepare(
     units_path: Path,
     batch_dir: Path,
     limit: int | None = None,
+    verify_candidates: Iterable[dict[str, object]] = (),
+    candidates_path: Path | None = None,
 ) -> PrepareReport:
     """Write a locate unit for every letter the rule missed; batch the new ones.
 
     Every candidate letter is written to the units file (the file is rebuilt,
     so extraction can always find a unit's segments); only letters not yet in a
     batch file get new batches, so a re-run never judges a letter twice.
+    ``verify_candidates`` (:func:`candidate_units`) are written to ``candidates_path``;
+    :func:`combine` batches them for the verifiers.
     """
+    if candidates_path is not None:
+        write_jsonl(candidates_path, list(verify_candidates))
     units: list[dict[str, object]] = []
     candidates = unreadable = 0
     for row in letter_rows:
-        if not needs_agent(row.get("status", ""), row.get("indication_bearing", "")):
+        if not needs_agent(row.get("status", ""), row.get("indication_bearing", ""),
+                           row.get("indication_candidate", "false")):
             continue
         candidates += 1
         text = text_of(row.get("letter_url", ""))
@@ -297,6 +346,7 @@ def combine(
     verify_units_path: Path,
     verdicts_path: Path,
     decided: str,
+    candidates_path: Path | None = None,
 ) -> CombineReport:
     """Pair every answer on disk, extract agreed spans, record decided letters.
 
@@ -355,6 +405,32 @@ def combine(
                 accepted += 1
             else:
                 rejected += 1
+        held = before.get(unit_id)
+        if held is None or any(held.get(k) != row.get(k) for k in ("final", "located", "text")):
+            new_rows.append(row)
+    located_ids = {str(u["unit_id"]) for u in verify_units}
+    for candidate in read_jsonl(candidates_path) if candidates_path is not None else []:
+        unit_id = str(candidate["unit_id"])
+        if unit_id in located_ids:
+            continue
+        verify_units.append(candidate)
+        final, needs = pair_verify(va.get(unit_id, ""), vb.get(unit_id, ""), vc.get(unit_id, ""))
+        if needs:
+            verify_tb.append(unit_id)
+        if not final:
+            continue
+        row = {
+            "unit_id": unit_id, "locate_a": None, "locate_b": None, "locate_tiebreak": None,
+            "located": CANDIDATE, "text": candidate["text"], "verify_a": va.get(unit_id),
+            "verify_b": vb.get(unit_id), "verify_tiebreak": vc.get(unit_id),
+            "final": ACCEPTED if final == STATES else REJECTED,
+            "locate_prompt_version": None, "verify_prompt_version": VERIFY_PROMPT_VERSION,
+            "decided": decided,
+        }
+        if final == STATES:
+            accepted += 1
+        else:
+            rejected += 1
         held = before.get(unit_id)
         if held is None or any(held.get(k) != row.get(k) for k in ("final", "located", "text")):
             new_rows.append(row)
@@ -422,7 +498,9 @@ __all__ = [
     "STATES",
     "VERIFY_PROMPT_VERSION",
     "LocateOutcome",
+    "CANDIDATE",
     "accepted_spans",
+    "candidate_units",
     "batched_ids",
     "extract",
     "needs_agent",

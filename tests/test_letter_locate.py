@@ -150,3 +150,32 @@ def test_only_letters_of_submissions_without_an_indication_are_kept(tmp_path: Pa
         encoding="utf-8")
     assert [r["application"] for r in ll.without_indication(rows, table)] == ["B", "C"]
     assert ll.without_indication(rows, tmp_path / "absent.tsv") == rows
+
+
+def test_a_candidate_sentence_goes_straight_to_the_verifiers(tmp_path: Path) -> None:
+    p = _paths(tmp_path)
+    candidates = p["units"].parent / "candidates.jsonl"
+    rows = [{"application": "NDA000009", "submission_type": "ORIG", "submission_no": "1",
+             "approval_date": "2021-01-01", "status": "ok", "indication_bearing": "false",
+             "indication_candidate": "true",
+             "sentence": "provides for the use of X for prophylaxis of CMV"}]
+    units = ll.candidate_units(rows, {"000009": {"XBRAND"}})
+    report = ll.prepare(rows, lambda url: "unused", {}, p["units"], p["batches"],
+                        verify_candidates=units, candidates_path=candidates)
+    # Not a locate unit: the candidate skips locating.
+    assert (report.candidates, report.new_batches) == (0, ())
+    combine = lambda: ll.combine(p["units"], p["raw"], p["batches"], p["verify"],
+                                 p["verdicts"], decided="2026-10-02",
+                                 candidates_path=candidates)
+    first = combine()
+    assert [x.name for x in first.verify_batches] == ["verify-batch-001.ids"]
+    _answer(p, "verify-batch-001-A.txt", ["NDA000009|ORIG|1 = STATES_INDICATION"])
+    _answer(p, "verify-batch-001-B.txt", ["NDA000009|ORIG|1 = NOT_INDICATION"])
+    assert [x.name for x in combine().verify_tiebreaks] == ["verify-tiebreak-batch-001.ids"]
+    _answer(p, "verify-tiebreak-batch-001-C.txt", ["NDA000009|ORIG|1 = STATES_INDICATION"])
+    assert combine().accepted == 1
+    assert ll.accepted_spans(p["verdicts"]) == {
+        "NDA000009|ORIG|1": "provides for the use of X for prophylaxis of CMV"}
+    assert ll.recorded(p["verdicts"])["NDA000009|ORIG|1"]["located"] == ll.CANDIDATE
+    # A decided letter yields no new candidate unit.
+    assert ll.candidate_units(rows, {}, decided=ll.recorded(p["verdicts"])) == []

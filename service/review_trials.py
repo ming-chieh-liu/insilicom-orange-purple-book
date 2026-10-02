@@ -41,9 +41,12 @@ _log = get_logger(__name__)
 
 #: The token after a study word. A line break inside an id ("GS-US-281- 0102")
 #: is repaired by :func:`repair`.
+#: A dot is part of an id only between two letters or digits (``BC.385``): a run
+#: of dots is a table-of-contents leader, and the page number after it is not
+#: part of the id (``Study P05101........115`` is ``P05101``, 2026-10-02).
 MENTION = re.compile(
     r"\b(?:Stud(?:y|ies)|Trials?|Protocols?)\s+(?:No\.?\s*|Number\s*|ID\s*)?\(?"
-    r"([A-Za-z0-9][A-Za-z0-9\-_/\.]*(?:-\s\d+)?[A-Za-z0-9]?)"
+    r"([A-Za-z0-9](?:[A-Za-z0-9\-_/]|\.(?=[A-Za-z0-9]))*(?:-\s\d+)?[A-Za-z0-9]?)"
 )
 
 #: A section heading line in extracted review text: numbered ("7 Clinical/
@@ -149,6 +152,8 @@ def candidate_tokens(text: str) -> list[tuple[str, int]]:
 
     >>> [t for t, _ in candidate_tokens("Study DR-103-301 and Study 301 and Study design, Trial GOG-0240")]
     ['DR-103-301', 'GOG-0240']
+    >>> [t for t, _ in candidate_tokens("Study P05101........115 Protocol BC.385. Study X4P-001-103....44")]
+    ['P05101', 'BC.385', 'X4P-001-103']
     """
     out: list[tuple[str, int]] = []
     for match in MENTION.finditer(text):

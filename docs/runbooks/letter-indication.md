@@ -23,6 +23,17 @@ Only a span both locators agreed on (or a tiebreak chose) **and** both verifiers
 accepted becomes the submission's indication, recorded with `source = approval_letter_located` so it
 stays distinguishable from the keyword route.
 
+**Candidate sentences skip step 2 (2026-10-02).** `service/letters.py` also flags sentences the
+strict rule rejects but a wider rule accepts (`indication_candidate = true`: a care phrase such as
+"for prophylaxis of" or "in the treatment of", or a sentence opening "provide(s) for the use of",
+with no labeling, dosing or manufacturing change word). The sentence is already verbatim letter
+text, so it goes straight to **verify** (step 4) as a unit in `adjudication/letter_candidate_units.jsonl`,
+for every such letter without a verdict — whatever other indication the submission has, since the
+letter's is the most specific. Its verdict is recorded with `located = candidate` and no locate
+answers. Measured against the agents' verdicts on 586 letters the strict rule missed: the wider rule
+flags 322 of the 372 they accepted and 31 they did not, so it is never used without the verifiers.
+Same verify prompt (v1): it sees only the text and the approval.
+
 ## How to run it
 
 ```bash
@@ -30,6 +41,7 @@ PY=/data/mliu/miniforge3/envs/clinical-trials-claude/bin/python
 $PY main.py --mode letters                        # read letters (needs FDA; throttled)
 $PY main.py --mode letter-locate-prepare [--limit N]
 #   → adjudication/letter_locate_units.jsonl + letter_indication_batches/locate-batch-NNN.ids
+#   → adjudication/letter_candidate_units.jsonl (candidate sentences; batched by combine)
 #   run locators A and B per batch (prompt: letter-indication-locate.md), save answers as
 #   adjudication/letter_indication_raw/locate-batch-NNN-{A,B}.txt
 $PY main.py --mode letter-indication-combine
@@ -49,6 +61,10 @@ it re-reads every answer file and appends a verdict only when a letter's outcome
 
 **Locate unit** — one letter: `{"unit_id": "<application>|<type>|<number>", "approval": "…",
 "segments": "[S1] …\n[S2] …"}` in `adjudication/letter_locate_units.jsonl` (rebuilt, gitignored).
+
+**Candidate unit** — one candidate sentence, already verbatim: same shape as a verify unit, in
+`adjudication/letter_candidate_units.jsonl` (rebuilt, gitignored); `combine` adds it to the verify
+units and batches.
 
 **Verify unit** — one extracted span: `{"unit_id": …, "approval": …, "text": "…"}` in
 `adjudication/letter_verify_units.jsonl` (rebuilt, gitignored). Built only for letters whose

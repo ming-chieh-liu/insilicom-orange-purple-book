@@ -950,9 +950,7 @@ def main(argv: list[str] | None = None) -> int:
         repository = TsvRepository(args.out)
         repository.save(
             "letter_indications",
-            ("application", "submission_type", "submission_no", "approval_date",
-             "letter_url", "url_guessed", "shared_letter", "status", "sentence",
-             "indication_bearing"),
+            letters.LetterIndication._fields,
             letters_report.rows,
         )
         print(letters.render(letters_report))
@@ -1130,6 +1128,9 @@ def main(argv: list[str] | None = None) -> int:
             return 1
         with letters_tsv.open(encoding="utf-8") as handle:
             letter_rows = list(csv.DictReader(handle, delimiter="\t"))
+        # Candidate sentences go to the verifiers whatever other indication the
+        # submission has: the letter's is the most specific (2026-10-02).
+        all_letter_rows = list(letter_rows)
         if args.only_without_indication:
             letter_rows = letter_locate.without_indication(
                 letter_rows, Path(args.out) / "submission_indications.tsv")
@@ -1147,6 +1148,9 @@ def main(argv: list[str] | None = None) -> int:
             return got[0] if got else None
 
         adjudication_dir = Path(args.adjudication)
+        lp_candidates = letter_locate.candidate_units(
+            all_letter_rows, brands,
+            decided=letter_locate.recorded(adjudication_dir / "letter_indication_verdicts.jsonl"))
         lp_report = letter_locate.prepare(
             letter_rows,
             _letter_text,
@@ -1154,6 +1158,9 @@ def main(argv: list[str] | None = None) -> int:
             adjudication_dir / "letter_locate_units.jsonl",
             adjudication_dir / "letter_indication_batches",
             limit=args.limit,
+            verify_candidates=(lp_candidates[:args.limit] if args.limit is not None
+                               else lp_candidates),
+            candidates_path=adjudication_dir / "letter_candidate_units.jsonl",
         )
         print(
             f"{lp_report.candidates:,} letters the keyword rule missed; "
@@ -1162,6 +1169,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         for path in lp_report.new_batches:
             print(f"  run locators A and B on {path.name}")
+        print(f"{len(lp_candidates):,} candidate sentences to verify "
+              "(run letter-indication-combine to batch them)")
         print("next: follow docs/runbooks/letter-indication.md")
         return 0
 
@@ -1174,6 +1183,7 @@ def main(argv: list[str] | None = None) -> int:
             adjudication_dir / "letter_verify_units.jsonl",
             adjudication_dir / "letter_indication_verdicts.jsonl",
             decided=date.today().isoformat(),
+            candidates_path=adjudication_dir / "letter_candidate_units.jsonl",
         )
         print(letter_locate.render(lc_report))
         return 0
