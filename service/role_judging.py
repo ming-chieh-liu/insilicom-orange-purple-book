@@ -44,8 +44,27 @@ class RoleReport(NamedTuple):
     by_role: tuple[tuple[str, int], ...]
 
 
+#: D47: when both judges answer "does not link" with different reasons, the
+#: reason recorded is the first of theirs in this order — no third judge.
+NON_LINKING_ORDER: tuple[str, ...] = ("FAILED", "NOT_FOR_THIS_APPROVAL", "PK_CLINPHARM", "OTHER")
+
+
+def splits_on_linking(a: str, b: str) -> bool:
+    """Whether two answers disagree on the only thing a link depends on (D47).
+
+    >>> splits_on_linking("PIVOTAL", "SUPPORTING"), splits_on_linking("SUPPORTING", "OTHER")
+    (False, True)
+    """
+    return (a in LINKING) != (b in LINKING)
+
+
 def pair(a: str, b: str, c: str) -> tuple[str, bool]:
     """``(final, needs_tiebreak)``; ``""`` while undecided.
+
+    D47 (2026-10-02): a third judge is asked only when one judge's answer links
+    (PIVOTAL/SUPPORTING) and the other's does not. Both linking at different
+    levels → PIVOTAL, the higher; both not linking for different reasons → the
+    first in :data:`NON_LINKING_ORDER`.
 
     >>> pair("PIVOTAL", "PIVOTAL", "")
     ('PIVOTAL', False)
@@ -53,6 +72,10 @@ def pair(a: str, b: str, c: str) -> tuple[str, bool]:
     ('', True)
     >>> pair("PIVOTAL", "OTHER", "OTHER")
     ('OTHER', False)
+    >>> pair("SUPPORTING", "PIVOTAL", "SUPPORTING")
+    ('PIVOTAL', False)
+    >>> pair("OTHER", "PK_CLINPHARM", "")
+    ('PK_CLINPHARM', False)
     >>> pair("PIVOTAL", "maybe", "")
     ('', False)
     """
@@ -61,6 +84,10 @@ def pair(a: str, b: str, c: str) -> tuple[str, bool]:
         return "", False
     if first == second:
         return first, False
+    if not splits_on_linking(first, second):
+        if first in LINKING:
+            return "PIVOTAL", False
+        return next(r for r in NON_LINKING_ORDER if r in (first, second)), False
     if third:
         return third, False
     return "", True
@@ -108,7 +135,8 @@ def combine(units_path: Path, raw_dir: Path, batch_dir: Path, verdicts: Path,
             continue
         rows.append({
             "unit_id": unit_id, "judge_a": a.get(unit_id), "judge_b": b.get(unit_id),
-            "tiebreak": c.get(unit_id) if a.get(unit_id) != b.get(unit_id) else None,
+            "tiebreak": c.get(unit_id)
+            if splits_on_linking(a.get(unit_id, ""), b.get(unit_id, "")) else None,
             "final": final, "prompt_version": version, "decided": decided_on,
         })
     new_tiebreaks = write_batches(batch_dir, f"{step}-tiebreak", [

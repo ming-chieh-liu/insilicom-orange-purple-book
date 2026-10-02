@@ -50,6 +50,11 @@ _SLOT_LINE = re.compile(r"^\[\[(\w+)\]\]$", re.M)
 _FIELD = re.compile(r"\{\{(\w+)\}\}")
 _REPLY_LINE = re.compile(r"^(NCT\d{8})\s*=\s*(Yes|No)$")
 
+#: The wrapper that puts several role units in one pool job, and its version.
+CASE_BATCH = "role-case-batch"
+CASE_BATCH_VERSION: int = 1
+_CASE_LINE = re.compile(r"^CASE\s+(\d+)\s*=\s*([A-Z_]+)$")
+
 
 class RenderError(ValueError):
     """A prompt that cannot be rendered faithfully; nothing is sent."""
@@ -75,7 +80,9 @@ class Rendered(NamedTuple):
     prompt: str
     version: int
     text: str
-    #: Matching: the NCT ids the reply must answer, in order. Roles: empty.
+    #: Matching: the NCT ids the reply must answer, in order. Roles: empty for
+    #: one unit; for several (:func:`group_role_requests`) the unit ids, in
+    #: case order — case n answers ``expects[n-1]``.
     expects: tuple[str, ...] = ()
 
 
@@ -220,6 +227,68 @@ def role_reply_line(rendered: Rendered, reply: str,
     return f"{rendered.request_id} = {lines[0]}"
 
 
+def group_role_requests(rendered: list[Rendered], per_job: int,
+                        prompts_dir: Path = PROMPTS_DIR) -> list[Rendered]:
+    """Role requests joined ``per_job`` at a time into one job each, every
+    case the unit's own prompt verbatim inside the :data:`CASE_BATCH` wrapper.
+
+    The job's id is its first unit's id plus ``+n`` (the units it holds); the
+    unit ids go to ``expects`` in case order.
+
+    >>> one = [Rendered(f"U{i}", "label-trial-role", 2, f"prompt {i}") for i in (1, 2, 3)]
+    >>> jobs = group_role_requests(one, 2)
+    >>> [(j.request_id, j.expects) for j in jobs]
+    [('U1+2', ('U1', 'U2')), ('U3+1', ('U3',))]
+    >>> "=== CASE 2 ===\\nprompt 2\\n=== END OF CASE 2 ===" in jobs[0].text
+    True
+    """
+    if per_job < 1:
+        raise RenderError(f"per_job must be at least 1, not {per_job}")
+    wrapper = _checked(CASE_BATCH, CASE_BATCH_VERSION, prompts_dir)
+    jobs: list[Rendered] = []
+    for start in range(0, len(rendered), per_job):
+        group = rendered[start:start + per_job]
+        if {r.prompt for r in group} != {group[0].prompt} or any(r.expects for r in group):
+            raise RenderError("only one-unit requests of one role prompt can be grouped")
+        cases = "\n\n".join(f"=== CASE {n} ===\n{r.text}\n=== END OF CASE {n} ==="
+                             for n, r in enumerate(group, 1))
+        jobs.append(Rendered(f"{group[0].request_id}+{len(group)}", group[0].prompt,
+                             group[0].version,
+                             fill(wrapper, {"count": len(group), "cases": cases}),
+                             tuple(r.request_id for r in group)))
+    return jobs
+
+
+def role_batch_reply_lines(rendered: Rendered, reply: str,
+                           options: Iterable[str]) -> list[str] | None:
+    """The raw-file lines for a several-case role reply, or ``None`` unless
+    every case is answered exactly once with a valid option and nothing else
+    is written (blank lines aside).
+
+    >>> r = Rendered("U1+2", "label-trial-role", 2, "", ("U1", "U2"))
+    >>> role_batch_reply_lines(r, "CASE 1 = PIVOTAL\\n\\nCASE 2 = OTHER\\n", {"PIVOTAL", "OTHER"})
+    ['U1 = PIVOTAL', 'U2 = OTHER']
+    >>> role_batch_reply_lines(r, "CASE 1 = PIVOTAL", {"PIVOTAL"}) is None
+    True
+    >>> role_batch_reply_lines(r, "CASE 1 = PIVOTAL\\nCASE 1 = OTHER\\nCASE 2 = OTHER",
+    ...                        {"PIVOTAL", "OTHER"}) is None
+    True
+    """
+    allowed = set(options)
+    answers: dict[int, str] = {}
+    for raw in reply.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        match = _CASE_LINE.match(line)
+        if match is None or match.group(2) not in allowed or int(match.group(1)) in answers:
+            return None
+        answers[int(match.group(1))] = match.group(2)
+    if set(answers) != set(range(1, len(rendered.expects) + 1)):
+        return None
+    return [f"{unit} = {answers[n]}" for n, unit in enumerate(rendered.expects, 1)]
+
+
 def _ids(batch_file: Path) -> list[str]:
     """The ids a batch file names, in order, once each.
 
@@ -283,12 +352,15 @@ def read_requests(path: Path) -> list[Rendered]:
 
 
 __all__ = [
+    "CASE_BATCH",
+    "CASE_BATCH_VERSION",
     "PROMPTS_DIR",
     "ROLE_TEMPLATE",
     "RenderError",
     "Rendered",
     "Template",
     "fill",
+    "group_role_requests",
     "load",
     "rendered_role",
     "read_requests",
@@ -296,6 +368,7 @@ __all__ = [
     "render_tier_batch",
     "render_unit",
     "render_unit_batch",
+    "role_batch_reply_lines",
     "role_reply_line",
     "tier_reply_lines",
     "write_requests",

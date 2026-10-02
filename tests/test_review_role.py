@@ -35,7 +35,7 @@ def test_calibration_units_are_batched_first_and_only_once(tmp_path: Path) -> No
 def test_combine_records_agreement_and_escalates_disagreement(tmp_path: Path) -> None:
     p = _setup(tmp_path)
     _answer(p, "role-batch-001-A.txt", [f"{_CAL} = PIVOTAL", f"{_OTHER} = OTHER"])
-    _answer(p, "role-batch-001-B.txt", [f"{_CAL} = PIVOTAL", f"{_OTHER} = FAILED"])
+    _answer(p, "role-batch-001-B.txt", [f"{_CAL} = PIVOTAL", f"{_OTHER} = SUPPORTING"])
     report = rr.combine(p["units"], p["raw"], p["batches"], p["verdicts"], "2026-09-25")
     assert report.newly_recorded == 1 and report.by_role == (("PIVOTAL", 1),)
     assert [x.name for x in report.tiebreak_batches] == ["role-tiebreak-batch-001.ids"]
@@ -47,6 +47,18 @@ def test_combine_records_agreement_and_escalates_disagreement(tmp_path: Path) ->
     assert rows[-1]["tiebreak"] == "FAILED" and rows[-1]["prompt_version"] == 2
     # Idempotent.
     assert rr.combine(p["units"], p["raw"], p["batches"], p["verdicts"], "x").newly_recorded == 0
+
+
+def test_a_split_on_the_same_side_of_linking_needs_no_third_judge(tmp_path: Path) -> None:
+    """D47: PIVOTAL/SUPPORTING → PIVOTAL; two non-linking reasons → the first in
+    the fixed order; neither is a tiebreak."""
+    p = _setup(tmp_path)
+    _answer(p, "role-batch-001-A.txt", [f"{_CAL} = SUPPORTING", f"{_OTHER} = OTHER"])
+    _answer(p, "role-batch-001-B.txt", [f"{_CAL} = PIVOTAL", f"{_OTHER} = FAILED"])
+    report = rr.combine(p["units"], p["raw"], p["batches"], p["verdicts"], "2026-10-02")
+    assert report.tiebreak_batches == () and dict(report.by_role) == {"PIVOTAL": 1, "FAILED": 1}
+    rows = [json.loads(line) for line in p["verdicts"].read_text().splitlines()]
+    assert all(r["tiebreak"] is None for r in rows)
 
 
 def test_a_v1_verdict_does_not_count_as_decided(tmp_path: Path) -> None:

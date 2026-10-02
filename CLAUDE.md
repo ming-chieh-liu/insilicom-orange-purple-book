@@ -280,7 +280,7 @@ code says `not yet implemented` until it lands.
   S8 expands each drug id with its counterpart. (4) **Prompts v3** (excerpt 3, no-label 3,
   literature 2): wording unchanged; candidates show `Conditions/Interventions (normalised): Name
   [MeSH D…]` beside the raw text, and the approval its drug and indication codes.
-- **D40 — every judged route uses two judges plus a third, full runs included** (2026-10-01,
+- **[PARTIALLY SUPERSEDED by D47, 2026-10-02 — for S6 role judgements the third judge is asked only when the two answers split on linking]** **D40 — every judged route uses two judges plus a third, full runs included** (2026-10-01,
   **implemented in code 2026-10-01: `match-combine --judges` defaults to 2**). Withdraws D33's
   recorded one-judge exception and D35's "full runs 1". Two independent judges answer every
   candidate; agreement is final; a disagreement goes to a fresh third judge whose answer is final.
@@ -394,6 +394,16 @@ code says `not yet implemented` until it lands.
   from S4; judging them after S9 was an artefact of building units from S10's links. Measured: 3,325
   label-stated (application, NCT) pairs, 974 also review-named; 3,282 units built (43 not found in their
   section 14).
+
+- **D47 — a role judgement escalates only a split on linking** (2026-10-02, **implemented in code
+  2026-10-02; applied to every recorded role verdict**). In S6 a fresh third judge is asked only when
+  one judge's answer links (PIVOTAL/SUPPORTING) and the other's does not. PIVOTAL vs SUPPORTING →
+  **PIVOTAL**; two non-linking reasons → the first in FAILED > NOT_FOR_THIS_APPROVAL > PK_CLINPHARM >
+  OTHER; neither calls a third judge (`service/role_judging.pair`). Re-applied to the recorded
+  verdicts (append-only): 56 rows (51 review, 5 label), 5 review links flip — each where the old
+  third judge overruled both judges' shared answer on linking. Why: the user's rule — a link depends
+  only on linking vs not; of 256 recorded review disagreements 137 split on linking, 34 were
+  PIVOTAL/SUPPORTING and 85 two non-linking reasons.
 
 ## Current status and to-do
 

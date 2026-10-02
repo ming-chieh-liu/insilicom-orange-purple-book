@@ -226,6 +226,20 @@ def build_parser() -> argparse.ArgumentParser:
         "descriptions) or C/D (per-submission units with no excerpt)",
     )
     parser.add_argument(
+        "--retries",
+        type=int,
+        default=pool_judging.RETRIES,
+        help="pool-judge: times a request whose reply fails the strict check (or "
+        "never comes) is sent again in the same run, as a fresh job",
+    )
+    parser.add_argument(
+        "--per-job",
+        type=int,
+        default=1,
+        help="render-prompts, role tasks: role units per pool job (role-case-batch "
+        "wrapper); written to <batch>.requests-x<N>.jsonl",
+    )
+    parser.add_argument(
         "--requests",
         default=None,
         help="pool-judge: the <batch>.requests.jsonl written by render-prompts",
@@ -754,7 +768,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             pool_report = pool_judging.judge(
                 prompt_render.read_requests(Path(args.requests)), pool,
-                Path(args.raw_file), args.judge, cap, args.limit)
+                Path(args.raw_file), args.judge, cap, args.limit, args.retries)
         except ValueError as error:
             print(f"not sent: {error}")
             return 1
@@ -783,6 +797,13 @@ def main(argv: list[str] | None = None) -> int:
             print(f"not rendered: {error}")
             return 1
         out = batch.with_suffix(".requests.jsonl")
+        if args.per_job > 1 and args.task != "match":
+            try:
+                rendered = prompt_render.group_role_requests(rendered, args.per_job)
+            except prompt_render.RenderError as error:
+                print(f"not rendered: {error}")
+                return 1
+            out = batch.with_suffix(f".requests-x{args.per_job}.jsonl")
         count = prompt_render.write_requests(rendered, out)
         print(f"{count} complete prompt(s) -> {out}")
         return 0

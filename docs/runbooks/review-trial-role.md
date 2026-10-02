@@ -99,12 +99,28 @@ empty field refuses). A reply counts only if it is exactly one of the six roles 
 (`prompt_render.role_reply_line`); the code then writes `<unit_id> = <ROLE>` to the judge's raw
 file. Anything else writes nothing and the unit stays undecided.
 
+### Ten units per job, and automatic re-send (2026-10-02)
+
+The full run renders **10 units per pool job**: `render-prompts … --per-job 10` writes
+`<batch>.requests-x10.jsonl`, each job the `role-case-batch` wrapper (`docs/prompts/role-case-batch.md`
+v1) around ten unit prompts **verbatim**, numbered CASE 1–10 (the code keeps the case → unit map).
+A reply counts only if it answers every case exactly once as `CASE n = <OPTION>` with a valid
+option and nothing else (`prompt_render.role_batch_reply_lines`); otherwise nothing in that job is
+recorded. `pool-judge` sends a rejected or empty job again as a fresh job up to `--retries`
+(default 2) more times in the same run, logging each attempt; what is still undecided is reported
+and sent again by the next run. Judges A, B and C remain separate jobs; pairing and tiebreaks stay
+in `*-combine`. Measured on the 200-unit pilot against one unit per job: 2 min instead of 16, ~12%
+cheaper, A/B agreement 92.5% vs 96.5%, the final role the same on 177 of the 181 units both modes
+agreed on, and the link decision the same on 178.
+
 ## Step 8 — combine and tiebreak
 
 | judge A | judge B | final |
 |---|---|---|
 | equal | equal | that answer |
-| different | different | a **fresh third judge** on that unit alone, told nothing of the disagreement; its answer is final |
+| PIVOTAL / SUPPORTING | the other of the two | **PIVOTAL**, no third judge (D47) |
+| two different non-linking roles | | the first of them in FAILED > NOT_FOR_THIS_APPROVAL > PK_CLINPHARM > OTHER, no third judge (D47) |
+| linking | non-linking | a **fresh third judge** on that unit, told nothing of the disagreement; its answer is final |
 
 Missing or unparseable answers leave the unit undecided for re-run — never guessed. If more than a
 quarter of a batch disagrees, stop and report: the prompt or the snippet extraction is wrong.

@@ -179,6 +179,55 @@ def test_the_raw_file_must_name_its_judge(tmp_path: Path) -> None:
         pj.judge(_requests(), _FakePool({}), tmp_path / "batch-001-D.txt", "D", 1)
 
 
+def test_a_several_case_role_job_records_every_case_or_none(tmp_path: Path) -> None:
+    jobs = [pr.Rendered("U1+2", "label-trial-role", 2, "j1", ("U1", "U2")),
+            pr.Rendered("U3+2", "label-trial-role", 2, "j2", ("U3", "U4"))]
+    pool = _FakePool({"j1": "CASE 1 = PIVOTAL\nCASE 2 = FAILED",
+                      "j2": "CASE 1 = OTHER"})                     # incomplete -> rejected
+    raw = tmp_path / "lrole-batch-001-A.txt"
+    report = pj.judge(jobs, pool, raw, "A", 2)
+    assert (report.answered, report.rejected) == (1, 1)
+    assert raw.read_text().splitlines() == ["U1 = PIVOTAL", "U2 = FAILED"]
+    # A re-run skips the complete job and sends the other again.
+    again = _FakePool({"j2": "CASE 1 = OTHER\nCASE 2 = SUPPORTING"})
+    assert pj.judge(jobs, again, raw, "A", 2).already_answered == 1 and again.sent == ["j2"]
+    assert "U4 = SUPPORTING" in raw.read_text()
+
+
+class _SequencePool:
+    """Answers each prompt from a queue: a bad reply first, then a good one."""
+
+    def __init__(self, answers: dict[str, list[str]]) -> None:
+        self.answers = answers
+        self.sent: list[str] = []
+
+    def run(self, prompt: str) -> PoolReply:
+        self.sent.append(prompt)
+        queue = self.answers.get(prompt, [])
+        text = queue.pop(0) if queue else ""
+        return PoolReply(len(self.sent), "done" if text else "failed", text, "", 0.01)
+
+
+def test_a_bad_reply_is_sent_again_until_valid_or_out_of_retries(tmp_path: Path) -> None:
+    jobs = [pr.Rendered("U1+2", "label-trial-role", 2, "j1", ("U1", "U2")),
+            pr.Rendered("U3+2", "label-trial-role", 2, "j2", ("U3", "U4")),
+            pr.Rendered("U5+1", "label-trial-role", 2, "j3", ("U5",))]
+    pool = _SequencePool({"j1": ["CASE 1 = PIVOTAL", "CASE 1 = PIVOTAL\nCASE 2 = OTHER"],
+                          "j2": ["", "Sure!", "CASE 1 = OTHER"],     # never valid
+                          "j3": ["CASE 1 = OTHER"]})
+    raw = tmp_path / "x-A.txt"
+    report = pj.judge(jobs, pool, raw, "A", 2, retries=2)
+    assert (report.answered, report.resent, report.rejected, report.failed) == (2, 3, 1, 0)
+    assert pool.sent.count("j2") == 3 and pool.sent.count("j1") == 2
+    assert sorted(raw.read_text().splitlines()) == ["U1 = PIVOTAL", "U2 = OTHER", "U5 = OTHER"]
+    attempts = [json.loads(x)["attempt"]
+                for x in raw.with_name(raw.name + ".jobs.jsonl").read_text().splitlines()]
+    assert max(attempts) == 3
+    assert "sent again (bad or no reply)               3" in pj.render(report, "A", raw)
+    none = pj.judge(jobs, _SequencePool({}), tmp_path / "y-A.txt", "A", 1, retries=0)
+    assert (none.resent, none.failed) == (0, 3)
+
+
 def test_the_tiebreak_list_renders_each_tier_once(tmp_path: Path) -> None:
     tiers = tmp_path / "tiers.jsonl"
     tier = cm.TierUnit("U#T1@abc", "U", 1, "approval", "excerpt", "name", "616",

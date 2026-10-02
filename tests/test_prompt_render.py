@@ -199,3 +199,22 @@ def test_a_slot_without_text_for_the_document_refuses(tmp_path: Path) -> None:
     with pytest.raises(pr.RenderError, match="slot 'gone'"):
         pr.load("x-role", tmp_path)
     assert pr.rendered_role("x-role", tmp_path / "absent") is None
+
+
+def test_role_requests_are_grouped_verbatim_and_the_wrapper_version_is_checked(
+        tmp_path: Path) -> None:
+    one = [pr.Rendered(f"U{i}", "label-trial-role", 2, f"prompt text {i}") for i in range(1, 4)]
+    [job] = pr.group_role_requests(one, 10)
+    assert job.expects == ("U1", "U2", "U3") and job.request_id == "U1+3"
+    assert "output exactly 3 lines" in job.text
+    for i in (1, 2, 3):
+        assert f"=== CASE {i} ===\nprompt text {i}\n=== END OF CASE {i} ===" in job.text
+    with pytest.raises(pr.RenderError, match="at least 1"):
+        pr.group_role_requests(one, 0)
+    with pytest.raises(pr.RenderError, match="one role prompt"):
+        pr.group_role_requests([one[0], one[1]._replace(prompt="review-trial-role")], 2)
+    (tmp_path / "role-case-batch.md").write_text(
+        "**Version:** 9\n\n## The prompt\n\n```text\n{{count}} {{cases}}\n```\n",
+        encoding="utf-8")
+    with pytest.raises(pr.RenderError, match="v9"):
+        pr.group_role_requests(one, 2, tmp_path)

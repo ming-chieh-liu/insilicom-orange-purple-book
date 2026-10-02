@@ -14,7 +14,10 @@ Rules carried from the runbooks:
   sends it again.
 * **Resumable.** A request whose answer is already in the raw file is skipped.
 * **Independent judges.** Judge A, B and C are separate runs into separate raw
-  files; each job is a fresh session with no tools and no batch context.
+  files; each job is a fresh session with no tools. A role job may hold
+  several units (``role-case-batch`` wrapper, 2026-10-02) — each case the
+  unit's own prompt verbatim; the reply must answer every case or none is
+  recorded.
 * **The orchestrator never reads the payload.** The text goes from the
   requests file to the pool; only ids, counts and statuses are reported.
 
@@ -60,6 +63,7 @@ class PoolReport(NamedTuple):
     failed: int          # no reply: job failed, overdue or pool unreachable
     cost_usd: float
     statuses: tuple[tuple[str, int], ...]
+    resent: int = 0      # jobs sent again after a failed strict check or no reply
 
 
 def is_role(prompt: str) -> bool:
@@ -85,16 +89,28 @@ def answered_ids(raw_file: Path, requests: Iterable[prompt_render.Rendered]) -> 
     done: set[str] = set()
     for request in requests:
         if is_role(request.prompt):
-            if request.request_id in roles:
+            if set(request.expects or (request.request_id,)) <= roles:
                 done.add(request.request_id)
         elif set(request.expects) <= tiers.get(request.request_id, set()):
             done.add(request.request_id)
     return done
 
 
+#: How many more times a request whose reply failed the strict check (or never
+#: came) is sent again in the same run, each time as a fresh job (2026-10-02).
+RETRIES: int = 2
+
+
 def judge(requests: list[prompt_render.Rendered], pool: Pool, raw_file: Path,
-          judge_letter: str, max_in_flight: int, limit: int | None = None) -> PoolReport:
-    """Send every unanswered request once; append valid answers as they arrive."""
+          judge_letter: str, max_in_flight: int, limit: int | None = None,
+          retries: int = RETRIES) -> PoolReport:
+    """Send every unanswered request; append valid answers as they arrive.
+
+    A reply that fails the strict check (malformed, incomplete, an option not
+    offered) or a job that returns nothing records nothing, and the request is
+    sent again as a fresh job, up to ``retries`` more times. What is still
+    undecided after that is reported, never guessed; a later run sends it again.
+    """
     if judge_letter not in JUDGES:
         raise ValueError(f"judge must be one of {JUDGES}, not {judge_letter!r}")
     if not raw_file.stem.endswith(f"-{judge_letter}"):
@@ -110,11 +126,13 @@ def judge(requests: list[prompt_render.Rendered], pool: Pool, raw_file: Path,
     tally: Counter[str] = Counter()
     cost = [0.0]
 
-    def one(request: prompt_render.Rendered) -> None:
+    def one(request: prompt_render.Rendered, attempt: int) -> str:
         reply = pool.run(request.text)
         lines: list[str] | None = None
         if reply.text:
-            if is_role(request.prompt):
+            if is_role(request.prompt) and request.expects:
+                lines = prompt_render.role_batch_reply_lines(request, reply.text, ROLES)
+            elif is_role(request.prompt):
                 line = prompt_render.role_reply_line(request, reply.text, ROLES)
                 lines = [line] if line else None
             else:
@@ -129,20 +147,34 @@ def judge(requests: list[prompt_render.Rendered], pool: Pool, raw_file: Path,
                     "request_id": request.request_id, "judge": judge_letter,
                     "prompt": request.prompt, "version": request.version,
                     "job_id": reply.job_id, "status": reply.status, "outcome": outcome,
-                    "error": reply.error, "cost_usd": reply.cost_usd,
+                    "error": reply.error, "cost_usd": reply.cost_usd, "attempt": attempt,
                     "at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
                 }) + "\n")
             tally[outcome] += 1
             tally["status:" + reply.status] += 1
             cost[0] += reply.cost_usd
+        return outcome
 
+    pending = todo
+    resent = 0
+    final: dict[str, str] = {}
     with ThreadPoolExecutor(max_workers=max(1, max_in_flight)) as executor:
-        list(executor.map(one, todo))
+        for attempt in range(1, max(0, retries) + 2):
+            if not pending:
+                break
+            if attempt > 1:
+                resent += len(pending)
+            outcomes = list(executor.map(one, pending, [attempt] * len(pending)))
+            final.update((r.request_id, o) for r, o in zip(pending, outcomes))
+            pending = [r for r, o in zip(pending, outcomes) if o != "answered"]
+    still = Counter(final[r.request_id] for r in pending)
     return PoolReport(
         requests=len(requests), already_answered=len(done), sent=len(todo),
-        answered=tally["answered"], rejected=tally["rejected"], failed=tally["failed"],
+        answered=tally["answered"],
+        rejected=still["rejected"], failed=still["failed"],
         cost_usd=cost[0],
         statuses=tuple(sorted((k[7:], v) for k, v in tally.items() if k.startswith("status:"))),
+        resent=resent,
     )
 
 
@@ -155,13 +187,14 @@ def render(report: PoolReport, judge_letter: str, raw_file: Path) -> str:
         f"    already answered (skipped)           {report.already_answered:>9,}",
         f"    sent this run                        {report.sent:>9,}",
         f"      answered (valid reply recorded)    {report.answered:>9,}",
-        f"      rejected (malformed reply)         {report.rejected:>9,}",
-        f"      failed (no reply)                  {report.failed:>9,}",
+        f"      sent again (bad or no reply)       {report.resent:>9,}",
+        f"      still rejected (malformed reply)   {report.rejected:>9,}",
+        f"      still failed (no reply)            {report.failed:>9,}",
         f"  cost this run (USD)                    {report.cost_usd:>9.2f}",
         "  job statuses: " + (", ".join(f"{s or '?'} {n}" for s, n in report.statuses) or "none"),
         "",
-        "  Rejected and failed requests stay undecided; re-run the same command to retry them.",
+        "  Requests still rejected or failed stay undecided; re-run the same command to retry them.",
     ])
 
 
-__all__ = ["JUDGES", "Pool", "PoolReport", "answered_ids", "is_role", "judge", "render"]
+__all__ = ["JUDGES", "RETRIES", "Pool", "PoolReport", "answered_ids", "is_role", "judge", "render"]
