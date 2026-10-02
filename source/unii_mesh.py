@@ -83,8 +83,35 @@ def fold(text: str) -> str:
     return re.sub(r"[^a-z0-9]+", " ", text.lower()).strip()
 
 
-def mesh_records(paths: Iterable[Path]) -> Iterator[MeshRecord]:
-    """Every descriptor and supplementary record carrying a UNII. Streamed."""
+def exact_key(text: str) -> str:
+    """A name as exact matching compares it: case and runs of spaces folded,
+    nothing else (D44). iKraph2 keys its names the same way.
+
+    >>> exact_key("  Non-Small  Cell Lung CANCER ")
+    'non-small cell lung cancer'
+    """
+    return " ".join(text.casefold().split())
+
+
+class MeshIndex(NamedTuple):
+    """Every MeSH descriptor and supplementary record, read once (D44)."""
+
+    #: ``MESH:<ui>`` → its UNII-shaped registry numbers (only records with any).
+    uniis: dict[str, frozenset[str]]
+    #: :func:`exact_key` of each entry term → the records listing it.
+    by_term: dict[str, frozenset[str]]
+    #: ``MESH:<ui>`` → its preferred name.
+    names: dict[str, str]
+    #: ``MESH:C…`` supplementary record → the descriptors it is mapped to.
+    headings: dict[str, frozenset[str]]
+
+
+def mesh_index(paths: Iterable[Path]) -> MeshIndex:
+    """Registry numbers, entry terms, names and heading mappings, in one pass."""
+    uniis: dict[str, frozenset[str]] = {}
+    by_term: dict[str, set[str]] = defaultdict(set)
+    names: dict[str, str] = {}
+    headings: dict[str, frozenset[str]] = {}
     for path in paths:
         if not path.is_file():
             _log.warning("%s: no MeSH file", path)
@@ -96,39 +123,42 @@ def mesh_records(paths: Iterable[Path]) -> Iterator[MeshRecord]:
             elif element.tag == "SupplementalRecord":
                 ui = element.findtext("SupplementalRecordUI") or ""
                 name = element.findtext("SupplementalRecordName/String") or ""
+                mapped = frozenset(
+                    "MESH:" + ref.text.strip().lstrip("*")
+                    for ref in element.findall(
+                        "HeadingMappedToList/HeadingMappedTo/DescriptorReferredTo/DescriptorUI")
+                    if ref.text)
+                if ui and mapped:
+                    headings[f"MESH:{ui}"] = mapped
             else:
                 continue
-            uniis = frozenset(
-                number.text.strip() for number in element.iter("RegistryNumber")
-                if number.text and UNII_SHAPE.match(number.text.strip()))
-            if ui and uniis:
-                terms = {fold(name)} | {
-                    fold(term.text)
-                    for term in element.findall("ConceptList/Concept/TermList/Term/String")
-                    if term.text}
-                yield MeshRecord(f"MESH:{ui}", name, frozenset(t for t in terms if t), uniis)
+            if ui:
+                mesh = f"MESH:{ui}"
+                names[mesh] = name
+                found = frozenset(
+                    number.text.strip() for number in element.iter("RegistryNumber")
+                    if number.text and UNII_SHAPE.match(number.text.strip()))
+                if found:
+                    uniis[mesh] = found
+                for term in [name, *(t.text or "" for t in element.findall(
+                        "ConceptList/Concept/TermList/Term/String"))]:
+                    if term.strip():
+                        by_term[exact_key(term)].add(mesh)
             element.clear()
+    _log.info("MeSH: %d records, %d with a UNII, %d entry terms", len(names), len(uniis),
+              len(by_term))
+    return MeshIndex(uniis, {k: frozenset(v) for k, v in by_term.items()}, names, headings)
 
 
-def entry_terms(paths: Iterable[Path], wanted: Iterable[str]) -> dict[str, set[str]]:
-    """``MESH:<ui>`` → its preferred name and entry terms as printed, for the
-    ids in ``wanted`` only (D42: spellings for matching trial strings). Streamed."""
-    want = set(wanted)
-    out: dict[str, set[str]] = {}
-    for path in paths:
-        if not path.is_file():
-            continue
-        for _, element in ET.iterparse(path, events=("end",)):
-            if element.tag not in ("DescriptorRecord", "SupplementalRecord"):
-                continue
-            ui = element.findtext("DescriptorUI") or element.findtext("SupplementalRecordUI")
-            if ui and f"MESH:{ui}" in want:
-                out[f"MESH:{ui}"] = {
-                    term.text.strip()
-                    for term in element.findall("ConceptList/Concept/TermList/Term/String")
-                    if term.text and term.text.strip()}
-            element.clear()
-    return out
+def records_of(index: MeshIndex) -> list[MeshRecord]:
+    """The records holding a UNII, as :func:`build` reads them."""
+    terms: dict[str, set[str]] = defaultdict(set)
+    for term, meshes in index.by_term.items():
+        for mesh in meshes:
+            if mesh in index.uniis:
+                terms[mesh].add(fold(term))
+    return [MeshRecord(mesh, index.names.get(mesh, ""), frozenset(terms[mesh]), found)
+            for mesh, found in index.uniis.items()]
 
 
 def unii_names(rows: Iterable[dict[str, str]]) -> dict[str, set[str]]:
@@ -208,5 +238,4 @@ def render(report: MapReport) -> str:
     ])
 
 
-__all__ = ["BASIS_REGISTRY", "MapReport", "MeshRecord", "UniiMesh", "build", "entry_terms", "fold",
-           "mesh_records", "read", "render", "unii_names"]
+__all__ = ["BASIS_REGISTRY", "MapReport", "MeshIndex", "MeshRecord", "UniiMesh", "build", "exact_key", "fold", "mesh_index", "records_of", "read", "render", "unii_names"]

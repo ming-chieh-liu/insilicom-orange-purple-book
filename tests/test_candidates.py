@@ -381,8 +381,8 @@ def test_studies_are_indexed_by_both_keys(patched_archive: None) -> None:
     archive = _Archive([_facts("NCT1"), _facts("NCT2", conditions=("Melanoma",))])
     studies, by_drug, by_condition = candidates.index_studies(
         archive,  # type: ignore[arg-type]
-        {"keytruda": "MESH:C582435"},
-        {"nsclc": "MESH:D002289", "melanoma": "MESH:D008545"},
+        {"keytruda": frozenset({"MESH:C582435"})},
+        {"nsclc": frozenset({"MESH:D002289"}), "melanoma": frozenset({"MESH:D008545"})},
     )
     assert len(studies) == 2
     assert by_drug["MESH:C582435"] == {"NCT1", "NCT2"}
@@ -394,7 +394,7 @@ def test_an_intervention_the_map_does_not_know_is_skipped(
 ) -> None:
     archive = _Archive([_facts("NCT1", interventions=("Unknownium",))])
     _, by_drug, _ = candidates.index_studies(
-        archive, {"keytruda": "MESH:C582435"}, {}  # type: ignore[arg-type]
+        archive, {"keytruda": frozenset({"MESH:C582435"})}, {}  # type: ignore[arg-type]
     )
     assert by_drug == {}
 
@@ -406,7 +406,7 @@ def test_the_matching_facts_ride_along_for_the_judge(
     dropped it would leave the judge nothing to compare."""
     archive = _Archive([_facts("NCT1")])
     studies, _, _ = candidates.index_studies(
-        archive, {"keytruda": "MESH:C582435"}, {}  # type: ignore[arg-type]
+        archive, {"keytruda": frozenset({"MESH:C582435"})}, {}  # type: ignore[arg-type]
     )
     assert studies["NCT1"].enrollment == "616"
     assert studies["NCT1"].phases == "PHASE3"
@@ -415,7 +415,7 @@ def test_the_matching_facts_ride_along_for_the_judge(
 def test_an_unusable_phase_is_excluded(patched_archive: None) -> None:
     archive = _Archive([_facts("NCT1", phases=("EARLY_PHASE1",))])
     studies, _, _ = candidates.index_studies(
-        archive, {"keytruda": "MESH:C582435"}, {}  # type: ignore[arg-type]
+        archive, {"keytruda": frozenset({"MESH:C582435"})}, {}  # type: ignore[arg-type]
     )
     assert studies == {}
 
@@ -690,7 +690,7 @@ def test_the_synonym_index_covers_studies_with_no_derived_mesh(
     the majority."""
     archive = _Archive([_facts_with_derived("NCT1", interventions=("Keytruda",))])
     _, by_drug, _ = candidates.index_studies(
-        archive, {"keytruda": "MESH:C582435"}, {}  # type: ignore[arg-type]
+        archive, {"keytruda": frozenset({"MESH:C582435"})}, {}  # type: ignore[arg-type]
     )
     assert by_drug["MESH:C582435"] == {"NCT1"}
 
@@ -710,7 +710,7 @@ def test_both_sources_apply_to_the_same_study(patched_archive: None) -> None:
         ]
     )
     _, by_drug, _ = candidates.index_studies(
-        archive, {"somedrug": "PubChem:CID1"}, {}  # type: ignore[arg-type]
+        archive, {"somedrug": frozenset({"PubChem:CID1"})}, {}  # type: ignore[arg-type]
     )
     assert by_drug["MESH:D004837"] == {"NCT1"}
     assert by_drug["PubChem:CID1"] == {"NCT1"}
@@ -724,7 +724,7 @@ def test_both_sources_feed_the_same_postings(patched_archive: None) -> None:
         ]
     )
     _, by_drug, _ = candidates.index_studies(
-        archive, {"keytruda": "MESH:C582435"}, {}  # type: ignore[arg-type]
+        archive, {"keytruda": frozenset({"MESH:C582435"})}, {}  # type: ignore[arg-type]
     )
     assert by_drug["MESH:C582435"] == {"NCT1", "NCT2"}
 
@@ -737,7 +737,7 @@ def test_conditions_follow_the_same_rule(patched_archive: None) -> None:
         ]
     )
     _, _, by_condition = candidates.index_studies(
-        archive, {}, {"nsclc": "MESH:D002289"}  # type: ignore[arg-type]
+        archive, {}, {"nsclc": frozenset({"MESH:D002289"})}  # type: ignore[arg-type]
     )
     assert by_condition["MESH:D002386"] == {"NCT1"}
     assert by_condition["MESH:D002289"] == {"NCT2"}
@@ -1198,7 +1198,7 @@ def test_name_words_and_generic_arms() -> None:
                              "Acalabrutinib;Chemoimmunotherapy;Placebo")
     got = candidates.drug_check(c, frozenset({"MESH:A"}), frozenset({"MESH:Z"}),
                                 frozenset({"zanubrutinib"}), frozenset({"MESH:A", "MESH:Z"}),
-                                {"acalabrutinib": "MESH:A"})
+                                {"acalabrutinib": frozenset({"MESH:A"})})
     assert got == "other"   # the generic arm no longer leaves it unresolved
 
 
@@ -1239,7 +1239,7 @@ def test_index_carries_normalised_codes_beside_the_raw_text(patched_archive: Non
     archive = _Archive([_facts("NCT1")])
     studies, _, _ = candidates.index_studies(
         archive,  # type: ignore[arg-type]
-        {"keytruda": "MESH:C582435"}, {"nsclc": "MESH:D002289"},
+        {"keytruda": frozenset({"MESH:C582435"})}, {"nsclc": frozenset({"MESH:D002289"})},
         {"MESH:C582435": "pembrolizumab", "MESH:D002289": "Carcinoma, Non-Small-Cell Lung"},
     )
     assert studies["NCT1"].intervention_codes == "pembrolizumab [MeSH C582435]"

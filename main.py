@@ -49,6 +49,7 @@ from service import (
     approval_events,
     drug_identity,
     drug_names as drug_names_table,
+    registry_identity,
     approval_map,
     attribution,
     identity_census,
@@ -895,12 +896,21 @@ def main(argv: list[str] | None = None) -> int:
             if role in review_role.LINKING
         ]
         review_linked = frozenset(key for key, _nct in linking_reviews)
+        # D44: MeSH names for the judge, and where a concept or supplementary
+        # id sits in the tree — the one place ids are rolled up.
+        cand_mesh = unii_mesh.mesh_index([Path(args.mesh), data.mesh_supplementary])
+        descriptor_of = {**{f"MESH:{c}": frozenset({f"MESH:{d}"})
+                            for c, d in mesh_descriptors.concept_to_descriptor(
+                                cand_vocabulary).items() if c != d},
+                         **cand_mesh.headings}
         candidates_report = candidates.build(
             data, archive, out_dir,
             ancestors=mesh_descriptors.ancestors(mesh_descriptors.read(cand_vocabulary)),
             review_linked=review_linked,
             # D39: MeSH names for the codes shown beside each raw text.
-            mesh_names=unii_bridge.mesh_names([Path(args.mesh), data.mesh_supplementary]),
+            mesh_names=cand_mesh.names,
+            descriptor_of=descriptor_of,
+            diseases=frozenset(f"MESH:{d.ui}" for d in mesh_descriptors.diseases(cand_vocabulary)),
             # D41: trials a review names PIVOTAL/SUPPORTING are not judged again.
             review_trials=linking_reviews,
         )
@@ -1221,9 +1231,15 @@ def main(argv: list[str] | None = None) -> int:
         # rather than taking --mode indications' ids, coded by the bare sweep.
         openfda_text = {r["application"]: r.get("text") or ""
                         for r in _tsv("indication_text.tsv")} or None
-        condition_rows = _tsv("trial_condition_map.tsv")
+        # D44: a registry condition string widens the sweep only where it reached
+        # exactly one MeSH descriptor (and, for the internal id, one entity) —
+        # the coder's terms are descriptors, and S3 rolls nothing up.
+        condition_rows = [r for r in _tsv("trial_condition_map.tsv")
+                          if r.get("mesh_id", "").startswith("MESH:D")
+                          and ";" not in r["mesh_id"]]
         exact = {r["source_name"].casefold(): r["mesh_id"] for r in condition_rows}
-        known = {r["mesh_id"]: r["biokdeid"] for r in condition_rows if r.get("biokdeid")}
+        known = {r["mesh_id"]: r["biokdeid"] for r in condition_rows
+                 if r.get("biokdeid") and ";" not in r["biokdeid"]}
         # D34: terms outside MeSH widen the sweep — first the registry condition
         # strings NLM consistently codes to one descriptor, then the ones P1
         # resolved through biokde. Neither overrules a MeSH entry term.
@@ -1337,20 +1353,16 @@ def main(argv: list[str] | None = None) -> int:
         for name, name_uniis in ingredient_uniis.items():
             for unii in name_uniis:
                 fda_names_of.setdefault(unii, set()).add(name)
-        mesh_files = [Path(args.mesh), data.mesh_supplementary]
+        # D44: MeSH read once — registry numbers, entry terms, names, headings.
+        mesh_index = unii_mesh.mesh_index([Path(args.mesh), data.mesh_supplementary])
         unii_mesh_rows, unii_mesh_report = unii_mesh.build(
-            unii_mesh.mesh_records(mesh_files), fda_names_of,
+            unii_mesh.records_of(mesh_index), fda_names_of,
             unii_mesh.unii_names(read_rows(data.unii_names)))
         pubchem_of = unii_bridge.unii_to_pubchem(
             unii_bridge.read_unii_records(data.unii_records))
-        concepts, descriptor_names = mesh_descriptors.rollup_and_names(vocabulary)
-        # D42: spellings for the trial side — FDA UNII names per ingredient,
-        # MeSH entry terms per id; iKraph2's own names are read in the build.
-        extra_names: dict[str, set[str]] = drug_identity.spellings(
-            read_rows(data.unii_names), ingredient_uniis)
-        extra_names.update(unii_mesh.entry_terms(mesh_files, {
-            r.mesh_id for r in unii_mesh_rows} | {
-            normalize.roll_up(normalize.as_graph_id(i), concepts) for i in indication_ids}))
+        _, descriptor_names = mesh_descriptors.rollup_and_names(vocabulary)
+        # D44: every name in the FDA UNII list, for exact name matching.
+        unii_by_name = registry_identity.unii_names(read_rows(data.unii_names))
         # One client per process: MongoClient is the pool. It is built here and
         # injected, so nothing under service/ knows a host or a credential.
         import pymongo
@@ -1368,11 +1380,11 @@ def main(argv: list[str] | None = None) -> int:
                 data,
                 archive,
                 ik2_entities,
-                concepts,
+                mesh_index,
                 indication_ids,
                 identities,
+                unii_by_name,
                 descriptor_names,
-                extra_names,
             )
         finally:
             ik2_client.close()
@@ -1395,10 +1407,12 @@ def main(argv: list[str] | None = None) -> int:
         )
         repository_out.save("drug_map", columns, normalize_report.drugs)
         repository_out.save("indication_map", columns, normalize_report.indications)
-        repository_out.save("trial_drug_map", columns, normalize_report.trial_drugs)
-        repository_out.save(
-            "trial_condition_map", columns, normalize_report.trial_conditions
-        )
+        # D44: exact ids per trial string and per NLM-coded MeSH id.
+        resolved_columns = registry_identity.Resolved._fields
+        repository_out.save("trial_drug_map", resolved_columns, normalize_report.trial_drugs)
+        repository_out.save("trial_condition_map", resolved_columns,
+                            normalize_report.trial_conditions)
+        repository_out.save("nlm_id_map", resolved_columns, normalize_report.nlm_ids)
         # Every name each application's drug goes by: brand, generic,
         # ingredient (salt), moiety, UNIIs — for the judge and the drug check.
         names_rows = drug_names_table.build(
@@ -1413,8 +1427,7 @@ def main(argv: list[str] | None = None) -> int:
         # D39: the exact PubChem <-> MeSH bridge through UNII, one-to-one only.
         bridges = unii_bridge.build(
             pubchem_of,
-            unii_bridge.mesh_to_unii(unii_bridge.mesh_registry(
-                [Path(args.mesh), data.mesh_supplementary])),
+            unii_bridge.mesh_to_unii((m, list(u)) for m, u in mesh_index.uniis.items()),
         )
         repository_out.save("id_bridge", unii_bridge.Bridge._fields, bridges)
         print(f"id_bridge: {len(bridges):,} exact UNII bridges (PubChem <-> MeSH)")

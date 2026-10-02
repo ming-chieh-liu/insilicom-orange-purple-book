@@ -1,4 +1,4 @@
-"""Tests for the normalisation policy: one id space for both sides of the edge (D42)."""
+"""Tests for S2/S3 normalisation by exact ids (D44)."""
 
 from __future__ import annotations
 
@@ -11,28 +11,52 @@ import pytest
 from config.settings import RawData, TrialArchive
 from service import normalize
 from service.drug_identity import DrugIdentity
-
-# "Gastric Cancer" is a MeSH *concept*; "Stomach Neoplasms" is the *descriptor*
-# that heads it. Both must land on D013274 or the join fails on obvious rows.
-_CONCEPTS = {"M0333444": "D013274", "D013274": "D013274", "C582435": "C582435"}
+from source.unii_mesh import MeshIndex
+from dao.ikraph2_entities import Node
 
 
-class _FakeGraph:
-    """iKraph2's names and exact-id lookups, as normalize.build reads them."""
+class FakeGraph:
+    """iKraph2 as the resolver reads it: names, exact ids, disease entities."""
 
-    def __init__(self, names: dict[str, frozenset[str]] | None = None,
-                 internal: dict[str, str] | None = None) -> None:
-        self._names = names or {}
-        self._internal = internal or {}
-        self.names_asked: list[str] = []
+    def __init__(self, names: dict[str, list[Node]] | None = None,
+                 ids: dict[str, list[Node]] | None = None,
+                 diseases: dict[str, list[str]] | None = None) -> None:
+        self.names = _NAMES if names is None else names
+        self.ids = _IDS if ids is None else ids
+        self.diseases = _DISEASES if diseases is None else diseases
 
-    def names_of(self, biokdeids: Iterable[str]) -> dict[str, frozenset[str]]:
-        asked = sorted(biokdeids)
-        self.names_asked += asked
-        return {i: self._names[i] for i in asked if i in self._names}
+    def named(self, keys: Iterable[str], types: Iterable[str]) -> dict[str, list[Node]]:
+        kinds = set(types)
+        out = {k: [n for n in self.names.get(k, []) if n.type in kinds] for k in keys}
+        return {k: v for k, v in out.items() if v}
+
+    def by_db_id(self, ids: Iterable[str]) -> dict[str, list[Node]]:
+        return {i: self.ids[i] for i in ids if i in self.ids}
+
+    def diseases_by_db_id(self, ids: Iterable[str]) -> dict[str, list[str]]:
+        return {i: self.diseases[i] for i in ids if i in self.diseases}
 
     def internal_ids(self, ids: Iterable[str]) -> dict[str, str]:
-        return {i: self._internal[i] for i in ids if i in self._internal}
+        return {k: v[0] for k, v in self.diseases_by_db_id(ids).items() if len(v) == 1}
+
+
+_PEMBRO = Node("2700000295", "TherapyPreventions", "PEMBROLIZUMAB", "UNII:DPT0O3T46P", 31352)
+_KEYTRUDA = Node("2700044997", "TherapyPreventions", "keytruda", "", 90)
+_PEMBRO_CHEM = Node("6308113", "Chemical", "pembrolizumab", "MESH:C582435", 4)
+_NSCLC = Node("55633", "Disease", "carcinoma, non-small-cell lung", "MESH:D002289", 107101)
+_EOS = Node("9001", "Disease", "eosinophilic asthma", "MESH:M0001", 50)
+_NAMES: dict[str, list[Node]] = {
+    "pembrolizumab": [_PEMBRO, _PEMBRO_CHEM],
+    "keytruda": [_KEYTRUDA, _PEMBRO_CHEM],
+    "non-small cell lung cancer": [_NSCLC],
+    "eosinophilic asthma": [_EOS],
+    "two drugs": [_PEMBRO, _KEYTRUDA],
+}
+_IDS: dict[str, list[Node]] = {
+    "UNII:DPT0O3T46P": [_PEMBRO], "MESH:C582435": [_PEMBRO_CHEM],
+    "MESH:C999": [Node("77", "Chemical", "only chemical", "MESH:C999", 1)],
+}
+_DISEASES: dict[str, list[str]] = {"MESH:D002289": ["55633"], "MESH:D2": ["1", "2"]}
 
 
 def test_a_bare_mesh_id_is_prefixed_for_the_graph() -> None:
@@ -45,23 +69,6 @@ def test_a_bare_mesh_id_is_prefixed_for_the_graph() -> None:
 def test_placeholder_ids_identify_nothing() -> None:
     assert not normalize.is_identifier("NA")
     assert normalize.is_identifier("MESH:D1")
-
-
-def test_concept_ids_roll_up_and_others_pass_through() -> None:
-    assert normalize.roll_up("MESH:M0333444", _CONCEPTS) == "MESH:D013274"
-    assert normalize.roll_up("MESH:D013274", _CONCEPTS) == "MESH:D013274"
-    assert normalize.roll_up("PubChem:CID1", _CONCEPTS) == "PubChem:CID1"
-
-
-def test_the_synonym_index_drops_short_ambiguous_design_and_placeholder_names() -> None:
-    index = normalize.synonym_index({
-        "MESH:C582435": ["Keytruda", "PB", "Control", "MK-3475"],
-        "MESH:C2": ["Opdivo", "mk-3475"],
-        "MESH:M0333444": ["Gastric Cancer"],
-        "NA": ["Anything"],
-    }, _CONCEPTS)
-    assert index == {"keytruda": "MESH:C582435", "opdivo": "MESH:C2",
-                     "gastric cancer": "MESH:D013274"}
 
 
 @pytest.mark.parametrize("asked,resolved,expected", [(10, 8, 0.8), (0, 0, 0.0)])
@@ -134,7 +141,7 @@ def test_applications_out_of_scope_are_skipped(corpus: RawData) -> None:
 
 def test_the_report_renders_the_application_rate() -> None:
     report = normalize.NormalizeReport(
-        drugs=(), indications=(), trial_drugs=(), trial_conditions=(),
+        drugs=(), indications=(), trial_drugs=(), trial_conditions=(), nlm_ids=(),
         coverages=(normalize.Coverage("drugs", 10, 9, 0, 0, ()),),
         applications_unresolved=2, applications_total=10,
     )
@@ -143,7 +150,7 @@ def test_the_report_renders_the_application_rate() -> None:
 
 
 def test_an_empty_report_has_a_zero_rate() -> None:
-    report = normalize.NormalizeReport((), (), (), (), (), 0, 0)
+    report = normalize.NormalizeReport((), (), (), (), (), (), 0, 0)
     assert report.application_rate == 0.0
 
 
@@ -220,79 +227,43 @@ def empty_archive(tmp_path: Path) -> TrialArchive:
     return TrialArchive(root=tmp_path / "no-archive")
 
 
-def _identity(name: str, mesh: str = "MESH:C582435", nodes: str = "2700000295") -> DrugIdentity:
-    return DrugIdentity(name, "DPT0O3T46P", mesh, "pembrolizumab", nodes,
-                        "TherapyPreventions", "unii_registry" if mesh else "unii_no_mesh")
+_MESH = MeshIndex(uniis={"MESH:C582435": frozenset({"DPT0O3T46P"})},
+                  by_term={"pembrolizumab": frozenset({"MESH:C582435"})},
+                  names={"MESH:C582435": "pembrolizumab"}, headings={})
 
 
-def test_the_pass_takes_exact_ids_and_expands_every_spelling(
+def test_s2_takes_exact_ids_and_s3_codes_nothing_without_an_archive(
     full_corpus: RawData, empty_archive: TrialArchive
 ) -> None:
-    graph = _FakeGraph(names={"2700000295": frozenset({"lambrolizumab"}),
-                              "55633": frozenset({"non-small-cell lung cancer"})},
-                       internal={"MESH:D002289": "55633"})
-    report = normalize.build(
-        full_corpus, empty_archive, graph, _CONCEPTS, ["D002289"],
-        {"PEMBROLIZUMAB": _identity("PEMBROLIZUMAB")},
-        extra_names={"PEMBROLIZUMAB": {"Keytruda"}, "MESH:C582435": {"MK-3475"}},
-    )
+    identity = DrugIdentity("PEMBROLIZUMAB", "DPT0O3T46P", "MESH:C582435", "pembrolizumab",
+                            "2700000295", "TherapyPreventions", "unii_registry")
+    report = normalize.build(full_corpus, empty_archive, FakeGraph(), _MESH, ["D002289"],
+                             {"PEMBROLIZUMAB": identity}, {})
     drug = report.drugs[0]
     assert (drug.mesh_id, drug.biokdeid, drug.basis) == (
         "MESH:C582435", "2700000295", "unii_registry")
     assert report.indications[0].mesh_id == "MESH:D002289"
     assert report.indications[0].biokdeid == "55633"
-    assert set(graph.names_asked) == {"2700000295", "55633"}
     assert report.application_rate == 1.0
-    assert len(report.coverages) == 4
+    assert (report.trial_drugs, report.trial_conditions, report.nlm_ids) == ((), (), ())
+    assert len(report.coverages) == 5
 
 
-def test_an_ingredient_no_exact_id_identifies_has_no_row(
+def test_an_ingredient_without_a_unii_falls_back_to_an_exact_name(
     full_corpus: RawData, empty_archive: TrialArchive
 ) -> None:
-    report = normalize.build(
-        full_corpus, empty_archive, _FakeGraph(), _CONCEPTS, [],
-        {"PEMBROLIZUMAB": _identity("PEMBROLIZUMAB", mesh="", nodes="")},
-    )
+    report = normalize.build(full_corpus, empty_archive, FakeGraph(), _MESH, [], {}, {})
+    drug = report.drugs[0]
+    # PEMBROLIZUMAB is an exact iKraph2 name and an exact MeSH entry term.
+    assert (drug.mesh_id, drug.biokdeid) == ("MESH:C582435", "2700000295")
+    assert "ikraph2_name" in drug.basis
+
+
+def test_an_ingredient_nothing_exact_reaches_has_no_row(
+    full_corpus: RawData, empty_archive: TrialArchive
+) -> None:
+    empty = MeshIndex({}, {}, {}, {})
+    report = normalize.build(full_corpus, empty_archive, FakeGraph(names={}), empty, [], {}, {})
     assert report.drugs == ()
     assert report.applications_unresolved == 1
-    assert report.application_rate == 0.0
     assert report.coverages[0].unresolved == ("PEMBROLIZUMAB",)
-
-
-def test_expanding_skips_rows_without_an_identifier() -> None:
-    rows = [normalize.Mapping("X", "NA", "", "", "", "")]
-    assert normalize.expand(rows, _FakeGraph(), {}) == {}
-
-
-def test_the_trial_side_matches_through_the_synonym_index(tmp_path: Path) -> None:
-    index = {"keytruda": "MESH:C582435"}
-    rows, coverage = normalize._match_trial_strings(
-        [("Keytruda", "Placebo"), ("KEYTRUDA",)], index, "trial intervention"
-    )
-    assert {r.name for r in rows} == {"Keytruda", "KEYTRUDA"}
-    assert coverage.asked == 3
-    assert coverage.resolved == 2
-    assert all(r.basis == "synonym" for r in rows)
-
-
-def test_a_trial_side_row_inherits_the_internal_id() -> None:
-    rows, _ = normalize._match_trial_strings(
-        [("Keytruda",)],
-        {"keytruda": "MESH:C582435"},
-        "trial intervention",
-        {"MESH:C582435": "6308113"},
-    )
-    assert rows[0].biokdeid == "6308113"
-
-
-def test_a_dose_stripped_name_resolves_only_under_the_guards() -> None:
-    """2026-09-30: dose, route and form removed; short or NLM-contradicted refused."""
-    index = {"cr845": "PubChem:CID24794466", "surgery": "MESH:D013455", "nacl": "MESH:D000111"}
-    rows, coverage = normalize._match_trial_strings(
-        [("CR845 0.5 mcg/kg", "Oral surgery", "NaCl 0.9%", "Unknown 5 mg")],
-        index, "trial intervention", nlm_of={"Oral surgery": {"MESH:D013514"}}, strip_doses=True,
-    )
-    assert [(r.name, r.mesh_id, r.basis) for r in rows] == [
-        ("CR845 0.5 mcg/kg", "PubChem:CID24794466", normalize.BASIS_DOSE_STRIPPED)
-    ]
-    assert coverage.resolved == 1

@@ -317,7 +317,7 @@ code says `not yet implemented` until it lands.
   Chemical one, 245 none; iKraph1's spellings carry over to the new id (`normalize.renamed_ids`), so the
   trial-side name index keeps 19,398 strings (19,408 before). S7 PMIDs are fetched best evidence first up to
   the 400-abstract budget (a cold API evidence page reads ~10 ms per row), prefetched 4 drugs at a time.
-- **D43 — iKraph2 everywhere except abstracts; FDA drugs by exact ids only** (2026-10-01, **implemented in
+- **[PARTIALLY SUPERSEDED by D44, 2026-10-01 — trial strings are matched forward by exact name/id to iKraph2, not as spellings of FDA ids; no roll-up in S2/S3]** **D43 — iKraph2 everywhere except abstracts; FDA drugs by exact ids only** (2026-10-01, **implemented in
   code 2026-10-01; S2/S3 rebuilt**). S2 drug rows come only from D42's exact ids (UNII → MeSH registry,
   iKraph2 node by `db_id`); the iKraph1 name resolution and its fallback are removed, so an ingredient no
   exact id identifies has no row (2,498 of 2,670 have one; applications with a drug id 98.5% → 96.5%). S3
@@ -327,6 +327,27 @@ code says `not yet implemented` until it lands.
   strings: drugs 94.0% → 94.5% exact (16,548 → 17,463 checkable); conditions 62.9% → 93.0% exact,
   76.1% → 96.2% within the MeSH tree (13,690 → 8,113 strings: ~2,800 wrong matches gone, ~1,500 right ones
   lost, and an uncoded trial stays in the pool).
+- **D44 — both sides normalised the same way, by exact match only; iKraph2 first, MeSH kept; roll-up only
+  in S8** (2026-10-01, **implemented in code 2026-10-01; S2/S3 rebuilt, S5→S11 to be re-run**). Every FDA
+  ingredient (S2) and every registry intervention/condition string and NLM-coded MeSH id (S3,
+  `service/registry_identity.py`) is matched **exactly** — a whole name (case and spacing folded) or an id:
+  drugs → iKraph2 entity (TherapyPreventions, else Chemical) + UNII, with exact unique MeSH/PubChem kept;
+  diseases → the one iKraph2 Disease entity + its MeSH id as stored. Routes: NLM MeSH id (drug: record's
+  UNIIs by RegistryNumber → entity; disease: entity holding the id), iKraph2 name, FDA UNII name list (brand
+  and code names: Keytruda, MK-3475 → pembrolizumab), MeSH entry term; a name reaching two entities of the
+  preferred type is dropped; no match → no id. **NLM's MeSH ids are never stripped.** S8 joins on any shared
+  key (`IK2:<biokdeid>`, `UNII:`, `MESH:`, `PubChem:`); the indication filter places concept (`M…`) and
+  supplementary (`C…`) ids under their descriptors (the only roll-up), counts an iKraph2/UNII key only by
+  equality, and uses a string-derived condition id only if it places on a disease descriptor (9,063 registry
+  "conditions" are non-diseases such as Olive Oil). S5 widens its coder only with strings that reached exactly
+  one MeSH descriptor. Outputs: `trial_drug_map.tsv`, `trial_condition_map.tsv`, new `nlm_id_map.tsv` (columns
+  `source_name, biokdeid, unii, mesh_id, pubchem, entity_type, basis`). Why: the user's rule — the trial side was
+  only normalised relative to the FDA side (a string that was not a spelling of an FDA id got nothing).
+  Measured against NLM's coding of the same strings: interventions 131,090 strings reach an id (was 20,917),
+  36,658 checkable, 92.0% exact / 93.4% within tree; conditions 51,206 (was 8,113), disease ids 95.6% within
+  tree on 20,359 (both routes agree 99.8%, MeSH term only 99.9%, iKraph2 name only 85.7%); FDA ingredients
+  with an id 2,631/2,670, applications with a drug id 99.2%; NLM ids reaching an entity 11,918/20,599. S11
+  shortlist recall 84.5% (2,479/2,933) on a run before the S8 disease-only rule.
 
 ## Current status and to-do
 
@@ -336,8 +357,8 @@ update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026
 1. **S4 documents and S6 review roles done** (4,825 / 4,825 roles decided, 2026-09-30).
 2. **D37–D41 committed and rebuilt** (latest 74cd4ea, 2026-10-01) — `make status` lists what is
    stale. The D35 pilots (2026-09-30) are superseded by the v2 prompts — every answer is re-judged.
-3. **D42 iKraph2 migration** implemented 2026-10-01; S2 rebuilt, S7 → S8 rebuilding. Agent pool
-   verified (cap 32 concurrent; seats are the bottleneck, 2026-10-01).
+3. **D42–D44 (iKraph2, exact-match normalisation)** implemented and committed 2026-10-01; the user will
+   re-run the whole pipeline. Agent pool verified (cap 32 concurrent; seats are the bottleneck).
 4. Then: rebuild (`make candidates`) → pilots per route → full runs (both two judges + third, D40) →
    S10 → D28 label roles → S10 → S11.
 
@@ -359,7 +380,7 @@ update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026
 S1  SPINE          Drugs@FDA -> 87,055 approved NDA|BLA events -> 11,295 trial-relevant (D23, D24)
 S2  DRUGS          per application: brand, generic, ingredient(s), moiety(ies), UNII(s)
                    (drug_names.tsv) + normalised drug id and its graph biokdeid (drug_map.tsv)
-S3  REGISTRY       every CT.gov study: interventions -> drug ids (NLM MeSH, then iKraph2/UNII/MeSH names,
+S3  REGISTRY       every CT.gov study: interventions -> drug ids (NLM MeSH + iKraph2 entity/UNII; exact names,
                    dose stripped), conditions -> disease ids, status, why stopped, dates;
                    WITHDRAWN / NOT_YET_RECRUITING dropped (trial_drug_map, trial_condition_map)
 S4  DOCUMENTS      fetched by hand at 1 req/s, never by make:

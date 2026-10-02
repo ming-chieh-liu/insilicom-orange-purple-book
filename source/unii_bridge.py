@@ -24,7 +24,6 @@ from __future__ import annotations
 import csv
 import io
 import re
-import xml.etree.ElementTree as ET
 import zipfile
 from collections import defaultdict
 from collections.abc import Iterable, Iterator
@@ -84,48 +83,6 @@ def read_unii_records(path: Path) -> Iterator[dict[str, str]]:
         with archive.open(name) as handle:
             yield from csv.DictReader(io.TextIOWrapper(handle, encoding="utf-8"),
                                       delimiter="\t")
-
-
-def mesh_registry(paths: Iterable[Path]) -> Iterator[tuple[str, list[str]]]:
-    """``(MESH:<ui>, [registry numbers])`` for every descriptor and supplementary record.
-
-    Streamed: ``supp2026.xml`` is 786 MB.
-    """
-    for path in paths:
-        if not path.is_file():
-            _log.warning("%s: no MeSH file", path)
-            continue
-        for _, element in ET.iterparse(path, events=("end",)):
-            if element.tag not in ("DescriptorRecord", "SupplementalRecord"):
-                continue
-            ui = element.findtext("DescriptorUI") or element.findtext("SupplementalRecordUI") or ""
-            numbers = [n.text.strip() for n in element.iter("RegistryNumber") if n.text]
-            if ui:
-                yield f"MESH:{ui}", numbers
-            element.clear()
-
-
-def mesh_names(paths: Iterable[Path]) -> dict[str, str]:
-    """``MESH:<ui>`` → its preferred name, descriptors and supplementary records (D39).
-
-    What a judge is shown beside a MeSH id (prompt v3). Streamed.
-    """
-    out: dict[str, str] = {}
-    for path in paths:
-        if not path.is_file():
-            continue
-        for _, element in ET.iterparse(path, events=("end",)):
-            if element.tag == "DescriptorRecord":
-                ui, name = element.findtext("DescriptorUI"), element.findtext("DescriptorName/String")
-            elif element.tag == "SupplementalRecord":
-                ui = element.findtext("SupplementalRecordUI")
-                name = element.findtext("SupplementalRecordName/String")
-            else:
-                continue
-            if ui and name:
-                out[f"MESH:{ui}"] = name
-            element.clear()
-    return out
 
 
 def mesh_to_unii(records: Iterable[tuple[str, list[str]]]) -> dict[str, str]:
@@ -192,8 +149,6 @@ __all__ = [
     "UNII_SHAPE",
     "build",
     "equivalents",
-    "mesh_names",
-    "mesh_registry",
     "mesh_to_unii",
     "read_bridges",
     "read_unii_records",

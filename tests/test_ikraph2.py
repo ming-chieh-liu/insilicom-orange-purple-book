@@ -176,20 +176,21 @@ class _Collection:
 
     def find(self, query: dict[str, Any], projection: dict[str, int]) -> _Cursor:
         self.queries.append(query)
+        kind = query.get("type")
+        types = set(kind["$in"]) if isinstance(kind, dict) else {kind} if kind else None
         if "biokdeid" in query:
             wanted = set(query["biokdeid"]["$in"])
             return _Cursor(r for r in self.rows if r["biokdeid"] in wanted)
-        ids = set(query["db_id"]["$in"])
-        types = set(query["type"]["$in"]) if "type" in query else None
+        field = "term_key" if "term_key" in query else "db_id"
+        ids = set(query[field]["$in"])
         return _Cursor(r for r in self.rows
-                       if r["db_id"] in ids and (types is None or r["type"] in types))
+                       if r[field] in ids and (types is None or r["type"] in types))
 
 
 _NAMES = [
-    {"biokdeid": 2700000295, "term_key": "pembrolizumab",
-     "variants": [{"term": "pembrolizumab"}, {"term": "PEMBROLIZUMAB"}]},
-    {"biokdeid": 2700000295, "term_key": "lambrolizumab", "variants": []},
-    {"biokdeid": 55633, "term_key": "", "variants": [{"term": "NSCLC"}, {"term": ""}]},
+    {"biokdeid": 2700000295, "term_key": "pembrolizumab", "type": "TherapyPreventions"},
+    {"biokdeid": 6308113, "term_key": "pembrolizumab", "type": "Chemical"},
+    {"biokdeid": 55633, "term_key": "nsclc", "type": "Disease"},
 ]
 
 
@@ -309,32 +310,22 @@ def test_answers_persist_across_runs_and_a_torn_line_is_skipped(
     assert "unreadable cache line" in caplog.text
 
 
-def test_names_and_internal_ids_come_from_ikraph2() -> None:
+def test_exact_names_and_disease_ids_come_from_ikraph2() -> None:
     rows = _ROWS + [{"biokdeid": 55633, "type": "Disease", "official_name": "nsclc",
                      "db_id": "MESH:D002289", "mention_count": 5},
-                    {"biokdeid": 77, "type": "Chemical", "official_name": "x",
-                     "db_id": "MESH:D002289", "mention_count": 50}]
+                    {"biokdeid": 56, "type": "Disease", "official_name": "dup",
+                     "db_id": "MESH:D9", "mention_count": 1},
+                    {"biokdeid": 57, "type": "Disease", "official_name": "dup",
+                     "db_id": "MESH:D9", "mention_count": 1}]
     client, _ = _client(rows)
     entities = Ikraph2Entities(client, Ikraph2Connection())
-    names = entities.names_of(["2700000295", "55633", "not-a-number"])
-    assert names == {"2700000295": {"pembrolizumab", "PEMBROLIZUMAB", "lambrolizumab"},
-                     "55633": {"NSCLC"}}
-    # A Disease entity wins over a more-mentioned Chemical holding the same id.
-    assert entities.internal_ids(["MESH:D002289", "MESH:C582435", ""]) == {
-        "MESH:D002289": "55633", "MESH:C582435": "6308113"}
-
-
-def test_entry_terms_are_read_as_printed_for_wanted_ids_only(tmp_path: Path) -> None:
-    from source import unii_mesh
-    desc = tmp_path / "desc.xml"
-    desc.write_text("""<?xml version="1.0"?><DescriptorRecordSet>
-      <DescriptorRecord><DescriptorUI>D1</DescriptorUI>
-        <DescriptorName><String>Esomeprazole</String></DescriptorName>
-        <ConceptList><Concept><TermList><Term><String>Esomeprazole</String></Term>
-          <Term><String>Nexium</String></Term></TermList></Concept></ConceptList>
-      </DescriptorRecord>
-      <DescriptorRecord><DescriptorUI>D2</DescriptorUI>
-        <DescriptorName><String>Other</String></DescriptorName></DescriptorRecord>
-      </DescriptorRecordSet>""", encoding="utf-8")
-    assert unii_mesh.entry_terms([desc, tmp_path / "absent.xml"], ["MESH:D1"]) == {
-        "MESH:D1": {"Esomeprazole", "Nexium"}}
+    named = entities.named(["pembrolizumab", "nsclc", ""], ["TherapyPreventions", "Chemical"])
+    # Drug type first; the db_id comes back with each entity.
+    assert [(n.biokdeid, n.type, n.db_id) for n in named["pembrolizumab"]] == [
+        ("2700000295", "TherapyPreventions", "UNII:DPT0O3T46P"),
+        ("6308113", "Chemical", "MESH:C582435")]
+    assert "nsclc" not in named
+    assert entities.diseases_by_db_id(["MESH:D002289", "MESH:D9"]) == {
+        "MESH:D002289": ["55633"], "MESH:D9": ["56", "57"]}
+    # An id two disease entities hold has no one entity.
+    assert entities.internal_ids(["MESH:D002289", "MESH:D9"]) == {"MESH:D002289": "55633"}

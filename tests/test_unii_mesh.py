@@ -57,7 +57,7 @@ def _records(tmp_path: Path) -> list[unii_mesh.MeshRecord]:
     desc, supp = tmp_path / "desc.xml", tmp_path / "supp.xml"
     desc.write_text(_DESC, encoding="utf-8")
     supp.write_text(_SUPP, encoding="utf-8")
-    return list(unii_mesh.mesh_records([desc, supp, tmp_path / "absent.xml"]))
+    return unii_mesh.records_of(unii_mesh.mesh_index([desc, supp, tmp_path / "absent.xml"]))
 
 
 def test_records_carry_entry_terms_and_only_unii_shaped_numbers(tmp_path: Path) -> None:
@@ -103,3 +103,19 @@ def test_the_table_reads_back(tmp_path: Path) -> None:
                     "R6DXU4WAY9\tMESH:D064098\tEsomeprazole\t2\tunii_registry\n",
                     encoding="utf-8")
     assert unii_mesh.read(path) == {"R6DXU4WAY9": "MESH:D064098"}
+
+
+def test_the_index_keeps_terms_names_and_supplementary_headings(tmp_path: Path) -> None:
+    desc, supp = tmp_path / "desc.xml", tmp_path / "supp.xml"
+    desc.write_text(_DESC, encoding="utf-8")
+    supp.write_text(_SUPP.replace(
+        "<SupplementalRecordName><String>SMOFlipid</String></SupplementalRecordName>",
+        "<SupplementalRecordName><String>SMOFlipid</String></SupplementalRecordName>"
+        "<HeadingMappedToList><HeadingMappedTo><DescriptorReferredTo>"
+        "<DescriptorUI>*D005217</DescriptorUI></DescriptorReferredTo></HeadingMappedTo>"
+        "</HeadingMappedToList>"), encoding="utf-8")
+    index = unii_mesh.mesh_index([desc, supp])
+    assert index.by_term["nexium"] == {"MESH:D064098"}
+    assert index.names["MESH:D000002"] == "No Registry"
+    assert index.headings == {"MESH:C000709826": {"MESH:D005217"}}
+    assert unii_mesh.exact_key(" Nexium  ") == "nexium"

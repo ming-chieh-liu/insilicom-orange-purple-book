@@ -131,29 +131,6 @@ def build(names: Iterable[str], uniis: dict[str, tuple[str, ...]],
     return out, report
 
 
-def spellings(rows: Iterable[dict[str, str]],
-              uniis: dict[str, tuple[str, ...]]) -> dict[str, set[str]]:
-    """Ingredient name → every name the FDA UNII list gives any of its UNIIs,
-    as printed: brand names (``Jinarc``), code names (``OPC-41061``), INNs.
-
-    >>> rows = [{"UNII": "21G72T1950", "NAME": "Jinarc", "DISPLAY_NAME": "TOLVAPTAN"},
-    ...         {"UNII": "OTHER00000", "NAME": "x", "DISPLAY_NAME": "y"}]
-    >>> sorted(spellings(rows, {"TOLVAPTAN": ("21G72T1950",)})["TOLVAPTAN"])
-    ['Jinarc', 'TOLVAPTAN']
-    """
-    wanted = {u for found in uniis.values() for u in found}
-    by_unii: dict[str, set[str]] = {}
-    for row in rows:
-        unii = (row.get("UNII") or "").strip()
-        if unii in wanted:
-            for key in ("NAME", "DISPLAY_NAME"):
-                name = (row.get(key) or "").strip()
-                if name:
-                    by_unii.setdefault(unii, set()).add(name)
-    return {name: set().union(*(by_unii.get(u, set()) for u in found))
-            for name, found in uniis.items()}
-
-
 def split(ids: str) -> list[str]:
     """A ";"-joined id column as a list.
 
@@ -177,4 +154,4 @@ def render(report: IdentityReport) -> str:
 
 
 __all__ = ["BASIS_NONE", "BASIS_NO_MESH", "BASIS_REGISTRY", "DrugIdentity",
-           "IdentityReport", "SEPARATOR", "build", "render", "spellings", "split", "uniis_of"]
+           "IdentityReport", "SEPARATOR", "build", "render", "split", "uniis_of"]

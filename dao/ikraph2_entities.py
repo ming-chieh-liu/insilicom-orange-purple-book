@@ -61,40 +61,59 @@ class Ikraph2Entities:
         self._entities = client[connection.database][connection.entities]
         self._names = client[connection.database][connection.entity_names]
 
-    def names_of(self, biokdeids: Iterable[str]) -> dict[str, frozenset[str]]:
-        """Every spelling iKraph2 records for each entity: its normalised name
-        keys and every surface variant seen in the literature."""
-        wanted = sorted({int(i) for i in biokdeids if str(i).isdigit()})
-        out: dict[str, set[str]] = defaultdict(set)
-        for start in range(0, len(wanted), BATCH):
-            for row in self._names.find(
-                {"biokdeid": {"$in": wanted[start:start + BATCH]}},
-                {"_id": 0, "biokdeid": 1, "term_key": 1, "variants.term": 1},
-            ):
-                names = out[str(row["biokdeid"])]
-                if row.get("term_key"):
-                    names.add(str(row["term_key"]))
-                names.update(str(v["term"]) for v in row.get("variants") or [] if v.get("term"))
-        _log.info("iKraph2: names for %d of %d entities", len(out), len(wanted))
-        return {k: frozenset(v) for k, v in out.items()}
-
-    def internal_ids(self, ids: Iterable[str]) -> dict[str, str]:
-        """External id → the iKraph2 entity carrying exactly it, a ``Disease``
-        entity first, then the most mentioned. For indication codes (S5)."""
-        wanted = [i for i in dict.fromkeys(ids) if i]
-        best: dict[str, tuple[int, int, str]] = {}
+    def _db_ids(self, biokdeids: Iterable[int]) -> dict[int, tuple[str, int]]:
+        """biokdeid → (db_id, mention_count)."""
+        wanted = sorted(set(biokdeids))
+        out: dict[int, tuple[str, int]] = {}
         for start in range(0, len(wanted), BATCH):
             for row in self._entities.find(
-                {"db_id": {"$in": wanted[start:start + BATCH]}},
-                {"_id": 0, "biokdeid": 1, "type": 1, "db_id": 1, "mention_count": 1},
+                {"biokdeid": {"$in": wanted[start:start + BATCH]}},
+                {"_id": 0, "biokdeid": 1, "db_id": 1, "mention_count": 1},
             ):
-                key = (0 if row.get("type") == DISEASE else 1,
-                       -int(row.get("mention_count") or 0), str(row["biokdeid"]))
-                held = best.get(str(row["db_id"]))
-                if held is None or key < held:
-                    best[str(row["db_id"])] = key
-        _log.info("iKraph2: %d of %d ids have an entity", len(best), len(wanted))
-        return {db_id: key[2] for db_id, key in best.items()}
+                out[int(row["biokdeid"])] = (str(row.get("db_id") or ""),
+                                             int(row.get("mention_count") or 0))
+        return out
+
+    def named(self, keys: Iterable[str], types: Iterable[str]) -> dict[str, list[Node]]:
+        """Exact name key (:func:`source.unii_mesh.exact_key`) → every entity of
+        ``types`` iKraph2 records under exactly that name (D44)."""
+        wanted = sorted({k for k in keys if k})
+        kinds = list(types)
+        hits: dict[str, list[tuple[int, str, str]]] = defaultdict(list)
+        for start in range(0, len(wanted), BATCH):
+            for row in self._names.find(
+                {"term_key": {"$in": wanted[start:start + BATCH]}, "type": {"$in": kinds}},
+                {"_id": 0, "term_key": 1, "biokdeid": 1, "type": 1},
+            ):
+                hits[str(row["term_key"])].append(
+                    (int(row["biokdeid"]), str(row.get("type") or ""), str(row["term_key"])))
+        meta = self._db_ids(b for found in hits.values() for b, _, _ in found)
+        out: dict[str, list[Node]] = {}
+        for key, found in hits.items():
+            nodes = {b: Node(str(b), kind, name, meta.get(b, ("", 0))[0], meta.get(b, ("", 0))[1])
+                     for b, kind, name in found}
+            out[key] = sorted(nodes.values(), key=lambda n: (
+                kinds.index(n.type) if n.type in kinds else len(kinds), -n.mention_count,
+                n.biokdeid))
+        _log.info("iKraph2: %d of %d names known", len(out), len(wanted))
+        return out
+
+    def diseases_by_db_id(self, ids: Iterable[str]) -> dict[str, list[str]]:
+        """External id → the biokdeids of every ``Disease`` entity carrying exactly it."""
+        wanted = [i for i in dict.fromkeys(ids) if i]
+        out: dict[str, list[str]] = defaultdict(list)
+        for start in range(0, len(wanted), BATCH):
+            for row in self._entities.find(
+                {"db_id": {"$in": wanted[start:start + BATCH]}, "type": DISEASE},
+                {"_id": 0, "biokdeid": 1, "db_id": 1},
+            ):
+                out[str(row["db_id"])].append(str(row["biokdeid"]))
+        return {k: sorted(v) for k, v in out.items()}
+
+    def internal_ids(self, ids: Iterable[str]) -> dict[str, str]:
+        """External id → the one ``Disease`` entity carrying exactly it (S5);
+        an id two disease entities carry is left out."""
+        return {k: v[0] for k, v in self.diseases_by_db_id(ids).items() if len(v) == 1}
 
     def by_db_id(self, ids: Iterable[str]) -> dict[str, list[Node]]:
         """Every drug or chemical entity whose ``db_id`` is one of ``ids``.

@@ -5,13 +5,15 @@ to-do list in `CLAUDE.md` ("Current status") points here.
 
 ## Progress by stage (D38) — 2026-10-01
 
+**Next (user, 2026-10-01): re-run the whole pipeline on D42–D44.** S5→S11 outputs on disk predate the S5 descriptor fix and the S8 disease-only rule. Last S11 shortlist recall: 84.5% (2,479/2,933), against 81.6% on iKraph1.
+
 `make status` is the authority on what is stale; this table says what has been *done*.
 
 | Stage | State | Notes |
 |---|---|---|
 | S1 spine | done | 11,295 trial-relevant events |
-| S2 drugs | **D42 rebuilt 2026-10-01** | `unii_mesh.tsv` (UNII → MeSH by MeSH RegistryNumber, one record + shared name: 2,557 of 3,068 UNIIs); `drug_identity.tsv` (per ingredient: UNIIs, MeSH, iKraph2 nodes — 2,245 TherapyPreventions, 180 Chemical, 245 none); `drug_map.tsv` mesh ids now 2,353 MeSH / 154 PubChem (was 1,093 / 1,283), `biokdeid` = iKraph2 node(s) `;`-joined; trial name index 19,398 strings (19,408 before). Tie-break (enoxaparin → heparin) and belatacept roll-up: re-check on the D42 ids |
-| S3 registry | **code changed, not rebuilt** | dose-stripped drug names (99.7% precise); status and why-stopped read; WITHDRAWN / NOT_YET_RECRUITING dropped |
+| S2 drugs | **D42–D44 rebuilt 2026-10-01** | exact ids only: UNII → MeSH registry (`unii_mesh.tsv`), iKraph2 node by `db_id` (`drug_identity.tsv`), exact-name fallback; 2,631/2,670 ingredients, applications with a drug id 99.2% |
+| S3 registry | **D44 rebuilt 2026-10-01** | `trial_drug_map.tsv` 131,090 strings (92.0% exact vs NLM), `trial_condition_map.tsv` 51,206 (disease ids 95.6% within tree), `nlm_id_map.tsv` 20,599 NLM ids (11,918 with an iKraph2 entity); no roll-up |
 | S4 documents | done | labels 6,423/6,451 PDFs; letters 6,596/6,662; reviews as complete as FDA allows (118 of 131 missing are 404) |
 | S5 indications | **code changed, not rebuilt** | registry aliases must share a word with their descriptor |
 | S6 review roles | **done** | 4,825/4,825 (2026-09-30) |

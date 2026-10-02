@@ -5,7 +5,7 @@ from __future__ import annotations
 import zipfile
 from pathlib import Path
 
-from source import unii_bridge
+from source import unii_bridge, unii_mesh
 
 _DESC = """<?xml version="1.0"?>
 <DescriptorRecordSet>
@@ -65,7 +65,8 @@ def test_only_one_to_one_pairings_become_bridges(tmp_path: Path) -> None:
     desc, supp, records = _files(tmp_path)
     bridges = unii_bridge.build(
         unii_bridge.unii_to_pubchem(unii_bridge.read_unii_records(records)),
-        unii_bridge.mesh_to_unii(unii_bridge.mesh_registry([desc, supp])),
+        unii_bridge.mesh_to_unii(
+            (m, list(u)) for m, u in unii_mesh.mesh_index([desc, supp]).uniis.items()),
     )
     assert bridges == [
         unii_bridge.Bridge("AG9MHG098Z", "PubChem:CID135565884", "MESH:C000629551"),
@@ -75,14 +76,13 @@ def test_only_one_to_one_pairings_become_bridges(tmp_path: Path) -> None:
 
 def test_mesh_names_cover_descriptors_and_supplementary_records(tmp_path: Path) -> None:
     desc, supp, _ = _files(tmp_path)
-    names = unii_bridge.mesh_names([desc, supp, tmp_path / "absent.xml"])
+    names = unii_mesh.mesh_index([desc, supp, tmp_path / "absent.xml"]).names
     assert names["MESH:D000001"] == "Aspirin"
     assert names["MESH:C000629551"] == "zanubrutinib"
 
 
 def test_missing_inputs_yield_nothing(tmp_path: Path) -> None:
     assert list(unii_bridge.read_unii_records(tmp_path / "absent.zip")) == []
-    assert list(unii_bridge.mesh_registry([tmp_path / "absent.xml"])) == []
     assert unii_bridge.read_bridges(tmp_path / "absent.tsv") == []
     empty = tmp_path / "empty.zip"
     with zipfile.ZipFile(empty, "w") as archive:

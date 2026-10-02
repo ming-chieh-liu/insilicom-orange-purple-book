@@ -47,7 +47,9 @@ from pathlib import Path
 from typing import NamedTuple
 
 from config.settings import RawData, TrialArchive
-from service import approval_events, drug_names, indications, normalize, section14
+from service import (
+    approval_events, drug_names, indications, normalize, registry_identity, section14,
+)
 from source import trial_studies, unii_bridge
 from source.sponsor_families import same_sponsor
 from utility.logging import get_logger
@@ -605,6 +607,10 @@ def _is_generic_arm(arm: str) -> bool:
             or "placebo" in folded)
 
 
+#: Join keys that are not shown to a judge (D44): iKraph2 entities and UNIIs.
+HIDDEN_KEYS: tuple[str, ...] = (registry_identity.IK2, registry_identity.UNII)
+
+
 def coded(ids: Iterable[str], names: Mapping[str, str]) -> str:
     """``Name [MeSH D008258]; …`` for each distinct id, in first-seen order (D39).
 
@@ -613,6 +619,8 @@ def coded(ids: Iterable[str], names: Mapping[str, str]) -> str:
     """
     out: list[str] = []
     for identifier in dict.fromkeys(i for i in ids if i):
+        if identifier.startswith(HIDDEN_KEYS):
+            continue  # D44: join keys, not codes a judge can read
         if identifier.startswith("MESH:"):
             ui = identifier.removeprefix("MESH:")
             name = names.get(identifier, "")
@@ -628,7 +636,7 @@ def drug_check(
     approved_ids: frozenset[str],
     approved_words: frozenset[str],
     fda_ids: frozenset[str],
-    drug_of: Mapping[str, str],
+    drug_of: Mapping[str, frozenset[str]],
 ) -> str:
     """``same``, ``other`` or ``unresolved``: is a literature trial of this drug? (D37)
 
@@ -645,7 +653,7 @@ def drug_check(
     ...               "Lasmiditan 100 mg;Placebo")
     >>> drug_check(c, frozenset({"MESH:L"}), frozenset({"MESH:R"}),
     ...            frozenset({"rimegepant"}), frozenset({"MESH:L", "MESH:R"}),
-    ...            {"lasmiditan 100 mg": "MESH:L"})
+    ...            {"lasmiditan 100 mg": frozenset({"MESH:L"})})
     'other'
     >>> drug_check(c._replace(interventions="BGB-3111;Placebo"), frozenset(),
     ...            frozenset({"MESH:Z"}), frozenset({"zanubrutinib"}),
@@ -659,8 +667,8 @@ def drug_check(
     if trial_ids & approved_ids or any(word in text for word in approved_words):
         return "same"
     arms = [a for a in candidate.interventions.split(";") if not _is_generic_arm(a)]
-    resolved = [drug_of.get(a.strip().casefold()) for a in arms]
-    others = (trial_ids | {r for r in resolved if r}) & fda_ids
+    resolved = [drug_of.get(a.strip().casefold(), frozenset()) for a in arms]
+    others = (trial_ids | {key for found in resolved for key in found}) & fda_ids
     if others and arms and all(resolved):
         return "other"
     return "unresolved"
@@ -806,6 +814,67 @@ def read_indications(
             if mesh_id not in chosen[key]:
                 chosen[key].append(mesh_id)
     return headings, chosen
+
+
+def read_keys(path: Path, fold: bool = False) -> dict[str, frozenset[str]]:
+    """A D44 id map (``trial_drug_map``, ``trial_condition_map``, ``nlm_id_map``)
+    as source → every exact key it reached; ``fold`` case-folds the source, as
+    a registry string is looked up."""
+    out: dict[str, set[str]] = {}
+    for row in _read_tsv(path):
+        source = row["source_name"].casefold() if fold else row["source_name"]
+        out.setdefault(source, set()).update(registry_identity.keys_of(
+            registry_identity.Resolved(**{f: row.get(f) or "" for f in
+                                          registry_identity.Resolved._fields})))
+    return {k: frozenset(v) for k, v in out.items() if v}
+
+
+def disease_keys(keys: Mapping[str, frozenset[str]], diseases: frozenset[str],
+                 descriptor_of: Mapping[str, frozenset[str]]) -> dict[str, frozenset[str]]:
+    """Each string's keys, its MeSH ids kept only where they place on a disease
+    descriptor (directly, or through ``descriptor_of``).
+
+    >>> disease_keys({"olive oil": frozenset({"MESH:D9"}),
+    ...               "eos asthma": frozenset({"MESH:M1", "IK2:7"})},
+    ...              frozenset({"MESH:D1"}), {"MESH:M1": frozenset({"MESH:D1"})}) == {
+    ...     "eos asthma": frozenset({"MESH:M1", "IK2:7"})}
+    True
+    """
+    out: dict[str, frozenset[str]] = {}
+    for source, found in keys.items():
+        kept = frozenset(k for k in found if not k.startswith("MESH:") or k in diseases
+                         or descriptor_of.get(k, frozenset()) & diseases)
+        if kept:
+            out[source] = kept
+    return out
+
+
+def fda_keys(drug_rows: Iterable[dict[str, str]],
+             identity_rows: Iterable[dict[str, str]]) -> dict[str, frozenset[str]]:
+    """FDA ingredient → its exact keys: the row's id, its iKraph2 entities,
+    and its UNIIs (``drug_identity.tsv``).
+
+    >>> fda_keys([{"source_name": "A", "mesh_id": "MESH:C1", "biokdeid": "27;28"}],
+    ...          [{"source_name": "A", "uniis": "U1;U2"}])["A"] == frozenset(
+    ...     {"MESH:C1", "IK2:27", "IK2:28", "UNII:U1", "UNII:U2"})
+    True
+    """
+    uniis = {r["source_name"]: r.get("uniis") or "" for r in identity_rows}
+    out: dict[str, frozenset[str]] = {}
+    for row in drug_rows:
+        name = row["source_name"]
+        out[name] = frozenset(
+            [row["mesh_id"]] * bool(row.get("mesh_id"))
+            + [registry_identity.IK2 + b for b in (row.get("biokdeid") or "").split(";") if b]
+            + [registry_identity.UNII + u for u in uniis.get(name, "").split(";") if u])
+    return out
+
+
+def indication_entities(out_dir: Path) -> dict[str, str]:
+    """Indication MeSH id → its iKraph2 entity key, from ``submission_indications.tsv``."""
+    return {row["mesh_id"]: registry_identity.IK2 + row["biokdeid"]
+            for row in _read_tsv(out_dir / "submission_indications.tsv")
+            if row.get("mesh_id") and row.get("biokdeid")}
 
 
 def _read_tsv(path: Path) -> Iterator[dict[str, str]]:
@@ -1008,9 +1077,10 @@ def _non_indication(mesh_id: str) -> bool:
 
 def index_studies(
     archive: TrialArchive,
-    drug_of: dict[str, str],
-    condition_of: dict[str, str],
+    drug_of: Mapping[str, frozenset[str]],
+    condition_of: Mapping[str, frozenset[str]],
     mesh_names: Mapping[str, str] | None = None,
+    nlm_keys: Mapping[str, frozenset[str]] | None = None,
 ) -> tuple[dict[str, Candidate], dict[str, set[str]], dict[str, set[str]]]:
     """The registry, indexed by the two MeSH keys the filters use.
 
@@ -1029,6 +1099,8 @@ def index_studies(
     studies: dict[str, Candidate] = {}
     by_drug: dict[str, set[str]] = {}
     by_condition: dict[str, set[str]] = {}
+    empty: frozenset[str] = frozenset()
+    extra = nlm_keys or {}
     for facts in trial_studies.read_study_facts(archive):
         if not phase_kept(facts.phases, facts.enrollment):
             continue
@@ -1055,12 +1127,14 @@ def index_studies(
             # D39: the normalised codes beside the raw text, for the judge.
             condition_codes=coded(
                 (i for i in [*facts.derived_condition_mesh,
-                             *(condition_of.get(c.casefold(), "") for c in facts.conditions)]
+                             *(k for c in facts.conditions
+                               for k in sorted(condition_of.get(c.casefold(), empty)))]
                  if i and not _non_indication(i)),
                 mesh_names or {}),
             intervention_codes=coded(
                 [*facts.derived_drug_mesh,
-                 *(drug_of.get(i.casefold(), "") for i in facts.interventions)],
+                 *(k for i in facts.interventions
+                   for k in sorted(drug_of.get(i.casefold(), empty)))],
                 mesh_names or {}),
         )
         # CT.gov's own curation first, the synonym index only where it is
@@ -1077,23 +1151,26 @@ def index_studies(
         # absolute recall from 2,604 to 2,253 even as the rate appeared to
         # rise. Indexing under both ids costs nothing and loses nothing --
         # a study is retrievable by whichever vocabulary its drug resolved to.
+        # D44: every exact key — NLM's MeSH id and the iKraph2 entity and UNII
+        # it reaches, and whatever each string reached by exact name.
         for mesh in facts.derived_drug_mesh:
-            by_drug.setdefault(mesh, set()).add(facts.nct_id)
+            for key in {mesh} | extra.get(mesh, empty):
+                by_drug.setdefault(key, set()).add(facts.nct_id)
         for name in facts.interventions:
-            mesh_id = drug_of.get(name.casefold())
-            if mesh_id:
-                by_drug.setdefault(mesh_id, set()).add(facts.nct_id)
+            for key in drug_of.get(name.casefold(), empty):
+                by_drug.setdefault(key, set()).add(facts.nct_id)
         # D37: a never-an-indication descriptor ("Recurrence", "Disease") is
         # dropped on the trial side as it already is on the FDA side, or a
         # trial registered as "Recurrent or Metastatic NPC" carries no disease
         # id but Recurrence and is filtered out against its own indication.
         for mesh in facts.derived_condition_mesh:
             if not _non_indication(mesh):
-                by_condition.setdefault(mesh, set()).add(facts.nct_id)
+                for key in {mesh} | extra.get(mesh, empty):
+                    by_condition.setdefault(key, set()).add(facts.nct_id)
         for name in facts.conditions:
-            mesh_id = condition_of.get(name.casefold())
-            if mesh_id and not _non_indication(mesh_id):
-                by_condition.setdefault(mesh_id, set()).add(facts.nct_id)
+            for key in condition_of.get(name.casefold(), empty):
+                if not _non_indication(key):
+                    by_condition.setdefault(key, set()).add(facts.nct_id)
     _log.info(
         "%d studies indexed; %d drug keys, %d condition keys",
         len(studies),
@@ -1126,10 +1203,20 @@ def indication_allows(
     False
     >>> indication_allows([], ["MESH:D9"], tree), indication_allows(["MESH:D3"], [], tree)
     (True, True)
+    >>> indication_allows(["MESH:D3", "IK2:7"], ["IK2:7", "MESH:D9"], tree)  # same entity
+    True
+    >>> indication_allows(["MESH:D3"], ["IK2:8"], tree)  # no MeSH id to place: kept
+    True
     """
     wanted = {i for i in indication_ids if i}
     have = {t for t in trial_ids if t}
     if not wanted or not have or wanted & have:
+        return True
+    # D44: an iKraph2 entity or UNII key counts only by equality; the tree
+    # test reads MeSH ids, and a side with none is treated as id-less (kept).
+    wanted = {w for w in wanted if w.startswith("MESH:")}
+    have = {t for t in have if t.startswith("MESH:")}
+    if not wanted or not have:
         return True
     empty: frozenset[str] = frozenset()
     return any(
@@ -1451,6 +1538,8 @@ def build(
     review_linked: frozenset[str] = frozenset(),
     mesh_names: Mapping[str, str] | None = None,
     review_trials: Iterable[tuple[str, str]] = (),
+    descriptor_of: Mapping[str, frozenset[str]] | None = None,
+    diseases: frozenset[str] | None = None,
 ) -> CandidatesReport:
     """Collapse the descriptions, index the registry, and shortlist each unit.
 
@@ -1460,6 +1549,15 @@ def build(
     unit is added per case-C submission (indication, no judgeable §14
     description) and per case-D submission (no indication; candidates from
     ``drug_only_trials.tsv``).
+
+    D44: trials and FDA drugs are joined on every exact key either side holds
+    (MeSH, iKraph2 entity, UNII; :func:`read_keys`). ``descriptor_of`` places a
+    MeSH concept or supplementary id in the tree (its descriptor(s)); the
+    roll-up happens only here, in the indication filter, never in S2/S3.
+    ``diseases`` (disease descriptors): a MeSH id a registry *string* reached
+    counts for the filter only when it places on one — "Olive Oil" written as a
+    condition is exactly Olive Oil, and must not filter its trial out. NLM's
+    own condition codes are used as they are.
     """
     descriptions = list(_read_tsv(out_dir / "label_trials.tsv"))
     collapsed = collapse(descriptions)
@@ -1468,16 +1566,13 @@ def build(
     # Both sides of each filter come from P1, keyed the way the registry
     # spells them: case-folded, because a trial writes "Keytruda" where the
     # FDA writes "PEMBROLIZUMAB".
-    drug_of = {
-        row["source_name"].casefold(): row["mesh_id"]
-        for row in _read_tsv(out_dir / "trial_drug_map.tsv")
-    }
-    condition_of = {
-        row["source_name"].casefold(): row["mesh_id"]
-        for row in _read_tsv(out_dir / "trial_condition_map.tsv")
-    }
+    drug_of = read_keys(out_dir / "trial_drug_map.tsv", fold=True)
+    condition_of = read_keys(out_dir / "trial_condition_map.tsv", fold=True)
+    if diseases is not None:
+        condition_of = disease_keys(condition_of, diseases, descriptor_of or {})
+    nlm_keys = read_keys(out_dir / "nlm_id_map.tsv")
     drug_rows = list(_read_tsv(out_dir / "drug_map.tsv"))
-    fda_drug = {row["source_name"]: row["mesh_id"] for row in drug_rows}
+    fda_drug = fda_keys(drug_rows, _read_tsv(out_dir / "drug_identity.tsv"))
     # Ingredients whose id came from the suffix-stripped stem rather than the
     # name itself. For those the pool is the reference product's trials, so the
     # shortlist is ordered to put biosimilar-looking studies first.
@@ -1504,7 +1599,18 @@ def build(
     if not heading_ids and not chosen_ids:
         _log.warning("submission_indications.tsv is empty or missing — run "
                      "--mode indication-normalize first; units get no indication")
-    studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of, mesh_names)
+    studies, by_drug, by_condition = index_studies(archive, drug_of, condition_of, mesh_names,
+                                                   nlm_keys)
+    placed = descriptor_of or {}
+    entity_of = indication_entities(out_dir)
+
+    def filter_ids(ids: Iterable[str]) -> tuple[str, ...]:
+        """An indication's ids as the filter compares them: plus each one's
+        iKraph2 entity and, for a concept or supplementary id, its descriptor."""
+        listed = list(ids)
+        return tuple(dict.fromkeys([
+            *listed, *(entity_of[i] for i in listed if i in entity_of),
+            *(d for i in listed for d in sorted(placed.get(i, ())))]))
     names = mesh_names or {}
     # D39: each drug id with its exact UNII counterpart (PubChem <-> MeSH,
     # one-to-one only), so a PubChem-keyed drug reaches the trials NLM coded
@@ -1522,7 +1628,7 @@ def build(
     for mesh, ncts in by_drug.items():
         for nct in ncts:
             trial_drug_ids.setdefault(nct, set()).add(mesh)
-    fda_ids = frozenset(with_bridged(fda_drug.values()))
+    fda_ids = frozenset(with_bridged(k for keys in fda_drug.values() for k in keys))
     literature_of = read_literature(out_dir)
     words_of: dict[str, frozenset[str]] = {}
     applicant_of: dict[str, str] = {}
@@ -1545,7 +1651,9 @@ def build(
         for mesh, ncts in by_condition.items():
             for nct in ncts:
                 inverted.setdefault(nct, set()).add(mesh)
-        condition_ids = {nct: frozenset(ids) for nct, ids in inverted.items()}
+        condition_ids = {
+            nct: frozenset(ids | {d for i in ids for d in placed.get(i, ())})
+            for nct, ids in inverted.items()}
 
     units: list[Unit] = []
     no_drug = no_candidates = over_cap = already = from_review = 0
@@ -1554,8 +1662,7 @@ def build(
         key = f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
         application_names = ingredients.get(row["application"], ())
         drug_mesh = with_bridged(
-            fda_drug[name] for name in application_names if name in fda_drug
-        )
+            k for name in application_names for k in fda_drug.get(name, ()))
         stem_sourced = any(name in via_stem for name in application_names)
         heading = (row.get("heading") or "").strip()
         indication_mesh = pick_indication(
@@ -1580,7 +1687,7 @@ def build(
             approval_of.get(key, ""),
             studies,
             checker(row["application"], drug_mesh),
-            indication_ids,
+            filter_ids(indication_ids),
             condition_ids,
             ancestors,
         )
@@ -1590,7 +1697,7 @@ def build(
         else:
             shortlisted = shortlist(
                 drug_mesh,
-                indication_ids,
+                filter_ids(indication_ids),
                 approval_of.get(key, ""),
                 studies,
                 by_drug,
@@ -1630,7 +1737,7 @@ def build(
                 approval_date=approval_of.get(key, ""),
                 heading=heading,
                 indication_mesh=indication_mesh,
-                drug_mesh=";".join(sorted(drug_mesh)),
+                drug_mesh=";".join(sorted(k for k in drug_mesh if not k.startswith(HIDDEN_KEYS))),
                 stated_nct=stated,
                 acronym=row.get("acronym", ""),
                 enrollment=row.get("enrollment", ""),
@@ -1648,9 +1755,10 @@ def build(
             )
         )
     # D35: route every trial-relevant submission, then add the C and D units.
-    borrowed = {fda_drug[name] for name in via_stem if name in fda_drug}
+    borrowed = {row["mesh_id"] for row in drug_rows
+                if row["source_name"] in via_stem and row.get("mesh_id")}
     drug_of_app = {
-        application: with_bridged(fda_drug[n] for n in app_names if n in fda_drug)
+        application: with_bridged(k for n in app_names for k in fda_drug.get(n, ()))
         for application, app_names in ingredients.items()
     }
     routes = route(
@@ -1681,10 +1789,10 @@ def build(
             # D37 C+: the literature's trials, drug- and indication-checked.
             literature = literature_set(
                 literature_of.get(event.application, []), event.approval_date,
-                studies, check, ids, condition_ids, ancestors,
+                studies, check, filter_ids(ids), condition_ids, ancestors,
             )
             listed = shortlist(
-                drugs, ids, event.approval_date, studies, by_drug, by_condition,
+                drugs, filter_ids(ids), event.approval_date, studies, by_drug, by_condition,
                 prefer_biosimilar=False,
                 from_graph=frozenset(c.nct_id for c in literature),
                 condition_ids=condition_ids, ancestors=ancestors,
@@ -1717,7 +1825,7 @@ def build(
                 approval_date=event.approval_date,
                 heading="",
                 indication_mesh=ids[0] if len(ids) == 1 else "",
-                drug_mesh=";".join(sorted(drugs)),
+                drug_mesh=";".join(sorted(k for k in drugs if not k.startswith(HIDDEN_KEYS))),
                 stated_nct="",
                 acronym="",
                 enrollment="",
