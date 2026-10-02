@@ -301,7 +301,7 @@ code says `not yet implemented` until it lands.
   B units were this submission's own A trial; C units never overlap on the same submission (D36).
   **Rebuilt 2026-10-01:** judged units B 3,660 (1,644 lose 5,491 trials), C 2,234 (392 lose 1,746,
   named on an earlier same-moiety submission), D 153; recall unchanged at 81.6%.
-- **[PARTIALLY SUPERSEDED by D43, 2026-10-01 — S3 and S5 move to iKraph2 too; iKraph1's name fallback in S2 is removed]** **D42 — iKraph2 replaces iKraph1 for drug identity and literature edges** (2026-10-01, **implemented
+- **[PARTIALLY SUPERSEDED by D45, 2026-10-02 — a UNII takes a MeSH id only as its record's preferred concept; the node is one entity by D45's steps, never the moiety's by folding]** **[PARTIALLY SUPERSEDED by D43, 2026-10-01 — S3 and S5 move to iKraph2 too; iKraph1's name fallback in S2 is removed]** **D42 — iKraph2 replaces iKraph1 for drug identity and literature edges** (2026-10-01, **implemented
   in code 2026-10-01; S2 rebuilt**). (1) FDA ingredient → UNII → **MeSH by MeSH's own `RegistryNumber`**: kept only where the
   UNII sits on exactly one MeSH record and the two share a name; salts may share a record (D11). iKraph1
   name resolution is the fallback only where no record exists (`basis` says which). (2) Graph node = the
@@ -327,7 +327,7 @@ code says `not yet implemented` until it lands.
   strings: drugs 94.0% → 94.5% exact (16,548 → 17,463 checkable); conditions 62.9% → 93.0% exact,
   76.1% → 96.2% within the MeSH tree (13,690 → 8,113 strings: ~2,800 wrong matches gone, ~1,500 right ones
   lost, and an uncoded trial stays in the pool).
-- **D44 — both sides normalised the same way, by exact match only; iKraph2 first, MeSH kept; roll-up only
+- **[PARTIALLY SUPERSEDED by D45, 2026-10-02 — drugs on both sides resolve through one substance dictionary and one resolver to one entity, own ids before names, nothing folded; a condition takes its MeSH term's entity first]** **D44 — both sides normalised the same way, by exact match only; iKraph2 first, MeSH kept; roll-up only
   in S8** (2026-10-01, **implemented in code 2026-10-01; S2/S3 rebuilt, S5→S11 to be re-run**). Every FDA
   ingredient (S2) and every registry intervention/condition string and NLM-coded MeSH id (S3,
   `service/registry_identity.py`) is matched **exactly** — a whole name (case and spacing folded) or an id:
@@ -349,16 +349,44 @@ code says `not yet implemented` until it lands.
   with an id 2,631/2,670, applications with a drug id 99.2%; NLM ids reaching an entity 11,918/20,599. S11
   shortlist recall 84.5% (2,479/2,933) on a run before the S8 disease-only rule.
 
+- **D45 — one substance dictionary, one resolver, own ids then exact names, nothing folded; one entity
+  per name** (2026-10-02, **implemented in code 2026-10-02; S2/S3 rebuilt, S5→S11 to be re-run**).
+  (1) S2 writes `substance_ids.tsv`: UNII ↔ MeSH ↔ PubChem ↔ RxCUI, every pairing exact and unique — MeSH
+  from the record's concept `RegistryNumber` (one record, shared name), PubChem and RxCUI one-to-one from the
+  FDA UNII Records; `id_bridge.tsv` is each record's own UNII with its CID. (2) **Rule R**, the same for an FDA
+  ingredient (S2), a registry intervention string and an NLM MeSH id (S3), in `service/drug_identity.py`: a
+  name uses **only its own ids** — its UNII (FDA UNII list; for an FDA salt also the label extract's UNII for
+  that salt), the MeSH id of a record whose **preferred** concept is that UNII or of which the name is exactly
+  an entry term, that UNII's RxCUI and PubChem CID. Entity, first that answers: TherapyPreventions by UNII →
+  by MeSH → by RxCUI → by exact name (canonical, else an alias of a UNII-keyed entity) → Chemical by MeSH →
+  by PubChem → by exact name. **No moiety folding** (no label-extract moiety, no MeSH related/salt concept
+  fold): a salt reaches its moiety's entity only where iKraph2 lists the salt's name as that entity's alias.
+  A biosimilar keeps its reference record's MeSH id as a key (`stem`) but takes no entity through it and
+  matches only canonical names. One entity per name or none. (3) Conditions: the MeSH entry term's Disease
+  entity first; an exact name only where that record has none and the name's entity holds no other
+  descriptor. Why: the user's rule — normalise to the iKraph2 entity by exact external id or exact name; D44
+  gave one substance different entities on the two sides, and moiety folds (label extract, MeSH related
+  forms) mapped drugs to other substances (cyclophosphamide → 4-hydroxycyclophosphamide, magnesium sulfate →
+  magnesium ion, mycophenolate mofetil → mycophenolic acid). Measured against D44: FDA ingredients on a
+  TherapyPreventions entity 2,245 → 2,508, Chemical 180 → 45, none 245 → 117; rows with two or more entities
+  98 / 4,537 / 2,816 → 0; FDA name → different entity on the trial side 142/1,630 → 0/1,624; drug MeSH
+  agreement with NLM 95.7% → 95.5% (single-drug trials 92.8% → 93.2%); hand check of 60 usage-weighted
+  changed strings 52 correct / 2 wrong (both iKraph2 aliases: calcium citrate, saline → the cation); FDA alias
+  step 28/30. Costs: 71 FDA ingredients have no row (applications with a drug id 99.2% → 98.2%) and ~22,800
+  non-drug trial strings (aliases on id-less TP entities) are unmapped; future improvements in
+  `docs/STATUS.md`.
+
 ## Current status and to-do
 
 Full detail, evidence and commands: **`docs/STATUS.md`** — read it at the start of a session and
-update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026-10-01:
+update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026-10-02:
 
 1. **S4 documents and S6 review roles done** (4,825 / 4,825 roles decided, 2026-09-30).
 2. **D37–D41 committed and rebuilt** (latest 74cd4ea, 2026-10-01) — `make status` lists what is
    stale. The D35 pilots (2026-09-30) are superseded by the v2 prompts — every answer is re-judged.
-3. **D42–D44 (iKraph2, exact-match normalisation)** implemented and committed 2026-10-01; the user will
-   re-run the whole pipeline. Agent pool verified (cap 32 concurrent; seats are the bottleneck).
+3. **D42–D45 (iKraph2, exact-match normalisation; D45 rule R)** implemented and committed; S2/S3 rebuilt
+   2026-10-02 on D45. The user will re-run the whole pipeline from S5. Agent pool verified (cap 32
+   concurrent; seats are the bottleneck).
 4. Then: rebuild (`make candidates`) → pilots per route → full runs (both two judges + third, D40) →
    S10 → D28 label roles → S10 → S11.
 
@@ -379,9 +407,10 @@ update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026
 ```
 S1  SPINE          Drugs@FDA -> 87,055 approved NDA|BLA events -> 11,295 trial-relevant (D23, D24)
 S2  DRUGS          per application: brand, generic, ingredient(s), moiety(ies), UNII(s)
-                   (drug_names.tsv) + normalised drug id and its graph biokdeid (drug_map.tsv)
-S3  REGISTRY       every CT.gov study: interventions -> drug ids (NLM MeSH + iKraph2 entity/UNII; exact names,
-                   dose stripped), conditions -> disease ids, status, why stopped, dates;
+                   (drug_names.tsv) + substance dictionary (substance_ids.tsv) + each ingredient's
+                   own ids and one iKraph2 entity by rule R (drug_map.tsv, D45)
+S3  REGISTRY       every CT.gov study: interventions -> drug ids (NLM MeSH + one iKraph2 entity by rule R,
+                   D45; exact names, dose stripped), conditions -> disease ids, status, why stopped, dates;
                    WITHDRAWN / NOT_YET_RECRUITING dropped (trial_drug_map, trial_condition_map)
 S4  DOCUMENTS      fetched by hand at 1 req/s, never by make:
                      labels  -> §14 descriptions (NCT | name | count | subsection) + §1 text
@@ -447,7 +476,7 @@ make checks for staleness but never writes. Raw inputs are on the left.
 | Stage | `make` target | Writes | Reads |
 |---|---|---|---|
 | S1 spine | `spine` | `approval_events.tsv` | Drugs@FDA |
-| S2 drugs | `drugs` | `drug_names.tsv`, `drug_map.tsv`, `indication_map.tsv` | S1, moiety extract, UNII list, biokde, `indications.tsv` (openFDA) |
+| S2 drugs | `drugs` | `drug_names.tsv`, `substance_ids.tsv`, `drug_identity.tsv`, `drug_map.tsv`, `id_bridge.tsv`, `indication_map.tsv` | S1, moiety extract, UNII list and records, MeSH, iKraph2, `indications.tsv` (openFDA) |
 | S3 registry | `registry` | `trial_drug_map.tsv`, `trial_condition_map.tsv` | S2, CT.gov archive, biokde |
 | S4 documents | `documents` | `label_trials.tsv`, `submission_indication_text.tsv`, `letter_indications.tsv`, `review_trial_mentions.tsv`, review role units | S1, cached PDFs |
 | S5 indications | `indications` | `submission_indications.tsv` | S3, S4, letter-span verdicts, openFDA §1, MeSH |

@@ -32,12 +32,16 @@ OUT     := output
 ADJ     := adjudication
 RAW     := fda_raw
 DRUGSFDA := $(RAW)/drugsfda/drugsatfda.zip
+# Inputs outside the repo (config/settings.py defaults), so a new release marks S2/S3 stale.
+MESH_DESC := /data/mliu/ontology_normalization_tp/external_data/MeSH/desc2026.xml
+MOIETY_EXTRACT := /space/feng/share/drug_label/drug_indication_market.csv.gz
+TRIAL_MANIFEST := /data/mliu/insilicom-clinical_trials/final/output_raw/manifest.jsonl.gz
 LABELS_JSON := $(wildcard $(RAW)/label/drug-label-*.json.zip)
 
 STEPS := \
   approval_events=service/approval_events.py,dao/tsv_repository.py \
   indications=service/indications.py,dao/tsv_repository.py \
-  normalize=service/normalize.py,service/drug_names.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,source/unii_bridge.py,source/unii_mesh.py,service/drug_identity.py,service/registry_identity.py,dao/ikraph2_entities.py,dao/biokde.py,dao/tsv_repository.py \
+  normalize=service/normalize.py,service/drug_names.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,source/unii_bridge.py,source/unii_mesh.py,source/substance_ids.py,service/drug_identity.py,service/registry_identity.py,service/approval_events.py,dao/ikraph2_entities.py,dao/tsv_repository.py \
   labels=service/section14.py,dao/tsv_repository.py \
   letters=service/letters.py,dao/tsv_repository.py \
   reviews=service/review_trials.py,service/review_role.py,service/label_role.py,service/approval_events.py,source/review_docs.py,source/trial_studies.py,source/raw_table.py,dao/tsv_repository.py \
@@ -74,9 +78,9 @@ $(OUT)/indications.tsv $(OUT)/indication_text.tsv &: $(CODE_indications) $(LABEL
 # ---- P1 normalize -------------------------------------------------------------
 $(OUT)/drug_map.tsv $(OUT)/indication_map.tsv $(OUT)/trial_drug_map.tsv \
 $(OUT)/trial_condition_map.tsv $(OUT)/drug_names.tsv $(OUT)/id_bridge.tsv \
-$(OUT)/unii_mesh.tsv $(OUT)/drug_identity.tsv $(OUT)/nlm_id_map.tsv &: $(CODE_normalize) \
+$(OUT)/substance_ids.tsv $(OUT)/drug_identity.tsv $(OUT)/nlm_id_map.tsv &: $(CODE_normalize) \
 		$(OUT)/indications.tsv fda_raw/unii/UNII_Data.zip fda_raw/unii/UNIIs.zip \
-		fda_raw/mesh/supp2026.xml
+		fda_raw/mesh/supp2026.xml $(DRUGSFDA) $(MESH_DESC) $(MOIETY_EXTRACT) $(TRIAL_MANIFEST)
 	$(MAIN) --mode normalize
 
 # ---- P2a labels (cached PDFs only) -----------------------------------------------
@@ -131,7 +135,7 @@ $(OUT)/trial_submission_map.tsv $(OUT)/unlinked_submissions.tsv &: $(CODE_assemb
 # ---- stages S1-S11 (D38) ------------------------------------------------------------------
 spine: $(OUT)/approval_events.tsv                                              # S1
 drugs: $(OUT)/drug_names.tsv $(OUT)/drug_map.tsv $(OUT)/id_bridge.tsv \
-       $(OUT)/unii_mesh.tsv $(OUT)/drug_identity.tsv $(OUT)/nlm_id_map.tsv    # S2
+       $(OUT)/substance_ids.tsv $(OUT)/drug_identity.tsv $(OUT)/nlm_id_map.tsv # S2
 registry: $(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv             # S3
 documents: $(OUT)/label_trials.tsv $(OUT)/letter_indications.tsv \
            $(OUT)/review_trial_mentions.tsv                                    # S4 (--offline)

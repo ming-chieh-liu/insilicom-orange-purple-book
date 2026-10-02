@@ -11,6 +11,7 @@ import pytest
 from config.settings import RawData, TrialArchive
 from service import normalize
 from service.drug_identity import DrugIdentity
+from source.substance_ids import Dictionary, Substance
 from source.unii_mesh import MeshIndex
 from dao.ikraph2_entities import Node
 
@@ -230,6 +231,10 @@ def empty_archive(tmp_path: Path) -> TrialArchive:
 _MESH = MeshIndex(uniis={"MESH:C582435": frozenset({"DPT0O3T46P"})},
                   by_term={"pembrolizumab": frozenset({"MESH:C582435"})},
                   names={"MESH:C582435": "pembrolizumab"}, headings={})
+_DICTIONARY = Dictionary(
+    {"DPT0O3T46P": Substance("DPT0O3T46P", "PEMBROLIZUMAB", "MESH:C582435", "pembrolizumab",
+                             "preferred", "DPT0O3T46P", "", "")},
+    {"MESH:C582435": "DPT0O3T46P"})
 
 
 def test_s2_takes_exact_ids_and_s3_codes_nothing_without_an_archive(
@@ -238,7 +243,7 @@ def test_s2_takes_exact_ids_and_s3_codes_nothing_without_an_archive(
     identity = DrugIdentity("PEMBROLIZUMAB", "DPT0O3T46P", "MESH:C582435", "pembrolizumab",
                             "2700000295", "TherapyPreventions", "unii_registry")
     report = normalize.build(full_corpus, empty_archive, FakeGraph(), _MESH, ["D002289"],
-                             {"PEMBROLIZUMAB": identity}, {})
+                             {"PEMBROLIZUMAB": identity}, {}, _DICTIONARY)
     drug = report.drugs[0]
     assert (drug.mesh_id, drug.biokdeid, drug.basis) == (
         "MESH:C582435", "2700000295", "unii_registry")
@@ -249,21 +254,12 @@ def test_s2_takes_exact_ids_and_s3_codes_nothing_without_an_archive(
     assert len(report.coverages) == 5
 
 
-def test_an_ingredient_without_a_unii_falls_back_to_an_exact_name(
-    full_corpus: RawData, empty_archive: TrialArchive
-) -> None:
-    report = normalize.build(full_corpus, empty_archive, FakeGraph(), _MESH, [], {}, {})
-    drug = report.drugs[0]
-    # PEMBROLIZUMAB is an exact iKraph2 name and an exact MeSH entry term.
-    assert (drug.mesh_id, drug.biokdeid) == ("MESH:C582435", "2700000295")
-    assert "ikraph2_name" in drug.basis
-
-
 def test_an_ingredient_nothing_exact_reaches_has_no_row(
     full_corpus: RawData, empty_archive: TrialArchive
 ) -> None:
     empty = MeshIndex({}, {}, {}, {})
-    report = normalize.build(full_corpus, empty_archive, FakeGraph(names={}), empty, [], {}, {})
+    report = normalize.build(full_corpus, empty_archive, FakeGraph(names={}), empty, [], {}, {},
+                             Dictionary({}, {}))
     assert report.drugs == ()
     assert report.applications_unresolved == 1
     assert report.coverages[0].unresolved == ("PEMBROLIZUMAB",)

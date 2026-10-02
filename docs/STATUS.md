@@ -1,19 +1,19 @@
 # Rebuild status and to-do
 
-**Last updated:** 2026-10-01. Stage names S1–S11 since D38; the sections below that say P0–P6 predate it. Update this file whenever a stage finishes or is paused; the short
+**Last updated:** 2026-10-02. Stage names S1–S11 since D38; the sections below that say P0–P6 predate it. Update this file whenever a stage finishes or is paused; the short
 to-do list in `CLAUDE.md` ("Current status") points here.
 
 ## Progress by stage (D38) — 2026-10-01
 
-**Next (user, 2026-10-01): re-run the whole pipeline on D42–D44.** S5→S11 outputs on disk predate the S5 descriptor fix and the S8 disease-only rule. Last S11 shortlist recall: 84.5% (2,479/2,933), against 81.6% on iKraph1.
+**Next (user, 2026-10-02): re-run the whole pipeline from S5 on D42–D45** (S2/S3 rebuilt on D45 2026-10-02). S5→S11 outputs on disk predate the S5 descriptor fix and the S8 disease-only rule. Last S11 shortlist recall: 84.5% (2,479/2,933), against 81.6% on iKraph1.
 
 `make status` is the authority on what is stale; this table says what has been *done*.
 
 | Stage | State | Notes |
 |---|---|---|
 | S1 spine | done | 11,295 trial-relevant events |
-| S2 drugs | **D42–D44 rebuilt 2026-10-01** | exact ids only: UNII → MeSH registry (`unii_mesh.tsv`), iKraph2 node by `db_id` (`drug_identity.tsv`), exact-name fallback; 2,631/2,670 ingredients, applications with a drug id 99.2% |
-| S3 registry | **D44 rebuilt 2026-10-01** | `trial_drug_map.tsv` 131,090 strings (92.0% exact vs NLM), `trial_condition_map.tsv` 51,206 (disease ids 95.6% within tree), `nlm_id_map.tsv` 20,599 NLM ids (11,918 with an iKraph2 entity); no roll-up |
+| S2 drugs | **D45 rebuilt 2026-10-02** | `substance_ids.tsv` (133,467 UNIIs); rule R, one entity per ingredient (`drug_identity.tsv` route column): TP 2,508, Chemical 45, none 117; 2,561 `drug_map.tsv` rows, applications with a drug id 98.2%; `id_bridge.tsv` 16,129 |
+| S3 registry | **D45 rebuilt 2026-10-02** | `trial_drug_map.tsv` 108,343 strings (103,115 with an entity, 0 with two), drug MeSH vs NLM 95.5%; `trial_condition_map.tsv` 51,211 (42,382 with an entity, 0 with two); `nlm_id_map.tsv` 20,599 NLM ids (7,498 drug ids with an entity); FDA vs trial same-name disagreement 0/1,624 |
 | S4 documents | done | labels 6,423/6,451 PDFs; letters 6,596/6,662; reviews as complete as FDA allows (118 of 131 missing are 404) |
 | S5 indications | **code changed, not rebuilt** | registry aliases must share a word with their descriptor |
 | S6 review roles | **done** | 4,825/4,825 (2026-09-30) |
@@ -54,6 +54,29 @@ available". **Capacity is the constraint:** on 2026-10-01 afternoon 1 of 19 seat
 
 Next: commit D39 → `make candidates` → pilots per route (two
 judges + third) → full runs (two judges + third, D40) → S10 → D28 label roles → S10 → S11.
+
+## Future improvements — S2 drug mapping (recorded 2026-10-02, skipped for now)
+
+Under D45 rule R, 71 FDA ingredients have no `drug_map.tsv` row: no iKraph2 entity by any id or
+exact name, and no MeSH id of their own. 60 applications lose every drug key (applications with a
+drug id 99.2% → 98.2%), so their registry routes (B−, C−) build no shortlist (`no_drug_resolved`);
+30 combination products lose one ingredient. The user's decision: leave them out and move on.
+Fixable parts, measured 2026-10-02:
+
+1. **`ingredients_of` splits inside parentheses.** Drugs@FDA writes
+   `PANCRELIPASE (AMYLASE; LIPASE; PROTEASE)`; splitting on `;` yields fragments
+   (`PANCRELIPASE (AMYLASE`, `PROTEASE)`, `SULFAMETHAZINE)`, `SULFATHIAZOLE)`) that can match
+   nothing. Split only on top-level `;`. 4 fragments.
+2. **Combination products are iKraph2 aliases of RxCUI-keyed TherapyPreventions entities**
+   (`DARUNAVIR AND COBICISTAT`, `OMBITASVIR, PARITAPREVIR, RITONAVIR`,
+   `CONJUGATED ESTROGENS/MEDROXYPROGESTERONE ACETATE`). Rule R accepts a TP alias only on a
+   UNII-keyed entity (to keep ChEBI classes out); accepting RxCUI-keyed entities too would match
+   them. 3 ingredients.
+3. **The other 61 have nothing to match**: their UNII (55 also with an RxCUI or PubChem CID) is on
+   no iKraph2 entity and their exact name is not in iKraph2 — recent salts (BEROTRALSTAT
+   DIHYDROCHLORIDE, ELTROMBOPAG CHOLINE), radiolabelled agents, kits. Only a moiety fold would
+   reach them, and D45 removed folding on purpose; a UNII-only row would join just 71 trials
+   (20 registry strings name these salts). Left out.
 
 ## Where the rebuild stands (audited 2026-09-29 against the files on disk)
 

@@ -1,38 +1,43 @@
-"""Exact ids for registry interventions and conditions, iKraph2 first (D44).
+"""Exact ids for registry interventions and conditions, iKraph2 first (D44, D45).
 
 The trial side is normalised the same way as the FDA side, and **only by
 exact matches** — of an id, or of a whole name (case and spacing folded,
 nothing else). For each trial string or NLM-coded MeSH id this finds:
 
-* **drugs** — the iKraph2 drug entity (``TherapyPreventions``, else
-  ``Chemical``) and its UNII; the exact MeSH or PubChem id beside them;
-* **diseases** — the iKraph2 ``Disease`` entity; its MeSH id as stored.
+* **drugs** — the one iKraph2 drug entity (``TherapyPreventions``, else
+  ``Chemical``) through the shared resolver of :mod:`service.drug_identity`,
+  so a substance lands on the entity the FDA side gives it (D45);
+* **diseases** — the one iKraph2 ``Disease`` entity; its MeSH id as stored.
 
 Nothing is rolled up here: a concept id stays a concept id, and S8's
 indication filter places it in the MeSH tree when it compares (D44). What no
 exact match reaches stays as it came — an NLM MeSH id is never dropped for
 lacking an iKraph2 entity — or, for a string, uncoded.
 
-Routes, each exact and unique (a name or id reaching two entities of the
-preferred type says nothing and is dropped):
+**Own ids, then exact names (D45).** A string is read first as an id — a name
+in the FDA UNII list (brand and code names included: ``Keytruda``, ``MK-3475``)
+naming exactly one UNII, or one MeSH record's entry term — and then by its
+exact name in iKraph2, through the same steps as an FDA ingredient
+(:func:`service.drug_identity.pick`): TherapyPreventions by id, by name, then
+Chemical by id, by name. Nothing is folded to another substance; a salt
+reaches its moiety's entity only where iKraph2 itself lists the salt's name as
+an alias of the moiety's UNII-keyed entity.
 
 ========================  ============================================  =================
 route                     how                                           basis
 ========================  ============================================  =================
-NLM MeSH id (drug)        record's UNIIs (MeSH RegistryNumber) → the    ``nlm_mesh``
-                          TherapyPreventions entities with that UNII;
-                          none → the Chemical entity holding the id
+NLM MeSH id (drug)        the record's own UNII and MeSH id →           ``nlm_mesh``
+                          the resolver's id steps
 NLM MeSH id (disease)     the one Disease entity holding the id         ``nlm_mesh``
-name in iKraph2           the one entity of the type named so           ``ikraph2_name``
-name in the FDA UNII      the one UNII named so (brand and code names   ``unii_name``
-list (drugs)              included) → its TherapyPreventions entities
-name as a MeSH entry      the one MeSH record listing it                ``mesh_term``
-term
+name in the FDA UNII      the one UNII named so → its bundle →          ``unii_name``
+list (drugs)              the resolver's entity steps
+name as a MeSH entry      the one MeSH record listing it → its          ``mesh_term``
+term                      bundle (drugs) or its Disease entity
+name in iKraph2           drugs: the resolver's name steps (TP          ``ikraph2_name``
+                          after TP ids, Chemical after Chemical ids);
+                          diseases: only where the MeSH term's record
+                          has no entity
 ========================  ============================================  =================
-
-``Keytruda`` reaches pembrolizumab through the UNII list (iKraph2 keeps the
-brand as a separate entity without an id); every route that answers adds its
-keys, so a trial is joined by whichever of them the FDA side shares.
 """
 
 from __future__ import annotations
@@ -41,9 +46,13 @@ from collections.abc import Iterable, Mapping
 from typing import NamedTuple, Protocol
 
 from dao.ikraph2_entities import CHEMICAL, DISEASE, DRUG, Node
+from service import drug_identity
+from service.drug_identity import CANONICAL, Bundle
 from service.normalize import (
     DESIGN_WORDS, MIN_STRIPPED_LENGTH, MIN_SYNONYM_LENGTH, dose_stripped, nlm_agrees,
 )
+from source.moiety import is_biosimilar
+from source.substance_ids import Dictionary
 from source.unii_mesh import MeshIndex, exact_key
 from utility.logging import get_logger
 
@@ -126,33 +135,36 @@ def one_type(nodes: list[Node], types: tuple[str, ...]) -> list[Node]:
     return []
 
 
-def unii_mesh_records(index: MeshIndex) -> dict[str, frozenset[str]]:
-    """UNII → the MeSH records listing it (inverse of ``index.uniis``).
+def name_pick(nodes: list[Node], types: tuple[str, ...]) -> Node | None:
+    """The one entity a name names: among the entities for which it is the
+    canonical name if there are any, else among those holding it as an alias;
+    then :func:`one_type`. Used for diseases; drugs name-match through
+    :func:`service.drug_identity.pick`.
 
-    >>> idx = MeshIndex({"MESH:D1": frozenset({"U1", "U2"}), "MESH:C9": frozenset({"U2"})},
-    ...                 {}, {}, {})
-    >>> sorted(unii_mesh_records(idx)["U2"])
-    ['MESH:C9', 'MESH:D1']
+    >>> n = lambda b, t, r: Node(b, t, "", "", 0, r)
+    >>> name_pick([n("1", DISEASE, "canonical"), n("2", DISEASE, "alias")], (DISEASE,)).biokdeid
+    '1'
+    >>> name_pick([n("1", DISEASE, "alias"), n("2", DISEASE, "alias")], (DISEASE,)) is None
+    True
     """
-    out: dict[str, set[str]] = {}
-    for mesh, found in index.uniis.items():
-        for unii in found:
-            out.setdefault(unii, set()).add(mesh)
-    return {u: frozenset(m) for u, m in out.items()}
+    canonical = [n for n in nodes if n.role == CANONICAL]
+    hit = one_type(canonical or nodes, types)
+    return hit[0] if hit else None
 
 
-def drug_mesh(mesh_ids: Iterable[str], index: MeshIndex, graph: Graph) -> dict[str, Resolved]:
-    """NLM intervention MeSH id → its UNIIs and iKraph2 drug entities, exactly."""
+def drug_mesh(mesh_ids: Iterable[str], index: MeshIndex, dictionary: Dictionary,
+              graph: Graph) -> dict[str, Resolved]:
+    """NLM intervention MeSH id → its record's own UNII and its one iKraph2 drug entity."""
     wanted = sorted({m for m in mesh_ids if m.startswith("MESH:")})
-    uniis = {m: sorted(index.uniis.get(m, ())) for m in wanted}
-    found = graph.by_db_id([UNII + u for found in uniis.values() for u in found] + wanted)
+    bundles = {m: drug_identity.from_mesh(m, dictionary, index.names) for m in wanted}
+    found = graph.by_db_id(sorted({k for b in bundles.values()
+                                   for k in drug_identity.keys(b, dictionary)}))
     out: dict[str, Resolved] = {}
-    for mesh in wanted:
-        nodes = [n for u in uniis[mesh] for n in found.get(UNII + u, []) if n.type == DRUG]
-        if not nodes:
-            nodes = [n for n in found.get(mesh, []) if n.type == CHEMICAL]
-        out[mesh] = Resolved(mesh, _join(n.biokdeid for n in nodes), _join(uniis[mesh]), mesh,
-                             "", "drug", BASIS_NLM)
+    for mesh, bundle in bundles.items():
+        node, _ = drug_identity.pick(bundle, dictionary, found)
+        out[mesh] = Resolved(mesh, node.biokdeid if node else "", _join(bundle.uniis), mesh,
+                             _join(drug_identity.pubchems(bundle, dictionary)), "drug",
+                             BASIS_NLM)
     return out
 
 
@@ -179,9 +191,11 @@ def _ids_of(node: Node) -> tuple[str, str, str]:
 
 
 def drug_strings(strings: Iterable[str], index: MeshIndex,
-                 unii_by_name: Mapping[str, frozenset[str]], graph: Graph,
-                 nlm_of: Mapping[str, set[str]] | None = None) -> dict[str, Resolved]:
-    """Trial intervention string → the exact ids every route reached.
+                 unii_by_name: Mapping[str, frozenset[str]], dictionary: Dictionary,
+                 graph: Graph, nlm_of: Mapping[str, set[str]] | None = None
+                 ) -> dict[str, Resolved]:
+    """Trial intervention string → its own exact ids and its one iKraph2 entity,
+    by the steps an FDA ingredient takes (:func:`service.drug_identity.pick`).
 
     A string no route reaches is retried without its dose, route and form
     (``dose_stripped``) — still an exact lookup of what remains, under the
@@ -192,35 +206,24 @@ def drug_strings(strings: Iterable[str], index: MeshIndex,
     stripped = {s: dose_stripped(s) for s in distinct}
     asked = {exact_key(s) for s in distinct} | {exact_key(t) for t in stripped.values() if t}
     named = graph.named(asked, DRUG_TYPES)
-    uniis_named = {k: unii_by_name[k] for k in asked if len(unii_by_name.get(k, ())) == 1}
-    by_unii = graph.by_db_id(UNII + next(iter(u)) for u in uniis_named.values())
-    records_of = unii_mesh_records(index)
+    lookups: dict[str, tuple[Bundle, tuple[str, ...]]] = {}
+    for key in asked:
+        uniis = unii_by_name.get(key, frozenset())
+        own = [next(iter(uniis))] if len(uniis) == 1 else []
+        bundle, by_term = drug_identity.id_bundle(key, own, index, dictionary,
+                                                  is_biosimilar(key))
+        lookups[key] = (bundle, (BASIS_UNII_NAME,) * bool(own) + (BASIS_MESH_TERM,) * by_term)
+    found = graph.by_db_id(sorted({i for bundle, _ in lookups.values()
+                                   for i in drug_identity.keys(bundle, dictionary)}))
 
     def resolve(key: str) -> Resolved | None:
-        nodes, uniis, meshes, pubchems, bases = [], [], [], [], []
-        hit = one_type(named.get(key, []), DRUG_TYPES)
-        if hit:
-            unii, mesh, pubchem = _ids_of(hit[0])
-            nodes.append(hit[0].biokdeid)
-            uniis.append(unii)
-            meshes.append(mesh)
-            pubchems.append(pubchem)
-            bases.append(BASIS_IKRAPH2)
-        if key in uniis_named:
-            unii = next(iter(uniis_named[key]))
-            uniis.append(unii)
-            nodes += [n.biokdeid for n in by_unii.get(UNII + unii, []) if n.type == DRUG]
-            if len(records_of.get(unii, ())) == 1:
-                meshes.append(next(iter(records_of[unii])))
-            bases.append(BASIS_UNII_NAME)
-        records = index.by_term.get(key, frozenset())
-        if len(records) == 1:
-            meshes.append(next(iter(records)))
-            bases.append(BASIS_MESH_TERM)
+        bundle, id_bases = lookups[key]
+        node, route = drug_identity.pick(bundle, dictionary, found, named.get(key, []))
+        bases = [BASIS_IKRAPH2] * (route in drug_identity.NAME_ROUTES) + list(id_bases)
         if not bases:
             return None
-        return Resolved("", _join(nodes), _join(uniis), _join(meshes), _join(pubchems),
-                        "drug", _join(bases))
+        return Resolved("", node.biokdeid if node else "", _join(bundle.uniis), bundle.mesh_id,
+                        _join(drug_identity.pubchems(bundle, dictionary)), "drug", _join(bases))
 
     out: dict[str, Resolved] = {}
     for text in distinct:
@@ -243,7 +246,13 @@ def drug_strings(strings: Iterable[str], index: MeshIndex,
 
 def condition_strings(strings: Iterable[str], index: MeshIndex,
                       graph: Graph) -> dict[str, Resolved]:
-    """Trial condition string → its iKraph2 Disease entity and MeSH id, exactly."""
+    """Trial condition string → its one iKraph2 Disease entity and MeSH id, exactly.
+
+    The MeSH entry term comes first: where its record has a Disease entity, that
+    is the entity. An iKraph2 name match is used only where it does not, and
+    never when the entity it names holds a different MeSH descriptor or
+    supplementary id than the term's record (D45).
+    """
     distinct = [s for s in dict.fromkeys(strings) if s and _usable(s)]
     asked = {exact_key(s) for s in distinct}
     named = graph.named(asked, (DISEASE,))
@@ -253,21 +262,23 @@ def condition_strings(strings: Iterable[str], index: MeshIndex,
     out: dict[str, Resolved] = {}
     for text in distinct:
         key = exact_key(text)
-        nodes, meshes, bases = [], [], []
-        hit = one_type(named.get(key, []), (DISEASE,))
-        if hit:
-            nodes.append(hit[0].biokdeid)
-            meshes.append(_ids_of(hit[0])[1])
-            bases.append(BASIS_IKRAPH2)
-        if key in term_meshes:
-            mesh = term_meshes[key]
-            meshes.append(mesh)
-            if len(entity_of.get(mesh, [])) == 1:
-                nodes.append(entity_of[mesh][0])
-            bases.append(BASIS_MESH_TERM)
+        mesh = term_meshes.get(key, "")
+        by_term = entity_of.get(mesh, []) if mesh else []
+        by_name = name_pick(named.get(key, []), (DISEASE,))
+        name_mesh = _ids_of(by_name)[1] if by_name else ""
+        if len(by_term) == 1:
+            node = by_term[0]
+            name_used = by_name is not None and by_name.biokdeid == node
+        else:
+            node = ""
+            name_used = by_name is not None and not (
+                mesh and name_mesh[:6] in ("MESH:D", "MESH:C") and name_mesh != mesh)
+        if name_used and by_name and not node:
+            node = by_name.biokdeid
+        bases = ([BASIS_IKRAPH2] if name_used else []) + ([BASIS_MESH_TERM] if mesh else [])
         if bases:
-            out[text] = Resolved(text, _join(nodes), "", _join(meshes), "", "disease",
-                                 _join(bases))
+            out[text] = Resolved(text, node, "", mesh or (name_mesh if name_used else ""), "",
+                                 "disease", _join(bases))
     _log.info("trial conditions: %d of %d strings reached an exact id", len(out), len(distinct))
     return out
 
@@ -292,6 +303,6 @@ def unii_names(rows: Iterable[dict[str, str]]) -> dict[str, frozenset[str]]:
 
 
 __all__ = ["BASIS_IKRAPH2", "BASIS_MESH_TERM", "BASIS_NLM", "BASIS_UNII_NAME", "DOSE_STRIPPED",
-           "DRUG_TYPES", "Graph", "IK2", "Resolved", "SEPARATOR", "UNII", "condition_strings",
-           "disease_mesh", "drug_mesh", "drug_strings", "keys_of", "one_type",
-           "unii_mesh_records", "unii_names"]
+           "DRUG_TYPES", "Graph", "IK2", "Resolved", "SEPARATOR", "UNII",
+           "condition_strings", "disease_mesh", "drug_mesh", "drug_strings", "keys_of",
+           "name_pick", "one_type", "unii_names"]

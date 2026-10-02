@@ -18,6 +18,8 @@ from dao.ikraph2_api import Ikraph2Api, Ikraph2Error, Ikraph2Literature
 from dao.ikraph2_entities import Ikraph2Entities, Node, connection_uri
 from service import drug_identity, normalize
 from source.moiety import Moiety
+from source.substance_ids import Dictionary, Substance
+from source.unii_mesh import MeshIndex
 
 REL = "v1_2"
 
@@ -188,9 +190,12 @@ class _Collection:
 
 
 _NAMES = [
-    {"biokdeid": 2700000295, "term_key": "pembrolizumab", "type": "TherapyPreventions"},
-    {"biokdeid": 6308113, "term_key": "pembrolizumab", "type": "Chemical"},
+    {"biokdeid": 2700000295, "term_key": "pembrolizumab", "type": "TherapyPreventions",
+     "role": "canonical"},
+    {"biokdeid": 6308113, "term_key": "pembrolizumab", "type": "Chemical", "role": "alias"},
     {"biokdeid": 55633, "term_key": "nsclc", "type": "Disease"},
+    {"biokdeid": 2700001344, "term_key": "afatinib dimaleate", "type": "TherapyPreventions",
+     "role": "alias"},
 ]
 
 
@@ -233,30 +238,61 @@ def test_the_mongo_uri_quotes_the_credentials(tmp_path: Path) -> None:
         "mongodb://m+l:p%40ss@jupiter2:27017/?authSource=admin")
 
 
-def test_identity_prefers_the_drug_node_and_falls_back_to_chemical() -> None:
-    client, _ = _client(_ROWS)
-    lookup = Ikraph2Entities(client, Ikraph2Connection()).by_db_id
+def test_identity_takes_own_ids_then_the_exact_name_and_never_folds() -> None:
+    rows = _ROWS + [
+        {"biokdeid": 2700001344, "type": "TherapyPreventions", "official_name": "AFATINIB",
+         "db_id": "UNII:41UD74L59M", "mention_count": 8098},
+        {"biokdeid": 88, "type": "TherapyPreventions", "official_name": "x",
+         "db_id": "RXCUI:42", "mention_count": 1}]
+    client, _ = _client(rows)
+    graph = Ikraph2Entities(client, Ikraph2Connection())
+    names = ["PEMBROLIZUMAB", "AFATINIB DIMALEATE", "HEPARIN SODIUM", "HEPARIN", "RXONLY",
+             "ADALIMUMAB-AACF", "ODDITY", "NOTHING"]
     uniis = drug_identity.uniis_of(
-        ["PEMBROLIZUMAB", "HEPARIN SODIUM", "ODDITY", "NOTHING"],
-        {"PEMBROLIZUMAB": "DPT0O3T46P", "HEPARIN SODIUM": "ZZFG82DD2Y", "ODDITY": "ODDUNII000"},
+        names,
+        {"PEMBROLIZUMAB": "DPT0O3T46P", "AFATINIB DIMALEATE": "AFATSALT00", "HEPARIN": "T2410KM04A",
+         "RXONLY": "RXONLY0000", "ADALIMUMAB-AACF": "BIOSIM0000", "ODDITY": "ODDUNII000"},
         {"HEPARIN SODIUM": Moiety("HEPARIN SODIUM", "HEPARIN", "ZZFG82DD2Y", "T2410KM04A")})
-    assert uniis["HEPARIN SODIUM"] == ("ZZFG82DD2Y", "T2410KM04A")
-    identities, report = drug_identity.build(
-        ["PEMBROLIZUMAB", "HEPARIN SODIUM", "ODDITY", "NOTHING"], uniis,
-        {"DPT0O3T46P": ("MESH:C582435", "pembrolizumab"),
-         "T2410KM04A": ("MESH:D006493", "Heparin")},
-        {"ZZFG82DD2Y": "PubChem:CID772"}, lookup)
+    # The label extract gives the salt's own UNII, never its moiety's.
+    assert uniis["HEPARIN SODIUM"] == ("ZZFG82DD2Y",)
+    row = lambda u, m, mo, pc="", rx="", role="preferred": Substance(u, u, m, m.lower(), role,
+                                                                     mo, pc, rx)
+    dictionary = Dictionary(
+        {"DPT0O3T46P": row("DPT0O3T46P", "MESH:C582435", "DPT0O3T46P"),
+         "AFATSALT00": row("AFATSALT00", "MESH:D000077716", "41UD74L59M", role="related"),
+         "41UD74L59M": row("41UD74L59M", "MESH:D000077716", "41UD74L59M"),
+         "T2410KM04A": row("T2410KM04A", "MESH:D006493", "T2410KM04A"),
+         "ZZFG82DD2Y": row("ZZFG82DD2Y", "", "", "PubChem:CID772", role=""),
+         "RXONLY0000": row("RXONLY0000", "", "", "", "RXCUI:42", role=""),
+         "BIOSIM0000": row("BIOSIM0000", "MESH:C582435", "DPT0O3T46P", role="related")},
+        {"MESH:C582435": "DPT0O3T46P", "MESH:D000077716": "41UD74L59M",
+         "MESH:D006493": "T2410KM04A"})
+    identities, report = drug_identity.build(names, uniis, dictionary,
+                                             MeshIndex({}, {}, {}, {}), graph)
     pembro = identities["PEMBROLIZUMAB"]
     # A drug node exists, so the Chemical node holding the same MeSH id is not used.
-    assert (pembro.mesh_id, pembro.nodes, pembro.node_type) == (
-        "MESH:C582435", "2700000295", "TherapyPreventions")
-    heparin = identities["HEPARIN SODIUM"]
-    assert (heparin.mesh_id, heparin.nodes, heparin.node_type) == (
-        "MESH:D006493", "202330;202331", "Chemical")
+    assert (pembro.mesh_id, pembro.nodes, pembro.node_type, pembro.route) == (
+        "MESH:C582435", "2700000295", "TherapyPreventions", drug_identity.ROUTE_TP_UNII)
+    # The salt keeps its own ids only (no MeSH: it is a related form of afatinib's
+    # record); iKraph2 lists its name as an alias of AFATINIB, so the name finds it.
+    afatinib = identities["AFATINIB DIMALEATE"]
+    assert (afatinib.uniis, afatinib.mesh_id, afatinib.nodes, afatinib.route) == (
+        "AFATSALT00", "", "2700001344", drug_identity.ROUTE_TP_NAME)
+    assert (identities["HEPARIN SODIUM"].nodes, identities["HEPARIN SODIUM"].route) == (
+        "202331", drug_identity.ROUTE_CHEMICAL_PUBCHEM)
+    assert (identities["HEPARIN"].nodes, identities["HEPARIN"].route) == (
+        "202330", drug_identity.ROUTE_CHEMICAL_MESH)
+    assert (identities["RXONLY"].nodes, identities["RXONLY"].route) == (
+        "88", drug_identity.ROUTE_TP_RXCUI)
+    # A biosimilar keeps the reference product's MeSH id as a key, never its entity.
+    biosimilar = identities["ADALIMUMAB-AACF"]
+    assert (biosimilar.mesh_id, biosimilar.nodes, biosimilar.uniis) == (
+        "MESH:C582435", "", "BIOSIM0000")
     assert identities["ODDITY"].basis == drug_identity.BASIS_NO_MESH
     assert identities["NOTHING"].basis == drug_identity.BASIS_NONE
-    assert report == drug_identity.IdentityReport(4, 3, 2, 1, 1, 2)
-    assert "Chemical (fallback)" in drug_identity.render(report)
+    assert report[:6] == (8, 7, 3, 3, 2, 3)
+    text = drug_identity.render(report)
+    assert "Chemical (fallback)" in text and drug_identity.ROUTE_TP_NAME in text
 
 
 def test_drug_rows_come_from_exact_ids_only() -> None:
@@ -320,10 +356,10 @@ def test_exact_names_and_disease_ids_come_from_ikraph2() -> None:
     client, _ = _client(rows)
     entities = Ikraph2Entities(client, Ikraph2Connection())
     named = entities.named(["pembrolizumab", "nsclc", ""], ["TherapyPreventions", "Chemical"])
-    # Drug type first; the db_id comes back with each entity.
-    assert [(n.biokdeid, n.type, n.db_id) for n in named["pembrolizumab"]] == [
-        ("2700000295", "TherapyPreventions", "UNII:DPT0O3T46P"),
-        ("6308113", "Chemical", "MESH:C582435")]
+    # Drug type first; the db_id and the name's role come back with each entity.
+    assert [(n.biokdeid, n.type, n.db_id, n.role) for n in named["pembrolizumab"]] == [
+        ("2700000295", "TherapyPreventions", "UNII:DPT0O3T46P", "canonical"),
+        ("6308113", "Chemical", "MESH:C582435", "alias")]
     assert "nsclc" not in named
     assert entities.diseases_by_db_id(["MESH:D002289", "MESH:D9"]) == {
         "MESH:D002289": ["55633"], "MESH:D9": ["56", "57"]}

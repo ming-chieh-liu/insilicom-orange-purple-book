@@ -38,7 +38,8 @@ from dao.biokde import connection_uri
 from dao.graph_evidence import GraphEvidenceRepository
 from dao.tsv_repository import TsvRepository
 from source import (
-    label_pdf, mesh_descriptors, moiety, review_docs, trial_studies, unii_bridge, unii_mesh,
+    label_pdf, mesh_descriptors, moiety, review_docs, substance_ids, trial_studies, unii_bridge,
+    unii_mesh,
 )
 from source.raw_table import read_rows
 from service import (
@@ -1340,8 +1341,8 @@ def main(argv: list[str] | None = None) -> int:
                 for row in csv.DictReader(handle, delimiter="\t")
                 if row.get("mesh_id")
             ]
-        # D42: each FDA ingredient's exact ids — UNII -> MeSH by MeSH's own
-        # registry numbers, and its iKraph2 node by exact db_id.
+        # D45: each FDA ingredient's UNIIs — its own, and its moiety's from the
+        # label extract — and one substance dictionary both sides resolve through.
         folded = moiety.read(Path(args.moiety))
         uniis_by_name = drug_names_table.unii_index(data)
         trial_apps = frozenset(r.application for r in approval_events.build(data).rows
@@ -1350,16 +1351,14 @@ def main(argv: list[str] | None = None) -> int:
             data, trial_apps).values() for n in names})
         ingredient_uniis = drug_identity.uniis_of(ingredient_names, uniis_by_name, folded)
         fda_names_of: dict[str, set[str]] = {}
-        for name, name_uniis in ingredient_uniis.items():
-            for unii in name_uniis:
+        for name, held in ingredient_uniis.items():
+            for unii in held:
                 fda_names_of.setdefault(unii, set()).add(name)
         # D44: MeSH read once — registry numbers, entry terms, names, headings.
         mesh_index = unii_mesh.mesh_index([Path(args.mesh), data.mesh_supplementary])
-        unii_mesh_rows, unii_mesh_report = unii_mesh.build(
-            unii_mesh.records_of(mesh_index), fda_names_of,
-            unii_mesh.unii_names(read_rows(data.unii_names)))
-        pubchem_of = unii_bridge.unii_to_pubchem(
-            unii_bridge.read_unii_records(data.unii_records))
+        dictionary, dictionary_report = substance_ids.build(
+            mesh_index, unii_bridge.read_unii_records(data.unii_records),
+            unii_mesh.unii_names(read_rows(data.unii_names)), fda_names_of)
         _, descriptor_names = mesh_descriptors.rollup_and_names(vocabulary)
         # D44: every name in the FDA UNII list, for exact name matching.
         unii_by_name = registry_identity.unii_names(read_rows(data.unii_names))
@@ -1372,9 +1371,7 @@ def main(argv: list[str] | None = None) -> int:
         try:
             ik2_entities = Ikraph2Entities(ik2_client, ik2_connection)
             identities, identity_report = drug_identity.build(
-                ingredient_names, ingredient_uniis,
-                {r.unii: (r.mesh_id, r.mesh_name) for r in unii_mesh_rows}, pubchem_of,
-                ik2_entities.by_db_id)
+                ingredient_names, ingredient_uniis, dictionary, mesh_index, ik2_entities)
             archive = TrialArchive(root=Path(args.trial_archive))
             normalize_report = normalize.build(
                 data,
@@ -1384,15 +1381,17 @@ def main(argv: list[str] | None = None) -> int:
                 indication_ids,
                 identities,
                 unii_by_name,
+                dictionary,
                 descriptor_names,
             )
         finally:
             ik2_client.close()
         repository_out = TsvRepository(args.out)
-        repository_out.save("unii_mesh", unii_mesh.UniiMesh._fields, unii_mesh_rows)
+        repository_out.save("substance_ids", substance_ids.Substance._fields,
+                            [dictionary.by_unii[u] for u in sorted(dictionary.by_unii)])
         repository_out.save("drug_identity", drug_identity.DrugIdentity._fields,
                             [identities[n] for n in sorted(identities)])
-        print(unii_mesh.render(unii_mesh_report))
+        print(substance_ids.render(dictionary_report))
         print(drug_identity.render(identity_report))
         # Named so a reader cannot mistake one column for another: the row
         # holds three different identifiers plus two names, and an empty
@@ -1424,11 +1423,8 @@ def main(argv: list[str] | None = None) -> int:
             uniis_by_name,
         )
         repository_out.save("drug_names", drug_names_table.DrugNames._fields, names_rows)
-        # D39: the exact PubChem <-> MeSH bridge through UNII, one-to-one only.
-        bridges = unii_bridge.build(
-            pubchem_of,
-            unii_bridge.mesh_to_unii((m, list(u)) for m, u in mesh_index.uniis.items()),
-        )
+        # D39: the exact PubChem <-> MeSH bridge, from the dictionary (D45).
+        bridges = substance_ids.bridges(dictionary)
         repository_out.save("id_bridge", unii_bridge.Bridge._fields, bridges)
         print(f"id_bridge: {len(bridges):,} exact UNII bridges (PubChem <-> MeSH)")
         print(normalize.render(normalize_report))

@@ -43,6 +43,9 @@ class Node(NamedTuple):
     official_name: str
     db_id: str
     mention_count: int
+    #: How iKraph2 lists the name looked up: ``canonical`` (the entity's own
+    #: name) or ``alias``; "" where the node was read by id (D45).
+    role: str = ""
 
 
 def connection_uri(connection: Ikraph2Connection) -> str:
@@ -76,22 +79,25 @@ class Ikraph2Entities:
 
     def named(self, keys: Iterable[str], types: Iterable[str]) -> dict[str, list[Node]]:
         """Exact name key (:func:`source.unii_mesh.exact_key`) → every entity of
-        ``types`` iKraph2 records under exactly that name (D44)."""
+        ``types`` iKraph2 records under exactly that name (D44), with whether
+        the name is the entity's canonical one or an alias (D45)."""
         wanted = sorted({k for k in keys if k})
         kinds = list(types)
-        hits: dict[str, list[tuple[int, str, str]]] = defaultdict(list)
+        hits: dict[str, list[tuple[int, str, str, str]]] = defaultdict(list)
         for start in range(0, len(wanted), BATCH):
             for row in self._names.find(
                 {"term_key": {"$in": wanted[start:start + BATCH]}, "type": {"$in": kinds}},
-                {"_id": 0, "term_key": 1, "biokdeid": 1, "type": 1},
+                {"_id": 0, "term_key": 1, "biokdeid": 1, "type": 1, "role": 1},
             ):
                 hits[str(row["term_key"])].append(
-                    (int(row["biokdeid"]), str(row.get("type") or ""), str(row["term_key"])))
-        meta = self._db_ids(b for found in hits.values() for b, _, _ in found)
+                    (int(row["biokdeid"]), str(row.get("type") or ""), str(row["term_key"]),
+                     str(row.get("role") or "")))
+        meta = self._db_ids(b for found in hits.values() for b, _, _, _ in found)
         out: dict[str, list[Node]] = {}
         for key, found in hits.items():
-            nodes = {b: Node(str(b), kind, name, meta.get(b, ("", 0))[0], meta.get(b, ("", 0))[1])
-                     for b, kind, name in found}
+            nodes = {b: Node(str(b), kind, name, meta.get(b, ("", 0))[0],
+                             meta.get(b, ("", 0))[1], role)
+                     for b, kind, name, role in found}
             out[key] = sorted(nodes.values(), key=lambda n: (
                 kinds.index(n.type) if n.type in kinds else len(kinds), -n.mention_count,
                 n.biokdeid))

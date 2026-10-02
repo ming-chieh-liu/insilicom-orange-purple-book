@@ -45,6 +45,7 @@ from utility.logging import get_logger
 if TYPE_CHECKING:
     from service.drug_identity import DrugIdentity
     from service.registry_identity import Graph, Resolved
+    from source.substance_ids import Dictionary
     from source.unii_mesh import MeshIndex
 
 _log = get_logger(__name__)
@@ -346,14 +347,16 @@ BASIS_STEM = "stem"
 
 
 def with_identities(identities: dict[str, DrugIdentity]) -> dict[str, Mapping]:
-    """The FDA drug rows under D42, from exact ids only — no name resolution.
+    """The FDA drug rows from each ingredient's identity (D45: own ids, then
+    exact name, :func:`service.drug_identity.build`).
 
-    * an ingredient whose UNII maps to MeSH takes that id (``unii_registry``,
-      or ``stem`` for a suffixed biologic filed under the bare molecule);
-    * one with no MeSH record but an iKraph2 node is kept under its UNII, so
-      the literature route can walk it and the trial side can match its names;
+    * an ingredient with a MeSH id keeps it (``unii_registry``, or ``stem`` for
+      a suffixed biologic filed under the reference product's record);
+    * one with no MeSH id but an iKraph2 node is kept under its UNII (or under
+      no external id, when only its exact name found the node), so the
+      literature route can walk it and S8 can join on the node;
     * one with neither has no row: nothing exact identifies it;
-    * ``biokdeid`` is the iKraph2 node(s), ``;``-joined, or "".
+    * ``biokdeid`` is its one iKraph2 entity, or "".
 
     >>> from service.drug_identity import DrugIdentity
     >>> ids = {"A": DrugIdentity("A", "U1", "MESH:D9", "Nine", "27", "TherapyPreventions",
@@ -361,11 +364,12 @@ def with_identities(identities: dict[str, DrugIdentity]) -> dict[str, Mapping]:
     ...        "B": DrugIdentity("B", "U2", "", "", "28", "TherapyPreventions", "unii_no_mesh"),
     ...        "ADALIMUMAB-AACF": DrugIdentity("ADALIMUMAB-AACF", "U3", "MESH:D1", "Adalimumab",
     ...                                        "", "", "unii_registry"),
-    ...        "C": DrugIdentity("C", "U4", "", "", "", "", "unii_no_mesh")}
+    ...        "C": DrugIdentity("C", "U4", "", "", "", "", "unii_no_mesh"),
+    ...        "D": DrugIdentity("D", "", "", "", "29", "Chemical", "no_unii", "chemical_name")}
     >>> [(m.name, m.mesh_id, m.biokdeid, m.basis) for m in with_identities(ids).values()]
     ... # doctest: +NORMALIZE_WHITESPACE
     [('A', 'MESH:D9', '27', 'unii_registry'), ('B', 'UNII:U2', '28', 'unii_no_mesh'),
-     ('ADALIMUMAB-AACF', 'MESH:D1', '', 'stem')]
+     ('ADALIMUMAB-AACF', 'MESH:D1', '', 'stem'), ('D', '', '29', 'no_unii')]
     """
     out: dict[str, Mapping] = {}
     for name, identity in identities.items():
@@ -376,36 +380,8 @@ def with_identities(identities: dict[str, DrugIdentity]) -> dict[str, Mapping]:
                                 BASIS_STEM if stem else BASIS_UNII_REGISTRY)
         elif identity.nodes:
             first = identity.uniis.split(";")[0]
-            out[name] = Mapping(name, f"UNII:{first}", identity.nodes, "",
+            out[name] = Mapping(name, f"UNII:{first}" if first else "", identity.nodes, "",
                                 identity.node_type, identity.basis)
-    return out
-
-
-def fda_rows(names: Iterable[str], identities: dict[str, DrugIdentity],
-             by_name: dict[str, Resolved]) -> dict[str, Mapping]:
-    """The FDA drug rows (D44): exact ids from the UNII (:func:`with_identities`),
-    else an exact name match (``by_name``); an ingredient neither reaches has no row.
-
-    >>> from service.drug_identity import DrugIdentity
-    >>> from service.registry_identity import Resolved
-    >>> ids = {"A": DrugIdentity("A", "U1", "MESH:D9", "Nine", "27", "TherapyPreventions",
-    ...                          "unii_registry")}
-    >>> by_name = {"B": Resolved("B", "28", "", "MESH:C5", "", "drug", "ikraph2_name"),
-    ...            "C": Resolved("C", "29", "U3", "", "", "drug", "unii_name")}
-    >>> [(m.name, m.mesh_id, m.biokdeid, m.basis) for m in fda_rows("ABC", ids, by_name).values()]
-    ... # doctest: +NORMALIZE_WHITESPACE
-    [('A', 'MESH:D9', '27', 'unii_registry'), ('B', 'MESH:C5', '28', 'ikraph2_name'),
-     ('C', 'UNII:U3', '29', 'unii_name')]
-    """
-    out = with_identities({n: identities[n] for n in names if n in identities})
-    for name in names:
-        row = by_name.get(name)
-        if name in out or row is None:
-            continue
-        first = (row.mesh_id or row.pubchem).split(";")[0] or (
-            f"UNII:{row.unii.split(';')[0]}" if row.unii else "")
-        if first or row.biokdeid:
-            out[name] = Mapping(name, first, row.biokdeid, "", row.entity_type, row.basis)
     return out
 
 
@@ -417,12 +393,14 @@ def build(
     indication_ids: list[str],
     identities: dict[str, DrugIdentity],
     unii_by_name: dict[str, frozenset[str]],
+    dictionary: Dictionary,
     descriptor_names: dict[str, str] | None = None,
 ) -> NormalizeReport:
-    """S2's FDA side and S3's registry side, both by exact ids only (D44).
+    """S2's FDA side and S3's registry side, both by exact ids only (D44),
+    through one substance dictionary and one resolver (D45).
 
-    FDA ingredients take their UNII-derived ids (D42), else an exact name
-    match. Every registry intervention and condition string is matched by
+    FDA ingredients take their identities (own ids, then exact name, D45).
+    Every registry intervention and condition string is matched by
     exact name, and every NLM-coded MeSH id by exact id, to iKraph2 entities
     (:mod:`service.registry_identity`). Indications get their one Disease
     entity by exact id. Nothing is rolled up: S8 places ids in the MeSH tree.
@@ -435,10 +413,7 @@ def build(
     )
     by_application = ingredients_of(data, applications)
     names = sorted({name for names in by_application.values() for name in names})
-    missing = [n for n in names if not (identities.get(n) and (
-        identities[n].mesh_id or identities[n].nodes))]
-    drugs = fda_rows(names, identities, registry_identity.drug_strings(
-        missing, mesh, unii_by_name, graph))
+    drugs = with_identities({n: identities[n] for n in names if n in identities})
     drug_coverage = Coverage(
         label="FDA drug (active ingredient, exact ids)",
         asked=len(names),
@@ -489,10 +464,10 @@ def build(
         if facts.derived_drug_mesh:
             for name in facts.interventions:
                 nlm_of.setdefault(name, set()).update(facts.derived_drug_mesh)
-    trial_drugs = registry_identity.drug_strings(interventions, mesh, unii_by_name, graph,
-                                                 nlm_of)
+    trial_drugs = registry_identity.drug_strings(interventions, mesh, unii_by_name, dictionary,
+                                                 graph, nlm_of)
     trial_conditions = registry_identity.condition_strings(conditions, mesh, graph)
-    nlm_ids = {**registry_identity.drug_mesh(nlm_drugs, mesh, graph),
+    nlm_ids = {**registry_identity.drug_mesh(nlm_drugs, mesh, dictionary, graph),
                **registry_identity.disease_mesh(nlm_conditions, graph)}
 
     def coverage(label: str, asked: int, rows: Iterable[Resolved]) -> Coverage:
@@ -574,7 +549,6 @@ __all__ = [
     "build",
     "counted",
     "dose_stripped",
-    "fda_rows",
     "ingredients_of",
     "is_identifier",
     "nlm_agrees",

@@ -1,4 +1,4 @@
-"""Tests for the exact, one-to-one PubChem <-> MeSH bridge (D39)."""
+"""Tests for reading the PubChem <-> MeSH bridge and the UNII records (D39, D45)."""
 
 from __future__ import annotations
 
@@ -58,20 +58,6 @@ def _files(tmp_path: Path) -> tuple[Path, Path, Path]:
     with zipfile.ZipFile(records, "w") as archive:
         archive.writestr("UNII_Records_4Aug2026.txt", _RECORDS)
     return desc, supp, records
-
-
-def test_only_one_to_one_pairings_become_bridges(tmp_path: Path) -> None:
-    """A UNII shared by two MeSH records, or with two CIDs, bridges nothing."""
-    desc, supp, records = _files(tmp_path)
-    bridges = unii_bridge.build(
-        unii_bridge.unii_to_pubchem(unii_bridge.read_unii_records(records)),
-        unii_bridge.mesh_to_unii(
-            (m, list(u)) for m, u in unii_mesh.mesh_index([desc, supp]).uniis.items()),
-    )
-    assert bridges == [
-        unii_bridge.Bridge("AG9MHG098Z", "PubChem:CID135565884", "MESH:C000629551"),
-        unii_bridge.Bridge("R16CO5Y76E", "PubChem:CID2244", "MESH:D000001"),
-    ]
 
 
 def test_mesh_names_cover_descriptors_and_supplementary_records(tmp_path: Path) -> None:
