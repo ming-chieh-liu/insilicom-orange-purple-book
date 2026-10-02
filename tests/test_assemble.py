@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from service import assemble
+from service import assemble, label_role
 
 
 # ---------------------------------------------------------------------------
@@ -115,9 +115,16 @@ def workspace(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def _write_units(out: Path, units: list[dict[str, object]]) -> None:
+    """The units, and (D46) a PIVOTAL S6 label role for every label-stated trial
+    — what links it; a test about roles writes its own over these."""
     (out / "candidates.jsonl").write_text(
         "\n".join(json.dumps(u) for u in units) + "\n", encoding="utf-8"
     )
+    roles = [f"{u['application']}|{u['submission_type']}|{u['submission_no']}|{u['stated_nct']}"
+             for u in units if u.get("stated_nct")]
+    (out.parent / "adjudication" / "label_role_verdicts.jsonl").write_text("".join(
+        json.dumps({"unit_id": r, "final": "PIVOTAL", "prompt_version": label_role.PROMPT_VERSION}) + "\n"
+        for r in roles), encoding="utf-8")
 
 
 def test_a_label_stated_id_becomes_a_tier_a_link(
@@ -451,64 +458,6 @@ def _polarity(adj: Path, rows: list[dict[str, object]]) -> None:
     )
 
 
-def test_a_refuted_trial_does_not_reach_the_deliverable(
-    workspace: tuple[Path, Path]
-) -> None:
-    """The fenofibrate shape: section 14 cites ACCORD Lipid under "Lack of
-    Efficacy". A regex sees an id; only a reader sees that it failed."""
-    out, adj = workspace
-    _write_units(out, [_unit()])
-    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
-                     "final": "NOT_SUPPORTING"}])
-    report = assemble.build(out, adj)
-    assert report.links == ()
-    assert "judged_not_supporting" in {u.reason for u in report.unlinked}
-
-
-def test_supporting_anywhere_wins(workspace: tuple[Path, Path]) -> None:
-    """The runbook's OR rule — Tyvaso cites one trial as both its pivotal
-    study and its durability follow-up."""
-    out, adj = workspace
-    _write_units(out, [_unit()])
-    _polarity(adj, [
-        {"nct_id": "NCT02578680", "application": "BLA125514", "final": "NOT_SUPPORTING"},
-        {"nct_id": "NCT02578680", "application": "BLA125514", "final": "SUPPORTING"},
-    ])
-    assert len(assemble.build(out, adj).links) == 1
-
-
-def test_a_legacy_negative_verdict_still_counts_as_refuting() -> None:
-    """v1 wrote NEGATIVE and UNCLEAR; both mean not-supporting downstream."""
-    import tempfile
-    d = Path(tempfile.mkdtemp())
-    (d / "v.jsonl").write_text(
-        json.dumps({"nct_id": "N", "application": "A", "final": "NEGATIVE"}) + "\n",
-        encoding="utf-8",
-    )
-    assert assemble.refuted_pairs(d / "v.jsonl") == {("N", "A")}
-
-
-def test_an_unjudged_trial_is_not_refuted(workspace: tuple[Path, Path]) -> None:
-    """Unjudged is not refuted; dropping it would make partial adjudication
-    look like data loss."""
-    out, adj = workspace
-    _write_units(out, [_unit()])
-    _polarity(adj, [{"nct_id": "NCT99999999", "application": "BLA125514",
-                     "final": "NOT_SUPPORTING"}])
-    assert len(assemble.build(out, adj).links) == 1
-
-
-def test_polarity_is_keyed_on_the_application_too(
-    workspace: tuple[Path, Path]
-) -> None:
-    """A trial can support one drug's approval and be a failure on another."""
-    out, adj = workspace
-    _write_units(out, [_unit()])
-    _polarity(adj, [{"nct_id": "NCT02578680", "application": "NDA999999",
-                     "final": "NOT_SUPPORTING"}])
-    assert len(assemble.build(out, adj).links) == 1
-
-
 def test_an_injected_candidate_cannot_reach_tier_a() -> None:
     """It entered the shortlist because the literature named it, not because it
     passed the drug filter — one of only two hard facts the pool rests on."""
@@ -687,6 +636,7 @@ def test_a_review_identified_description_is_tier_a_whatever_the_counts(
 ) -> None:
     out, adj = workspace
     _write_units(out, [_unit(stated_nct="", review_nct="NCT02578680", enrollment="9")])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL", 2)])  # D46: its S6 role
     [link] = assemble.build(out, adj).links
     assert (link.evidence_source, link.evidence_tier) == ("review_name_match", "A")
     assert link.sources == "label_description;review_protocol" and link.conflict == ""
@@ -697,6 +647,7 @@ def test_a_judge_contradicting_the_review_is_overruled_and_recorded(
 ) -> None:
     out, adj = workspace
     _write_units(out, [_unit(stated_nct="", review_nct="NCT02578680")])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL", 2)])  # D46: its S6 role
     _identify(adj, "BLA125514|SUPPL|35|KEYNOTE-189", "NCT01111111")
     report = assemble.build(out, adj)
     [link] = report.links
@@ -710,11 +661,12 @@ def test_a_judge_agreeing_with_the_review_is_no_conflict(
 ) -> None:
     out, adj = workspace
     _write_units(out, [_unit(stated_nct="", review_nct="NCT02578680")])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL", 2)])  # D46: its S6 role
     _identify(adj, "BLA125514|SUPPL|35|KEYNOTE-189", "NCT02578680")
     assert assemble.build(out, adj).links[0].conflict == ""
 
 
-def test_a_review_calling_a_label_link_not_evidence_holds_it_at_tier_b(
+def test_a_review_calling_a_label_link_not_evidence_keeps_it_at_tier_a_flagged(
     workspace: tuple[Path, Path],
 ) -> None:
     out, adj = workspace
@@ -722,21 +674,9 @@ def test_a_review_calling_a_label_link_not_evidence_holds_it_at_tier_b(
     _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED", 2)])
     report = assemble.build(out, adj)
     [link] = report.links
-    assert (link.conflict, link.evidence_tier) == ("role_disagrees", "B")
+    # D46: the label's linking S6 role links it; the review's disagreement is flagged.
+    assert (link.conflict, link.evidence_tier) == ("role_disagrees", "A")
     assert [c.role for c in report.review_context] == ["FAILED"]
-
-
-def test_a_review_linking_what_polarity_refuted_is_a_role_disagreement(
-    workspace: tuple[Path, Path],
-) -> None:
-    out, adj = workspace
-    _write_units(out, [_unit()])
-    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
-                     "final": "NOT_SUPPORTING"}])
-    _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL", 2)])
-    [link] = assemble.build(out, adj).links
-    assert (link.evidence_source, link.conflict, link.evidence_tier) == (
-        "review_protocol", "role_disagrees", "B")
 
 
 _INDICATIONS_HEAD = ("application\tsubmission_type\tsubmission_no\tsource\tsource_key\ttext\t"
@@ -797,11 +737,12 @@ def test_a_review_identified_unit_does_not_take_part_in_guard_grouping() -> None
 
 
 # ---------------------------------------------------------------------------
-# D28 — label-link roles replace the old polarity verdicts
+# D46 — label-stated trials link on their S6 role; described trials need none
 # ---------------------------------------------------------------------------
 
 
-def _label_roles(adj: Path, rows: list[tuple[str, str]], version: int = 1) -> None:
+def _label_roles(adj: Path, rows: list[tuple[str, str]],
+                 version: int = label_role.PROMPT_VERSION) -> None:
     (adj / "label_role_verdicts.jsonl").write_text("\n".join(
         json.dumps({"unit_id": u, "final": role, "prompt_version": version}) for u, role in rows
     ) + "\n", encoding="utf-8")
@@ -818,32 +759,25 @@ def test_a_label_role_that_does_not_link_drops_the_link_with_its_role(
     assert "label_role_failed" in {u.reason for u in report.unlinked}
 
 
-def test_a_label_role_overrides_the_old_polarity_verdict(workspace: tuple[Path, Path]) -> None:
-    out, adj = workspace
-    _write_units(out, [_unit()])
-    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
-                     "final": "NOT_SUPPORTING"}])
-    _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "PIVOTAL")])
-    report = assemble.build(out, adj)
-    assert len(report.links) == 1 and report.label_role_missing == 0
-
-
 def test_a_role_under_an_old_prompt_version_is_ignored(workspace: tuple[Path, Path]) -> None:
     out, adj = workspace
     _write_units(out, [_unit()])
     _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED")], version=0)
     report = assemble.build(out, adj)
-    assert len(report.links) == 1 and report.label_role_missing == 1
-    assert "label links without a D28 role yet" in assemble.render(report)
+    # D46: a label-stated trial waits for its S6 role; it does not link unjudged.
+    assert report.links == () and report.label_role_missing == 1
+    assert assemble.LABEL_ROLE_PENDING in {u.reason for u in report.unlinked}
+    assert "label-stated trials awaiting S6 role" in assemble.render(report)
 
 
-def test_unit_building_sees_links_no_filter_has_touched(workspace: tuple[Path, Path]) -> None:
+def test_a_described_trial_needs_no_role(workspace: tuple[Path, Path]) -> None:
+    """D46: a §14 description S9 identified links with no S6 role at all."""
     out, adj = workspace
-    _write_units(out, [_unit()])
-    _polarity(adj, [{"nct_id": "NCT02578680", "application": "BLA125514",
-                     "final": "NOT_SUPPORTING"}])
-    _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "FAILED")])
-    assert len(assemble.build(out, adj, apply_label_roles=False).links) == 1
+    _write_units(out, [_unit(stated_nct="")])
+    _identify(adj, "BLA125514|SUPPL|35|KEYNOTE-189", "NCT02578680")
+    (adj / "label_role_verdicts.jsonl").write_text("", encoding="utf-8")
+    [link] = assemble.build(out, adj).links
+    assert link.evidence_source == "label_description"
 
 
 def test_a_label_role_rejecting_what_the_review_links_is_role_disagrees(
@@ -854,8 +788,9 @@ def test_a_label_role_rejecting_what_the_review_links_is_role_disagrees(
     _label_roles(adj, [("BLA125514|SUPPL|35|NCT02578680", "NOT_FOR_THIS_APPROVAL")])
     _reviews(adj, [("BLA125514|SUPPL|35|NCT02578680", "SUPPORTING", 2)])
     [link] = assemble.build(out, adj).links
+    # D46: either FDA document's linking verdict links it, at its own tier, flagged.
     assert (link.sources, link.conflict, link.evidence_tier) == (
-        "review_protocol", "role_disagrees", "B")
+        "review_protocol", "role_disagrees", "A")
 
 
 # ---------------------------------------------------------------------------

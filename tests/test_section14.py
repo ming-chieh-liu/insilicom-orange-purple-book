@@ -364,6 +364,9 @@ def test_the_pass_extracts_descriptions_and_indications(
     corpus: RawData, tmp_path: Path, stub_network: dict[str, str]
 ) -> None:
     report = section14.build(corpus, tmp_path / "cache", parsers=1)
+    # D46: each submission's section 14 is kept whole for S6's role units.
+    assert len(report.sections) == report.with_section_14
+    assert all(sec.text.lstrip().upper().startswith("14") for sec in report.sections)
     assert report.with_section_14 == 1
     assert report.section_14_rate == 1.0
     assert any(d.nct_id == "NCT01866319" for d in report.descriptions)
@@ -642,3 +645,68 @@ def test_descriptions_carry_the_full_heading() -> None:
 
 def test_an_unheaded_block_has_no_heading_to_continue() -> None:
     assert section14.continued_heading("", "14 CLINICAL STUDIES\nPreviously Untreated NSCLC") == ""
+
+
+# --- the name beside a registry id (2026-10-02) -----------------------------
+
+
+def test_an_id_takes_a_name_without_a_digit_written_right_before_it() -> None:
+    got = _describe("The efficacy of pemetrexed was evaluated in Study JMDB (NCT00087711).")
+    assert (got[0].nct_id, got[0].acronym) == ("NCT00087711", "JMDB")
+
+
+def test_a_figure_caption_name_is_not_given_to_the_next_id() -> None:
+    """A caption has no full stop, so it runs into the next sentence. The id
+    used to borrow the caption's trial name when none sat beside it."""
+    got = _describe(
+        "Figure 1: Kaplan-Meier Curve for Overall Survival in KEYNOTE-189 *Based on "
+        "the final OS analysis Initial Treatment The efficacy of pemetrexed was "
+        "evaluated in a multi-center study (NCT00087711) in 1725 patients."
+    )
+    assert (got[0].nct_id, got[0].acronym) == ("NCT00087711", "")
+
+
+def test_a_hyphenated_mixed_case_name_is_kept_whole() -> None:
+    got = _describe("Efficacy was shown in LUX-Lung 6 (NCT01121393), a randomized trial.")
+    assert got[0].acronym == "LUX-Lung 6"
+
+
+def test_an_abbreviation_or_the_drugs_own_name_is_not_a_name() -> None:
+    got = section14.describe_trials(
+        "NDA1", "ORIG", "1",
+        "14.1 Head\nPatients with CSII (NCT00000001) were compared. "
+        "SOVALDI (NCT00000002) was given.",
+        frozenset({"SOVALDI"}),
+    )
+    assert {d.nct_id: d.acronym for d in got} == {"NCT00000001": "", "NCT00000002": ""}
+
+
+def test_a_name_with_a_number_between_it_and_the_id_is_not_taken() -> None:
+    got = _describe("Patients 2 years to <12 ALPHA (60) 48 (NCT01651403) were enrolled.")
+    assert got[0].acronym == ""
+
+
+def test_a_sentence_without_an_id_still_needs_a_number_in_a_name() -> None:
+    """Rows with no id become search units; an all-letters word there is
+    usually an abbreviation, not a trial."""
+    got = _describe("PARAMOUNT enrolled 939 patients with NSCLC.")
+    assert got[0].acronym == ""
+
+
+def test_a_name_broken_at_its_hyphen_across_a_page_is_rejoined() -> None:
+    body = ("14 CLINICAL STUDIES\n14.1 Endometrial\nKEYTRUDA was investigated in KEYNOTE-\n"
+            "Reference ID: 4093616\nPage 30 of 80\n"
+            "B61 (NCT04704219), a single-arm trial.\n")
+    got = section14.describe_trials("BLA1", "ORIG", "1", section14.without_page_breaks(body))
+    assert (got[0].nct_id, got[0].acronym) == ("NCT04704219", "KEYNOTE-B61")
+
+
+def test_a_renaming_aside_does_not_separate_a_name_from_its_id() -> None:
+    got = _describe("WM were evaluated in Study PCYC-1118E (referred to as Study 1118) "
+                    "(NCT01614821), a single-arm trial.")
+    assert got[0].acronym == "PCYC-1118E"
+
+
+def test_a_table_abbreviation_is_not_a_name() -> None:
+    got = _describe("Patients with MSI-H by local PCR or IHC (NCT02460198) were enrolled.")
+    assert got[0].acronym == ""

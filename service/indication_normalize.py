@@ -27,6 +27,12 @@ source and saved.
 (``MESH:D…``) **and** the graph's ``biokdeid``, so the label route and the
 graph route read the same ids.
 
+**What the coder reads** (:mod:`service.indication_text`, 2026-10-02): a
+submission-level text loses its "Limitations of Use" passages and negated
+sentences, a long one keeps only sentences with an indication cue, and "HIV-1"
+reads "HIV"; a §14 heading has its abbreviations written out from the label's
+own definitions. The ``text`` column keeps the source's own words.
+
 **The submission-level choice** (``chosen``): the first of letter → that
 submission's label §1 → the current openFDA label that codes at least one
 disease. §14 headings are never ``chosen`` — they say which disease one trial
@@ -41,7 +47,7 @@ from collections.abc import Callable, Iterable
 from pathlib import Path
 from typing import NamedTuple
 
-from service import indications
+from service import indication_text, indications
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -159,20 +165,27 @@ def build(
                              (SOURCE_LABEL_1, label_section_1.get(key, ""))):
             if not text:
                 continue
-            ids = code_text(text, exact, index)
+            ids = code_text(indication_text.for_coding(
+                text, prose=True, label=source == SOURCE_LABEL_1), exact, index)
             pending.append((sub, source, "", text, ids))
             coded_submission = coded_submission or bool(ids)
         current = (openfda_text or {}).get(application, "")
         if not coded_submission and current:
-            pending.append((sub, SOURCE_OPENFDA, "", current,
-                            code_text(current, exact, index)))
+            pending.append((sub, SOURCE_OPENFDA, "", current, code_text(
+                indication_text.for_coding(current, prose=True, label=True), exact, index)))
         elif not coded_submission and openfda_text is None and openfda.get(application):
             ids = sorted(_prefixed(ui) for ui in openfda[application])
             pending.append((sub, SOURCE_OPENFDA, "", "", ids))
+        defined: dict[str, str] | None = None
         for heading in headings.get(key, []):
             full = (heading_text or {}).get((key, heading)) or heading
+            if defined is None:
+                defined = indication_text.abbreviations([label_section_1.get(key, "")])
+            readable = indication_text.expand_abbreviations(
+                indication_text.for_coding(full, prose=False),
+                {**indication_text.abbreviations([full]), **defined})
             pending.append((sub, SOURCE_HEADING, heading, full,
-                            code_text(full, exact, index)))
+                            code_text(readable, exact, index)))
 
     all_ids = {i for *_, ids in pending for i in ids}
     biokde = dict(known_biokdeids)

@@ -133,7 +133,7 @@ code says `not yet implemented` until it lands.
   in code 2026-09-25; `output/` not yet rebuilt**), `evidence_source = review_protocol`. The FDA named the trial by its sponsor
   protocol number and the match is exact, so as with a label-stated NCT there is nothing to
   corroborate. Tier C stays below it.
-- **D28 — every label link gets a role judgement at submission grain** (2026-09-24, **implemented
+- **[SUPERSEDED by D46, 2026-10-02 — the role of a label-stated trial is judged in S6 from S4's section 14, before any search; a trial S9 identifies gets no role check; the old polarity fallback is gone]** **D28 — every label link gets a role judgement at submission grain** (2026-09-24, **implemented
   in code 2026-09-25; not yet piloted**). A §14 mention is not support. The old polarity task ran once on *current* labels at
   *application* grain and was never re-run: 1,055 of 3,361 links (31%) have no support check, and P4
   identification never asks about support. New P4b step, before assembly, on the linked
@@ -143,7 +143,7 @@ code says `not yet implemented` until it lands.
   `docs/runbooks/label-trial-role.md`; a non-linking role leaves the link out as
   `label_role_<role>`; where no role exists yet the old polarity verdict still filters, and P5
   counts those links — D28 is complete when that count is 0.
-- **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — "the graph route (tier C) serves what has no usable document" becomes: a submission with an indication but no judgeable §14 description is case C; one with no indication is case D]** **D29 — how the sources combine** (2026-09-24, **implemented in code 2026-09-25; `output/` not yet rebuilt**). Direct sources first
+- **[PARTIALLY SUPERSEDED by D46, 2026-10-02 — a role disagreement between review and label keeps the row's tier (A) with the flag; it links if either verdict links]** **[PARTIALLY SUPERSEDED by D35, 2026-09-29 — "the graph route (tier C) serves what has no usable document" becomes: a submission with an indication but no judgeable §14 description is case C; one with no indication is case D]** **D29 — how the sources combine** (2026-09-24, **implemented in code 2026-09-25; `output/` not yet rebuilt**). Direct sources first
   (label-stated NCT, review protocol id). A §14 description whose trial name matches a protocol id or
   acronym the same submission's review matched skips the shortlist. The shortlist serves only
   descriptions no FDA document identifies; the graph route (tier C) serves what has no usable
@@ -223,7 +223,7 @@ code says `not yet implemented` until it lands.
   Why: the user's routing — the tier-C trigger was a missing label, the real gap a missing
   indication. Measured: the filter nets −28 of 2,412 label-stated answers (115 dropped, 87
   recovered from below the cap) and cuts judge calls 17,662 → 13,983 (−21%).
-- **D36 — a submission whose review names a linking trial is not searched as case C/D**
+- **[PARTIALLY SUPERSEDED by D46, 2026-10-02 — a label-stated PIVOTAL/SUPPORTING trial also makes the submission route A, with no C/D unit]** **D36 — a submission whose review names a linking trial is not searched as case C/D**
   (2026-09-30, **implemented in code 2026-09-30; P3 rebuilt**). P3 routes it `review` (tier A via
   P4r) when the FDA review names a trial judged PIVOTAL or SUPPORTING; one whose review trials are
   all non-linking (PK, other, failed, not for this approval) stays C/D. A §14 description (case B)
@@ -258,7 +258,7 @@ code says `not yet implemented` until it lands.
   4–5 real answers of 224, every one a disease-coding error (13 of 18 drops were later
   appearances or new-formulation reuse). Why: the user's routing — literature candidates have
   exact identity and need a support check, not a ranking. Detail: `docs/DESIGN.md` §3, §4.
-- **D38 — the pipeline is eleven stages, S1–S11, named for what they produce** (2026-10-01,
+- **[PARTIALLY SUPERSEDED by D46, 2026-10-02 — S6 judges the role of every trial an FDA document names by id (review protocol id, label NCT); S9 is identification only, for B±, C±, D; the post-S9 label-role pass is gone]** **D38 — the pipeline is eleven stages, S1–S11, named for what they produce** (2026-10-01,
   **docs and Makefile targets implemented 2026-10-01; `--mode` names unchanged**). P0–P6 no longer
   matched the order (review roles must run before routing, D36; registry normalisation before
   indications, D34) or the steps. **S1 SPINE · S2 DRUGS · S3 REGISTRY · S4 DOCUMENTS · S5
@@ -376,6 +376,25 @@ code says `not yet implemented` until it lands.
   non-drug trial strings (aliases on id-less TP entities) are unmapped; future improvements in
   `docs/STATUS.md`.
 
+- **D46 — S6 judges the role of every trial an FDA document names by id; S9 only identifies; one role
+  template** (2026-10-02, **implemented in code 2026-10-02; label units built, not yet piloted**). (1) **S6**
+  judges review protocol-id trials (as before) **and label-stated NCT trials**: one unit per (application,
+  stated NCT) at its earliest submission (D16), built from S4's `label_section14.jsonl.gz` — S4 now keeps each
+  submission's section 14 text, cleaned of PDF page furniture (FDA watermark, "Page X of Y", running headers,
+  page numbers beside a break; line-break hyphens rejoined) — never a second PDF parse. Letters stay out (D25).
+  (2) **One prompt template**, `docs/prompts/fda-document-trial-role.md`: ten document slots; the review
+  rendering is byte-identical to review v2 (its 4,825 verdicts stay valid) and the label rendering to label v1,
+  both pinned by SHA-256. (3) **S9** identifies only (B±, C±, D); **no role check** on a trial S9 identifies —
+  the post-S9 label-role pass and the old application-grain polarity verdicts are removed. (4) **S10**: a
+  label-stated trial links only on a linking S6 role (`label_role_pending` until judged); a label name matching
+  a review id takes the review's role; when review and label verdicts disagree the trial links if either is
+  PIVOTAL/SUPPORTING, keeps tier A and carries `role_disagrees`. (5) **S8**: a submission whose label states a
+  PIVOTAL/SUPPORTING trial is route A like a review-named one (no C/D unit). Why: the user's rule — a role check
+  belongs to trials an FDA document names by id, either for all routes or for these only, and these are known
+  from S4; judging them after S9 was an artefact of building units from S10's links. Measured: 3,325
+  label-stated (application, NCT) pairs, 974 also review-named; 3,282 units built (43 not found in their
+  section 14).
+
 ## Current status and to-do
 
 Full detail, evidence and commands: **`docs/STATUS.md`** — read it at the start of a session and
@@ -387,8 +406,8 @@ update it when a stage finishes or pauses. Stages are S1–S11 (D38). As of 2026
 3. **D42–D45 (iKraph2, exact-match normalisation; D45 rule R)** implemented and committed; S2/S3 rebuilt
    2026-10-02 on D45. The user will re-run the whole pipeline from S5. Agent pool verified (cap 32
    concurrent; seats are the bottleneck).
-4. Then: rebuild (`make candidates`) → pilots per route → full runs (both two judges + third, D40) →
-   S10 → D28 label roles → S10 → S11.
+4. Then: S6 label-role pilot + full run, S6 8 new review units, letter verify (979) → rebuild S5 →
+   `make candidates` → S9 pilots per route → full runs (two judges + third, D40) → S10 → S11.
 
 ## Hard constraints
 
@@ -418,7 +437,8 @@ S4  DOCUMENTS      fetched by hand at 1 req/s, never by make:
                      reviews -> protocol id -> exactly 1 registry study (+ guards)
 S5  INDICATIONS    one table, coded once: letter > located > label §1 > today's label;
                    §14 headings coded per description (submission_indications.tsv)
-S6  REVIEW ROLES   agents: each review-named trial PIVOTAL / SUPPORTING / other (D26, D27)
+S6  ROLES          agents: each trial an FDA document names by id — review protocol id or label-stated
+                   NCT — PIVOTAL / SUPPORTING / other, one template (D26, D27, D46)
 S7  LITERATURE     graph: drug x indication edges -> abstracts -> trials they name (NCT or
                    protocol id), with PMIDs; no indication: drug's treats edges (D31);
                    drug check (every arm another FDA drug -> out) + indication check
@@ -429,8 +449,8 @@ S8  ROUTE +        each submission / §14 description -> route and candidate set
                      C+  indication only  x literature trials         filter, top 100
                      C-  indication only  x registry shortlist
                      D   no indication    x drug-only literature
-S9  JUDGE          agents, per candidate Yes/No in tiers of 10, first Yes wins (D33):
-                     A: label role (D28)        B+ C+ D: literature template v2
+S9  JUDGE          agents, identification only (D46), per candidate Yes/No in tiers of 10,
+                   first Yes wins (D33):        B+ C+ D: literature template v2
                      "+" before "-"             B- C-:   registry templates v3
                    two judges + a third on disagreement, pilots and full runs (D40)
 S10 ASSEMBLE       earliest submission wins (D16, every route, same-moiety applications);
@@ -454,7 +474,7 @@ make checks for staleness but never writes. Raw inputs are on the left.
                                   │     │      │    │    │                         │
  CT.gov archive ─────────> [S3 registry] <─────┘    │    │                         │
  (600,762 studies)            │   │     │           │    │                         │
- openFDA labels ──┐           │   │     │           │    └──> S6 REVIEW ROLES ─┐   │
+ openFDA labels ──┐           │   │     │           │    └──> S6 ROLES (D46) ──┐   │
  (today's §1) ────┴─────> [S5 indications] <────────┘         [agents]          │   │
  MeSH tree ───────────────────┘   │     │                                       │   │
                                   │     v                                       │   │
@@ -464,7 +484,7 @@ make checks for staleness but never writes. Raw inputs are on the left.
                         [S8 route + candidates] <── S2, S3, S4, S5, S6 verdicts ┘   │
                                   │                                                 │
                                   v                                                 │
-                           S9 JUDGE [agents] ── identify, label-role verdicts       │
+                           S9 JUDGE [agents] ── identify verdicts (D46)       │
                                   │                                                 │
                                   v                                                 │
                            [S10 assemble] <── S1, S2, S4, S5, S6, S9 ───────────────┘
@@ -478,12 +498,12 @@ make checks for staleness but never writes. Raw inputs are on the left.
 | S1 spine | `spine` | `approval_events.tsv` | Drugs@FDA |
 | S2 drugs | `drugs` | `drug_names.tsv`, `substance_ids.tsv`, `drug_identity.tsv`, `drug_map.tsv`, `id_bridge.tsv`, `indication_map.tsv` | S1, moiety extract, UNII list and records, MeSH, iKraph2, `indications.tsv` (openFDA) |
 | S3 registry | `registry` | `trial_drug_map.tsv`, `trial_condition_map.tsv` | S2, CT.gov archive, biokde |
-| S4 documents | `documents` | `label_trials.tsv`, `submission_indication_text.tsv`, `letter_indications.tsv`, `review_trial_mentions.tsv`, review role units | S1, cached PDFs |
+| S4 documents | `documents` | `label_trials.tsv`, `submission_indication_text.tsv`, `label_section14.jsonl.gz`, `letter_indications.tsv`, `review_trial_mentions.tsv`, review role units | S1, cached PDFs |
 | S5 indications | `indications` | `submission_indications.tsv` | S3, S4, letter-span verdicts, openFDA §1, MeSH |
-| S6 review roles | agents | `adjudication/review_role_verdicts.jsonl` | S4 units |
+| S6 roles | agents (`label-role-units` builds label units) | `adjudication/review_role_verdicts.jsonl`, `label_role_verdicts.jsonl` | S4 |
 | S7 literature | `literature` | `graph_trials.tsv`, `drug_only_trials.tsv` | S2, S5, biokde edges and abstracts |
 | S8 route + candidates | `candidates` | `submission_routes.tsv`, `candidates.jsonl` | S2, S3, S4, S5, S6, S7 |
-| S9 judge | agents (`make judge-prepare`) | `adjudication/identify_verdicts.jsonl`, `label_role_verdicts.jsonl` | S8 |
+| S9 judge | agents (`make judge-prepare`) | `adjudication/identify_verdicts.jsonl` | S8 |
 | S10 assemble | `assemble` | `trial_submission_map.tsv`, `unlinked_submissions.tsv` | S1, S2, S4, S5, S6, S8, S9 |
 | S11 validate | `validate` | report | S8, S10 |
 

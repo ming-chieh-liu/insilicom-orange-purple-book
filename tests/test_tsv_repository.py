@@ -105,3 +105,12 @@ def test_no_database_connection_is_opened_anywhere_in_this_module() -> None:
     source = Path(module.__file__).read_text()
     for forbidden in ("pymongo", "MongoClient", "psycopg", "sqlite3", "connect("):
         assert forbidden not in source
+
+
+def test_a_saved_table_loads_back_by_column(tmp_path: Path, caplog: pytest.LogCaptureFixture) -> None:
+    repository = TsvRepository(tmp_path)
+    repository.save("t", ("a", "b"), [Row("1", "x \"quoted\"")])
+    assert repository.load("t") == [{"a": "1", "b": 'x "quoted"'}]
+    with caplog.at_level(logging.WARNING):
+        assert repository.load("absent") == []
+    assert "no such table" in caplog.text

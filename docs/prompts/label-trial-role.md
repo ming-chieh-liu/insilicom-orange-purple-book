@@ -1,10 +1,15 @@
-# Prompt — role of a trial in its own submission's label (D28)
+# Prompt — role of a trial in its own submission's label (S6, D46)
 
-**Version:** 1 · **Created:** 2026-09-25 · **Runbook:** `docs/runbooks/label-trial-role.md`
+**Version:** 2 (2026-10-02; v1 2026-09-25, never used to judge) · **Created:** 2026-09-25 · **Runbook:** `docs/runbooks/label-trial-role.md`
 
-The judge prompt. One judgement = one `(submission, nct_id)` label link — a trial the label route
-(label-stated NCT, name matched to a review id, or a judged §14 description) attributes to this
-submission after D16. Substitute the three `{{…}}` fields; send nothing else.
+The judge prompt. One judgement = one `(application, label-stated NCT)` at the earliest submission
+whose label states it (D16, D46), built from S4's `label_trials.tsv` and `label_section14.jsonl.gz`.
+Substitute the three `{{…}}` fields; send nothing else.
+
+**v2 (2026-10-02)** changes the unit content, not the wording (same SHA-256): the target is named by
+its NCT id, S4's trial name is shown and searched only where the label writes it right before the
+id (a figure caption had given NCT00087711, Study JMDB, the name KEYNOTE-189), the patient count is
+searched only where the id's own sentence writes it, and overlapping passages are merged.
 
 Changing the wording changes what stored verdicts mean: **bump the version** and record it on every
 verdict rather than editing in place.
@@ -19,63 +24,11 @@ carry trials behind earlier indications because section 14 is cumulative).
 
 ## The prompt
 
-```text
-You are classifying how an FDA drug label's CLINICAL STUDIES section (section 14)
-uses one clinical study.
+**Rendered from `fda-document-trial-role.md`** (document = `label`, D46, 2026-10-02). The text
+is no longer kept here, so the two role prompts cannot drift apart; the rendering is pinned
+by SHA-256 in `tests/test_prompt_render.py` and is byte-identical to the text this version was
+judged with.
 
-APPROVAL BEING JUDGED:
-{{approval}}
-
-TARGET STUDY: {{target}}
-
-TEXT (every passage of this approval's own label section 14 that mentions the
-target study, each with the subsection it sits under):
-<text>
-{{text}}
-</text>
-
-QUESTION: what role does the TARGET STUDY play in the APPROVAL BEING JUDGED?
-
-OUTPUT_OPTIONS:
-PIVOTAL                - a primary basis of THIS approval: the label presents it as
-                         establishing effectiveness for what this approval provides
-                         for (e.g. the randomized controlled trial whose results
-                         the subsection reports for that indication).
-SUPPORTING             - contributes efficacy evidence to THIS approval but is not
-                         its main basis (e.g. a second or supportive trial, a
-                         dose-finding or extension study, an additional population
-                         or endpoint).
-PK_CLINPHARM           - a pharmacokinetic, pharmacodynamic, bioavailability,
-                         bioequivalence, food-effect, drug-interaction or
-                         organ-impairment study.
-NOT_FOR_THIS_APPROVAL  - described but not evidence for THIS approval: it supports
-                         a DIFFERENT indication or an EARLIER approval that the
-                         label still carries (section 14 keeps the trials of every
-                         earlier indication), or it is ongoing, confirmatory or
-                         postmarketing.
-FAILED                 - presented as failing its primary endpoint or as showing
-                         no benefit (e.g. under a "lack of efficacy" heading).
-OTHER                  - anything else that is not one of the cases above:
-                         safety-only or long-term follow-up, design or background
-                         mention, another product's study, or the text gives no
-                         basis to judge. A study that supports a different or
-                         earlier indication is NOT_FOR_THIS_APPROVAL, not OTHER.
-
-RULES:
-- Judge ONLY from the TEXT and the APPROVAL BEING JUDGED above. Do not use outside
-  knowledge of this drug, study or disease. Do not open files, search, or look
-  anything up.
-- Judge ONLY the TARGET STUDY. Other studies in the text are context, not the
-  answer.
-- If the approval line gives no indication ("approval letter not available"),
-  judge whether the text presents the study as efficacy evidence at all:
-  PIVOTAL or SUPPORTING if it does, otherwise the option that fits.
-- If the text supports more than one option, choose the one that best describes
-  the study's role in THIS approval.
-
-Output exactly one option from OUTPUT_OPTIONS, on a single line, with no
-explanation, no punctuation and no preamble.
-```
 
 ---
 
@@ -84,11 +37,11 @@ explanation, no punctuation and no preamble.
 | Field | Built from |
 |---|---|
 | `{{approval}}` | `<brand names> · <application> <type> <number> · approved <date> · <letter "provides for …" sentence>`, or `approval letter not available` — built by `label_role.approval_line`, the same shape as the review route |
-| `{{target}}` | the label's trial name, or `the study of N patients` / `the study described under "<heading>"` for a trial the label does not name, plus `(registry id NCT…; the label may not print it)` |
-| `{{text}}` | every mention in that submission's label §14 of the registry id, the trial name or the stated patient count, ±700 characters, at most 8, each prefixed `[<14.N> <subsection heading>]`; a trial never mentioned by name falls back to its whole subsection (≤3,000 characters) |
+| `{{target}}` | `<name> (registry id NCT…)` where the label writes the name right before the id (`label_role.name_beside_id`), else `the study registered as NCT…` |
+| `{{text}}` | every mention in that submission's label §14 of the registry id, the verified name, or the patient count where the id's sentence states it; ±700 characters, overlapping windows in one subsection merged, at most 8 (those holding the id first), in reading order, each prefixed `[<14.N> <subsection heading>]` |
 
-The registry record is **not** shown: P4 already used it to identify the trial, and showing it
-would let a judge answer from the registry instead of from the FDA's text.
+The registry record is **not** shown: the label states the id, and showing the record would let a
+judge answer from the registry instead of from the FDA's text.
 
 ## Why it is worded this way
 

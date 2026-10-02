@@ -174,3 +174,28 @@ def test_the_render_prompts_mode(tmp_path: Path, capsys: pytest.CaptureFixture[s
                       "--adjudication", str(tmp_path)]) == 1
     assert main.main(["--mode", "render-prompts", "--adjudication", str(tmp_path)]) == 1
     assert "not rendered" in capsys.readouterr().out
+
+
+def test_both_role_prompts_render_from_one_template_unchanged() -> None:
+    """D46: one template; each rendering is byte-identical to the text its
+    version was judged with, so no stored verdict changes meaning."""
+    import hashlib
+    pinned = {
+        "review-trial-role": (2, "f3344ab75c0264163fa8d1f9f3024bdf1409a9e7529a73ffada2c5231657ca85"),
+        "label-trial-role": (2, "a384fadb3ae6a6c0d2bea736a3a219fe0adb9361b516a5a862534b03ea875054"),
+    }
+    for name, (version, digest) in pinned.items():
+        template = pr.load(name)
+        assert (template.version, hashlib.sha256(template.text.encode()).hexdigest()) == (
+            version, digest), name
+        assert "[[" not in template.text
+    assert pr.rendered_role("trial-candidate-match") is None
+
+
+def test_a_slot_without_text_for_the_document_refuses(tmp_path: Path) -> None:
+    (tmp_path / f"{pr.ROLE_TEMPLATE}.md").write_text(
+        "| x-role | review | 1 |\n\n## The template\n\n```text\n[[gone]]\n```\n",
+        encoding="utf-8")
+    with pytest.raises(pr.RenderError, match="slot 'gone'"):
+        pr.load("x-role", tmp_path)
+    assert pr.rendered_role("x-role", tmp_path / "absent") is None

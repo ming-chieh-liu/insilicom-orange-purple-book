@@ -20,59 +20,11 @@ verdict rather than editing in place.
 
 ## The prompt
 
-```text
-You are classifying how an FDA review document uses one clinical study.
+**Rendered from `fda-document-trial-role.md`** (document = `review`, D46, 2026-10-02). The text
+is no longer kept here, so the two role prompts cannot drift apart; the rendering is pinned
+by SHA-256 in `tests/test_prompt_render.py` and is byte-identical to the text this version was
+judged with.
 
-APPROVAL BEING JUDGED:
-{{approval}}
-
-TARGET PROTOCOL ID: {{protocol_id}}
-
-TEXT (every passage of the review that mentions the target protocol id, each
-with the section heading it sits under and the document it came from):
-<text>
-{{text}}
-</text>
-
-QUESTION: what role does the study with the TARGET PROTOCOL ID play in the
-APPROVAL BEING JUDGED?
-
-OUTPUT_OPTIONS:
-PIVOTAL                - a primary basis of THIS approval: the review presents it
-                         as establishing effectiveness for what this approval
-                         provides for (e.g. "pivotal", "primary evidence",
-                         "adequate and well-controlled", the main efficacy trial).
-SUPPORTING             - contributes efficacy evidence to THIS approval but is not
-                         its main basis (e.g. dose-finding, supportive phase 2,
-                         extension study, additional population or endpoint).
-PK_CLINPHARM           - a pharmacokinetic, pharmacodynamic, bioavailability,
-                         bioequivalence, food-effect, drug-interaction or
-                         organ-impairment study.
-NOT_FOR_THIS_APPROVAL  - named but not evidence for THIS approval: it supported an
-                         EARLIER approval (for example the original indication,
-                         when this approval adds a new one), or it is ongoing,
-                         a confirmatory or postmarketing study, or required
-                         after approval.
-FAILED                 - presented as failing its primary endpoint or as showing
-                         no benefit.
-OTHER                  - anything else that is not one of the cases above:
-                         safety-only, design or background mention, another
-                         product's study, or the text gives no basis to judge.
-                         A study that supported an earlier approval is
-                         NOT_FOR_THIS_APPROVAL, not OTHER.
-
-RULES:
-- Judge ONLY from the TEXT and the APPROVAL BEING JUDGED above. Do not use outside
-  knowledge of this drug, study or disease. Do not open files, search, or look
-  anything up.
-- Judge ONLY the TARGET PROTOCOL ID. Other studies in the text are context, not
-  the answer.
-- If the text supports more than one option, choose the one that best describes
-  the study's role in THIS approval.
-
-Output exactly one option from OUTPUT_OPTIONS, on a single line, with no
-explanation, no punctuation and no preamble.
-```
 
 ---
 

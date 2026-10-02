@@ -19,21 +19,18 @@ _BODY = (
 )
 
 
-def test_label_sourced_links_become_targets_once() -> None:
-    link = assemble.Link(
-        nct_id="NCT1", application="NDA1", submission_type="ORIG", submission_no="1",
-        approval_date="2010", action_type="", indication_mesh="", indication_term="Lipids",
-        drug_mesh="", trial_name="ACCORD", label_enrollment="5518", registry_enrollment="",
-        evidence_tier="A", evidence_source="label_nct", count_check="no_count",
-        sources="label_nct;review_protocol",
-    )
-    review_only = link._replace(nct_id="NCT2", evidence_source="review_protocol",
-                                sources="review_protocol")
-    unsourced = link._replace(nct_id="NCT3", sources="", evidence_source="label_description")
-    targets = label_role.targets_of([link, link, review_only, unsourced])
-    assert targets == [LinkTarget("NDA1|ORIG|1", "NCT1", "ACCORD", "Lipids", "5518"),
-                       LinkTarget("NDA1|ORIG|1", "NCT3", "ACCORD", "Lipids", "5518")]
-
+def test_label_stated_trials_become_targets_at_their_earliest_submission() -> None:
+    """D46: units come from S4's label rows, one per (application, stated NCT)."""
+    rows = [{"application": "NDA1", "submission_type": "SUPPL", "submission_no": "10",
+             "nct_id": "NCT1", "acronym": "ACCORD", "heading": "Lipids", "enrollment": "5518"},
+            {"application": "NDA1", "submission_type": "SUPPL", "submission_no": "9",
+             "nct_id": "NCT1", "acronym": "ACCORD", "heading": "Lipids", "enrollment": "5518"},
+            {"application": "NDA1", "submission_type": "SUPPL", "submission_no": "9",
+             "nct_id": "NCT2", "acronym": "", "heading": "", "heading_full": "Lipids, full",
+             "enrollment": ""}]
+    targets = label_role.targets_from_label(rows, {"NDA1|SUPPL|9": "2010", "NDA1|SUPPL|10": "2010"})
+    assert targets == [LinkTarget("NDA1|SUPPL|9", "NCT1", "ACCORD", "Lipids", "5518"),
+                       LinkTarget("NDA1|SUPPL|9", "NCT2", "", "Lipids, full", "")]
 
 def test_passages_find_the_trial_under_its_own_subsection() -> None:
     text = label_role.passages(_BODY, LinkTarget("k", "NCT00000620", "ACCORD Lipid", "", "5518"))
@@ -41,9 +38,31 @@ def test_passages_find_the_trial_under_its_own_subsection() -> None:
     assert "showed no benefit" in text
 
 
-def test_a_comma_written_count_is_found() -> None:
-    text = label_role.passages(_BODY, LinkTarget("k", "NCT9", "n=1485", "", "1485"))
-    assert text.startswith("[14.1 Lipids]")
+def test_a_count_is_searched_only_where_the_id_sentence_writes_it() -> None:
+    """1,485 is written nowhere near NCT9, so it says nothing about that trial."""
+    assert label_role.passages(_BODY, LinkTarget("k", "NCT9", "n=1485", "", "1485")) == ""
+    body = ("14 CLINICAL STUDIES\n14.1 Lipids\nTrial A (NCT00000009) enrolled 1,485 patients."
+            + " Filler." * 300 + " Of the 1485 patients, most finished.\n")
+    text = label_role.passages(body, LinkTarget("k", "NCT00000009", "", "", "1485"))
+    assert text.count("[14.1 Lipids]") == 2 and "most finished" in text
+
+
+def test_a_name_s4_paired_wrongly_is_neither_shown_nor_searched() -> None:
+    """The figure caption names KEYNOTE-189; the id belongs to Study JMDB."""
+    body = ("14 CLINICAL STUDIES\n14.1 NSCLC\nKEYNOTE-189 results." + " Filler." * 300
+            + " Figure 1: Survival in KEYNOTE-189 *Based on the final analysis The "
+              "efficacy of pemetrexed was evaluated in Study JMDB (NCT00087711).\n")
+    target = LinkTarget("A|ORIG|1", "NCT00087711", "KEYNOTE-189", "NSCLC", "")
+    assert label_role.name_beside_id(body, target) == ""
+    [unit] = label_role.build_units([target], {"A|ORIG|1": body}, {}).units
+    assert unit["target"] == "the study registered as NCT00087711"
+    assert unit["text"].count("[14.1 NSCLC]") == 1 and "KEYNOTE-189 results" not in unit["text"]
+
+
+def test_overlapping_windows_are_merged_into_one_passage() -> None:
+    body = "14 CLINICAL STUDIES\n14.1 Lung\nStudy KEYNOTE-189 (NCT02578680) enrolled 616 patients."
+    text = label_role.passages(body, LinkTarget("k", "NCT02578680", "KEYNOTE-189", "", "616"))
+    assert text.count("[14.1 Lung]") == 1 and text.count("enrolled") == 1
 
 
 def test_an_unnamed_trial_falls_back_to_its_subsection() -> None:
@@ -69,47 +88,8 @@ def test_units_are_built_or_dropped_with_a_reason() -> None:
                                "no_label_text": 1}
     [unit] = report.units
     assert unit["unit_id"] == "A|ORIG|1|NCT00000620" and unit["approval"] == "APPROVAL"
-    assert unit["target"].startswith("ACCORD Lipid (registry id NCT00000620")
+    assert unit["target"] == "ACCORD Lipid (registry id NCT00000620)"
     assert "built" in label_role.render_units(report, Path("u.jsonl"))
-
-
-def test_label_urls_key_bare_digits_as_nda_or_bla(monkeypatch: pytest.MonkeyPatch) -> None:
-    docs = [
-        label_pdf.LabelDocument("125514", "SUPPL", "35", "u1", ""),
-        label_pdf.LabelDocument("125514", "SUPPL", "35", "u-dup", ""),
-        label_pdf.LabelDocument("021612", "ORIG", "1", "u2", ""),
-        label_pdf.LabelDocument("999999", "ORIG", "1", "u3", ""),
-    ]
-    monkeypatch.setattr(label_role.label_pdf, "read_label_documents", lambda data: iter(docs))
-    urls = label_role.label_urls(object(), {"BLA125514|SUPPL|35", "NDA021612|ORIG|1"})  # type: ignore[arg-type]
-    assert urls == {"BLA125514|SUPPL|35": "u1", "NDA021612|ORIG|1": "u2"}
-
-
-def test_sections_come_from_the_cache_only(tmp_path: Path) -> None:
-    cached = label_pdf.cache_path("https://x/a.pdf", tmp_path)
-    cached.parent.mkdir(parents=True, exist_ok=True)
-    cached.write_bytes(b"%PDF")
-    got = label_role.read_sections(
-        {"A|ORIG|1": "https://x/a.pdf", "B|ORIG|1": "https://x/missing.pdf"},
-        tmp_path, parsers=1, extract=lambda path: "SECTION 14",
-    )
-    assert got == {"A|ORIG|1": "SECTION 14"}
-
-
-def test_a_label_with_no_section_14_yields_nothing(tmp_path: Path) -> None:
-    cached = label_pdf.cache_path("https://x/a.pdf", tmp_path)
-    cached.parent.mkdir(parents=True, exist_ok=True)
-    cached.write_bytes(b"%PDF")
-    assert label_role.read_sections({"A|ORIG|1": "https://x/a.pdf"}, tmp_path,
-                                    parsers=1, extract=lambda path: "") == {}
-
-
-def test_the_default_extractor_takes_section_14(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setattr(label_role.label_pdf, "extract_text",
-                        lambda path: ("1 INDICATIONS\nx\n" + _BODY, 1, 1))
-    assert label_role._section_14(Path("x.pdf")).startswith("14 CLINICAL STUDIES")
-    monkeypatch.setattr(label_role.label_pdf, "extract_text", lambda path: None)
-    assert label_role._section_14(Path("x.pdf")) == ""
 
 
 def test_letter_sentences_are_read(tmp_path: Path) -> None:

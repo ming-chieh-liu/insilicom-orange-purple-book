@@ -42,7 +42,7 @@ STEPS := \
   approval_events=service/approval_events.py,dao/tsv_repository.py \
   indications=service/indications.py,dao/tsv_repository.py \
   normalize=service/normalize.py,service/drug_names.py,service/indications.py,source/mesh_descriptors.py,source/moiety.py,source/unii_bridge.py,source/unii_mesh.py,source/substance_ids.py,service/drug_identity.py,service/registry_identity.py,service/approval_events.py,dao/ikraph2_entities.py,dao/tsv_repository.py \
-  labels=service/section14.py,dao/tsv_repository.py \
+  labels=service/section14.py,dao/tsv_repository.py,dao/jsonl_repository.py \
   letters=service/letters.py,dao/tsv_repository.py \
   reviews=service/review_trials.py,service/review_role.py,service/label_role.py,service/approval_events.py,source/review_docs.py,source/trial_studies.py,source/raw_table.py,dao/tsv_repository.py \
   indication_normalize=service/indication_normalize.py,service/indications.py,service/letter_locate.py,service/approval_events.py,source/trial_studies.py,dao/ikraph2_entities.py,dao/tsv_repository.py \
@@ -84,7 +84,7 @@ $(OUT)/substance_ids.tsv $(OUT)/drug_identity.tsv $(OUT)/nlm_id_map.tsv &: $(COD
 	$(MAIN) --mode normalize
 
 # ---- P2a labels (cached PDFs only) -----------------------------------------------
-$(OUT)/label_trials.tsv $(OUT)/submission_indication_text.tsv &: $(CODE_labels) \
+$(OUT)/label_trials.tsv $(OUT)/submission_indication_text.tsv $(OUT)/label_section14.jsonl.gz &: $(CODE_labels) \
 		$(OUT)/approval_events.tsv
 	$(MAIN) --mode labels --offline
 
@@ -119,6 +119,7 @@ $(OUT)/candidates.jsonl $(OUT)/submission_routes.tsv &: $(CODE_candidates) \
 		$(OUT)/submission_indications.tsv \
 		$(OUT)/label_trials.tsv $(OUT)/graph_trials.tsv $(OUT)/drug_only_trials.tsv \
 		$(OUT)/review_trial_mentions.tsv $(ADJ)/review_role_verdicts.jsonl \
+		$(ADJ)/label_role_verdicts.jsonl \
 		$(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv $(OUT)/drug_map.tsv \
 		$(OUT)/drug_names.tsv $(OUT)/id_bridge.tsv $(OUT)/nlm_id_map.tsv \
 		$(OUT)/drug_identity.tsv
@@ -129,7 +130,7 @@ $(OUT)/trial_submission_map.tsv $(OUT)/unlinked_submissions.tsv &: $(CODE_assemb
 		$(OUT)/approval_events.tsv $(OUT)/candidates.jsonl $(OUT)/drug_map.tsv \
 		$(OUT)/graph_trials.tsv $(OUT)/submission_indications.tsv \
 		$(ADJ)/identify_verdicts.jsonl $(ADJ)/review_role_units.jsonl \
-		$(ADJ)/review_role_verdicts.jsonl
+		$(ADJ)/review_role_verdicts.jsonl $(ADJ)/label_role_verdicts.jsonl
 	$(MAIN) --mode assemble
 
 # ---- stages S1-S11 (D38) ------------------------------------------------------------------

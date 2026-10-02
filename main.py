@@ -36,6 +36,7 @@ from config.settings import (
 )
 from dao.biokde import connection_uri
 from dao.graph_evidence import GraphEvidenceRepository
+from dao.jsonl_repository import JsonlRepository
 from dao.tsv_repository import TsvRepository
 from source import (
     label_pdf, mesh_descriptors, moiety, review_docs, substance_ids, trial_studies, unii_bridge,
@@ -889,14 +890,20 @@ def main(argv: list[str] | None = None) -> int:
         if not cand_vocabulary.exists:
             print(f"{cand_vocabulary.descriptors} not found — pass --mesh")
             return 1
-        # D35 (2026-09-30): a submission whose review names a PIVOTAL or
+        # D36 (2026-09-30): a submission whose review names a PIVOTAL or
         # SUPPORTING trial is served at tier A and gets no case C/D unit.
+        # D46 (2026-10-02): so does one whose label states such a trial's NCT.
         linking_reviews = [
             (key, nct) for key, nct, role, _protocol
             in assemble.review_judgements(Path(args.adjudication))
             if role in review_role.LINKING
         ]
-        review_linked = frozenset(key for key, _nct in linking_reviews)
+        linking_labels = [
+            key for (key, _nct), role in label_role.read_roles(
+                Path(args.adjudication) / "label_role_verdicts.jsonl").items()
+            if role in review_role.LINKING
+        ]
+        review_linked = frozenset([key for key, _nct in linking_reviews] + linking_labels)
         # D44: MeSH names for the judge, and where a concept or supplementary
         # id sits in the tree — the one place ids are rolled up.
         cand_mesh = unii_mesh.mesh_index([Path(args.mesh), data.mesh_supplementary])
@@ -1040,26 +1047,28 @@ def main(argv: list[str] | None = None) -> int:
             print(f"{data.root} not found — the label links need the bulk data tree")
             return 1
         adjudication_dir = Path(args.adjudication)
-        unfiltered = assemble.build(Path(args.out), adjudication_dir, apply_label_roles=False)
-        lr_targets = label_role.targets_of(unfiltered.links)
-        lr_sections = label_role.read_sections(
-            label_role.label_urls(data, {t.key for t in lr_targets}),
-            Path(args.label_cache), parsers=args.parsers,
-        )
+        # D46: one unit per (application, label-stated NCT) at its earliest
+        # submission, straight from S4 — no search or assembly comes first.
+        lr_dates = {
+            f"{r['application']}|{r['submission_type']}|{r['submission_no']}": r["approval_date"]
+            for r in TsvRepository(args.out).load("approval_events")
+        }
+        lr_targets = label_role.targets_from_label(
+            TsvRepository(args.out).load("label_trials"), lr_dates)
+        # D46: section 14 as S4 cut it — the PDFs are not parsed a second time.
+        lr_sections = label_role.sections_by_submission(
+            JsonlRepository(args.out).load("label_section14"))
         lr_brands: dict[str, set[str]] = {}
         for product in read_rows(data.products):
             lr_brands.setdefault((product.get("ApplNo") or "").strip().zfill(6), set()).add(
                 (product.get("DrugName") or "").strip()
             )
         lr_sentences = label_role.read_sentences(Path(args.out))
-        lr_dates = {
-            f"{l.application}|{l.submission_type}|{l.submission_no}": l.approval_date
-            for l in unfiltered.links
-        }
         lr_approvals = {
-            key: label_role.approval_line(key, when, lr_brands.get(key.split("|")[0][-6:], set()),
-                                          lr_sentences.get(key, ""))
-            for key, when in lr_dates.items()
+            t.key: label_role.approval_line(t.key, lr_dates.get(t.key, ""),
+                                            lr_brands.get(t.key.split("|")[0][-6:], set()),
+                                            lr_sentences.get(t.key, ""))
+            for t in lr_targets
         }
         lr_report = label_role.build_units(lr_targets, lr_sections, lr_approvals)
         lr_path = adjudication_dir / "label_role_units.jsonl"
@@ -1324,6 +1333,9 @@ def main(argv: list[str] | None = None) -> int:
             ("application", "submission_type", "submission_no", "text"),
             labels_report.indications,
         )
+        # D46: section 14 kept whole, line breaks and all, for S6's role units.
+        JsonlRepository(args.out).save("label_section14", (
+            section._asdict() for section in labels_report.sections))
         print(section14.render(labels_report))
         print(f"\nwritten to {repository.out_dir}/")
         return 0

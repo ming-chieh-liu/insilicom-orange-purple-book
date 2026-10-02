@@ -187,6 +187,53 @@ def test_an_unopenable_pdf_is_reported_not_raised(tmp_path: Path) -> None:
     assert label_pdf.read_pdf(broken) is None
 
 
+def test_extracted_text_is_stored_and_reused(tmp_path: Path,
+                                            monkeypatch: pytest.MonkeyPatch) -> None:
+    """S4 processing fixes must not pay the PDF extraction again."""
+    pdf = tmp_path / "a.pdf"
+    pdf.write_bytes(b"%PDF fake")
+    calls: list[Path] = []
+
+    def extract(path: Path) -> tuple[str, int, int] | None:
+        calls.append(path)
+        return ("14 CLINICAL STUDIES", 3, path.stat().st_size)
+
+    monkeypatch.setattr(label_pdf, "_extract_uncached", extract)
+    first = label_pdf.extract_text(pdf)
+    assert label_pdf.extract_text(pdf) == first == ("14 CLINICAL STUDIES", 3, 9)
+    assert len(calls) == 1 and label_pdf.text_path(pdf).is_file()
+    # A different file (size) or a new extractor version extracts again.
+    pdf.write_bytes(b"%PDF fake, longer")
+    label_pdf.extract_text(pdf)
+    monkeypatch.setattr(label_pdf, "EXTRACTOR_VERSION", label_pdf.EXTRACTOR_VERSION + 1)
+    label_pdf.extract_text(pdf)
+    label_pdf.extract_text(pdf)
+    assert len(calls) == 3
+
+
+def test_an_unreadable_pdf_is_remembered(tmp_path: Path,
+                                         monkeypatch: pytest.MonkeyPatch) -> None:
+    pdf = tmp_path / "b.pdf"
+    pdf.write_bytes(b"x")
+    calls: list[Path] = []
+    monkeypatch.setattr(label_pdf, "_extract_uncached",
+                        lambda path: calls.append(path))
+    assert label_pdf.extract_text(pdf) is None and label_pdf.extract_text(pdf) is None
+    assert len(calls) == 1
+
+
+def test_a_store_that_cannot_be_written_or_read_costs_only_time(
+        tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    pdf = tmp_path / "c.pdf"
+    pdf.write_bytes(b"x")
+    label_pdf.text_path(pdf).write_bytes(b"not gzip")
+    monkeypatch.setattr(label_pdf, "_extract_uncached", lambda path: ("t", 1, 1))
+    monkeypatch.setattr(label_pdf.os, "replace", lambda a, b: (_ for _ in ()).throw(OSError("ro")))
+    assert label_pdf.extract_text(pdf) == ("t", 1, 1)
+    assert not list(tmp_path.glob("*.part"))
+    assert label_pdf.extract_text(tmp_path / "missing.pdf") is None
+
+
 @pytest.mark.parametrize(
     ("text", "expected"),
     [("", True), ("x" * 99, True), ("x" * 5_000, False)],

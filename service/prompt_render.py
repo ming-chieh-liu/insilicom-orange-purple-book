@@ -9,7 +9,10 @@ receives must already be complete. This module does the substitution in code:
 * the template is read **verbatim** from ``docs/prompts/<name>.md`` (the
   ``text`` block under ``## The prompt``), and its ``**Version:**`` must equal the
   version the code stamps on answers — a mismatch refuses to render rather than
-  judging under one version and recording another;
+  judging under one version and recording another. The two role prompts
+  (``review-trial-role``, ``label-trial-role``) are renderings of one template,
+  ``fda-document-trial-role.md`` (D46): its ``[[slot]]`` lines are filled for the
+  document, and each rendering keeps the name and version in its table;
 * every ``{{field}}`` is filled in a single pass from the stored unit (a value
   that itself contains ``{{…}}`` is never expanded), and a placeholder with no
   value refuses to render — a blank field would be judged as "not stated";
@@ -36,6 +39,14 @@ from service import candidate_match, identification
 PROMPTS_DIR = Path("docs/prompts")
 
 _VERSION = re.compile(r"\*\*Version:\*\*\s*(\d+)")
+
+#: The one template both role prompts render from (D46).
+ROLE_TEMPLATE = "fda-document-trial-role"
+_RENDERING = re.compile(r"^\|\s*([\w-]+)\s*\|\s*(\w+)\s*\|\s*(\d+)\s*\|\s*$", re.M)
+_SLOT = re.compile(
+    r"^### (\w+)\n\n#### review\n\n```text\n(.*?)\n```\n\n#### label\n\n```text\n(.*?)\n```",
+    re.M | re.S)
+_SLOT_LINE = re.compile(r"^\[\[(\w+)\]\]$", re.M)
 _FIELD = re.compile(r"\{\{(\w+)\}\}")
 _REPLY_LINE = re.compile(r"^(NCT\d{8})\s*=\s*(Yes|No)$")
 
@@ -68,12 +79,48 @@ class Rendered(NamedTuple):
     expects: tuple[str, ...] = ()
 
 
+def _text_block(doc: str, path: Path, heading: str) -> str:
+    _, _, after = doc.partition(heading)
+    _, fence, body = after.partition("```text\n")
+    if not fence:
+        raise RenderError(f"{path}: no ```text block under '{heading}'")
+    text, closed, _ = body.partition("\n```")
+    if not closed:
+        raise RenderError(f"{path}: the ```text block under '{heading}' is not closed")
+    return text
+
+
+def rendered_role(name: str, prompts_dir: Path = PROMPTS_DIR) -> Template | None:
+    """``name`` rendered from the role template, or None when the template does
+    not list it (D46). Raises :class:`RenderError` on a slot the template does
+    not define."""
+    path = prompts_dir / f"{ROLE_TEMPLATE}.md"
+    if not path.is_file():
+        return None
+    doc = path.read_text(encoding="utf-8")
+    renderings = {m.group(1): (m.group(2), int(m.group(3))) for m in _RENDERING.finditer(doc)}
+    if name not in renderings:
+        return None
+    document, version = renderings[name]
+    slots = {m.group(1): {"review": m.group(2), "label": m.group(3)} for m in _SLOT.finditer(doc)}
+    template = _text_block(doc, path, "## The template")
+    missing = [m for m in _SLOT_LINE.findall(template) if document not in slots.get(m, {})]
+    if missing:
+        raise RenderError(f"{path}: slot {missing[0]!r} has no {document} text")
+    return Template(name, version,
+                    _SLOT_LINE.sub(lambda m: slots[m.group(1)][document], template))
+
+
 def load(name: str, prompts_dir: Path = PROMPTS_DIR) -> Template:
-    """The template ``name`` exactly as written in its prompt file.
+    """The template ``name`` exactly as written in its prompt file, or as the
+    role template renders it (:func:`rendered_role`).
 
     Raises :class:`RenderError` when the file, its version line or its
     ``text`` block under ``## The prompt`` is missing.
     """
+    role = rendered_role(name, prompts_dir)
+    if role is not None:
+        return role
     path = prompts_dir / f"{name}.md"
     if not path.is_file():
         raise RenderError(f"{path}: no such prompt")
@@ -81,14 +128,7 @@ def load(name: str, prompts_dir: Path = PROMPTS_DIR) -> Template:
     version = _VERSION.search(doc)
     if version is None:
         raise RenderError(f"{path}: no **Version:** line")
-    _, _, after = doc.partition("## The prompt")
-    _, fence, body = after.partition("```text\n")
-    if not fence:
-        raise RenderError(f"{path}: no ```text block under '## The prompt'")
-    text, closed, _ = body.partition("\n```")
-    if not closed:
-        raise RenderError(f"{path}: the prompt's ```text block is not closed")
-    return Template(name, int(version.group(1)), text)
+    return Template(name, int(version.group(1)), _text_block(doc, path, "## The prompt"))
 
 
 def fill(template: Template, values: Mapping[str, object]) -> str:
@@ -244,11 +284,13 @@ def read_requests(path: Path) -> list[Rendered]:
 
 __all__ = [
     "PROMPTS_DIR",
+    "ROLE_TEMPLATE",
     "RenderError",
     "Rendered",
     "Template",
     "fill",
     "load",
+    "rendered_role",
     "read_requests",
     "render_tier",
     "render_tier_batch",

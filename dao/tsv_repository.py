@@ -20,6 +20,7 @@ went.
 
 from __future__ import annotations
 
+import csv
 from collections.abc import Iterable, Sequence
 from pathlib import Path
 from typing import NamedTuple
@@ -38,7 +39,7 @@ FORBIDDEN: tuple[str, ...] = ("\t", "\n", "\r")
 
 
 class TsvRepository:
-    """Write named tables into one directory."""
+    """Write, and read back, named tables in one directory."""
 
     def __init__(self, out_dir: str | Path) -> None:
         self._out_dir = Path(out_dir)
@@ -78,6 +79,15 @@ class TsvRepository:
                 count += 1
         _log.info("wrote %s (%d rows)", path, count)
         return count
+
+    def load(self, name: str) -> list[dict[str, str]]:
+        """One table's rows as ``{column: value}``; an absent table is empty."""
+        path = self.path_for(name)
+        if not path.is_file():
+            _log.warning("%s: no such table", path)
+            return []
+        with path.open(encoding="utf-8", newline="") as handle:
+            return list(csv.DictReader(handle, delimiter=DELIMITER, quoting=csv.QUOTE_NONE))
 
 
 __all__ = ["DELIMITER", "FORBIDDEN", "TsvRepository"]

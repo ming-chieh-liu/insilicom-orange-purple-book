@@ -255,42 +255,8 @@ def tier_for(
     return TIER_STATED if evidence_source in DIRECT_SOURCES else TIER_JUDGED
 
 
-#: The one polarity verdict that means the label presents a trial as evidence.
-#: Everything else -- ``NOT_SUPPORTING`` in v2, ``NEGATIVE`` and ``UNCLEAR`` in
-#: v1 -- means it does not.
-SUPPORTING: str = "SUPPORTING"
-
-
-def refuted_pairs(path: Path) -> set[tuple[str, str]]:
-    """``(nct_id, application)`` pairs section 14 does not present as evidence.
-
-    **The OR rule, from the section-14 runbook.** A trial discussed in several
-    subsections yields several verdicts, and if *any* says SUPPORTING the pair
-    is supporting: Tyvaso cites one trial as both its pivotal study and its
-    durability follow-up, and a judge may reasonably call the second
-    not-supporting while the first plainly supports. A pair is refuted only
-    when **every** verdict on it is unsupportive; a pair with no verdict is
-    left alone, because unjudged is not refuted.
-
-    **Known limitation.** These verdicts were made against openFDA's
-    *current-snapshot* labels, at application grain, while the links they
-    filter come from *per-submission* labels. Section 14 is cumulative and
-    pruned, so a trial pivotal in 2015 can appear under a "lack of efficacy"
-    heading today -- and this would then drop a correct 2015 link on the
-    strength of a 2026 reading. Measured coverage is 2,005 of 2,293 pairs; how
-    often the two readings disagree is not measured and would need the era
-    labels judged separately.
-    """
-    supporting: set[tuple[str, str]] = set()
-    against: set[tuple[str, str]] = set()
-    for row in identification.iter_json_lines(path):
-        nct = str(row.get("nct_id") or "")
-        application = str(row.get("application") or "")
-        if not nct or not application:
-            continue
-        target = supporting if row.get("final") == SUPPORTING else against
-        target.add((nct, application))
-    return against - supporting
+#: Unlinked reason of a label-stated trial whose S6 role is not decided yet (D46).
+LABEL_ROLE_PENDING = "label_role_pending"
 
 
 def _submission_sort(number: str) -> tuple[int, str]:
@@ -370,7 +336,7 @@ __all__ = [
     "add_conflict",
     "chosen_indications",
     "indication_mismatches",
-    "refuted_pairs",
+    "LABEL_ROLE_PENDING",
     "review_judgements",
     "tier_for",
 ]
@@ -389,7 +355,7 @@ class AssembleReport(NamedTuple):
     review_context: tuple[ReviewContext, ...] = ()
     attribution_moved: int = 0
     by_conflict: tuple[tuple[str, int], ...] = ()
-    #: Label links with no D28 role yet; the old polarity verdict filtered them.
+    #: Label-stated trials held back until S6 decides their role (D46).
     label_role_missing: int = 0
 
     @property
@@ -487,13 +453,13 @@ def review_judgements(adjudication_dir: Path) -> list[tuple[str, str, str, str]]
     return out
 
 
-def build(out_dir: Path, adjudication_dir: Path, *,
-          apply_label_roles: bool = True) -> AssembleReport:
+def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     """Join the candidate units, the verdicts and the spine into the map.
 
-    ``apply_label_roles=False`` skips every support filter on label links — the
-    D28 role and the old polarity verdict alike — and is how D28's units are
-    built: every link P5 would make, judged where it is attributed.
+    D46: a trial an FDA document names by an exact id links only on a linking
+    S6 role — a label-stated NCT on its label role, a label name matching a
+    review id on the review's role; a trial S9 identified (routes B, C, D) has
+    no role check.
     """
     from collections import Counter
 
@@ -511,15 +477,9 @@ def build(out_dir: Path, adjudication_dir: Path, *,
 
     def group(application: str) -> str:
         return moiety_of.get(application, application)
-    # Section-14 polarity: trials the label cites but does not present as
-    # evidence. The fenofibrate label discusses ACCORD Lipid under a heading
-    # reading "Lack of Efficacy in Cardiovascular Outcomes Trials"; a regex
-    # sees a trial id, and only a reader sees that it failed.
-    refuted = refuted_pairs(adjudication_dir / "verdicts.jsonl")
-    # D28: the role each label link plays in its own submission's label. Where
-    # it exists it replaces the polarity verdict above, which read today's
-    # label per application; the old verdict is the fallback until D28 has
-    # judged every link.
+    # D46: the S6 role of each label-stated trial, judged on its earliest
+    # submission's own section 14. (The old application-grain polarity verdicts
+    # and the post-S9 label-role pass are gone.)
     label_roles = label_role.read_roles(adjudication_dir / "label_role_verdicts.jsonl")
     # Which MeSH ids were reached only by stripping a biologic suffix. Read
     # from drug_map rather than recomputed, so P5 and P3 cannot disagree about
@@ -588,6 +548,10 @@ def build(out_dir: Path, adjudication_dir: Path, *,
     # as appearing at that review's submission, so whichever route saw it
     # first decides where the link goes.
     judged_reviews = review_judgements(adjudication_dir)
+    review_roles_of: dict[tuple[str, str], set[str]] = {}
+    for review_key, review_nct, review_role_name, _ in judged_reviews:
+        review_roles_of.setdefault((review_key.split("|", 1)[0], review_nct), set()).add(
+            review_role_name)
     review_links = [
         (key, nct, protocol) for key, nct, role, protocol in judged_reviews
         if role in review_role.LINKING and key in spine
@@ -745,15 +709,17 @@ def build(out_dir: Path, adjudication_dir: Path, *,
         )
         route = routes.get(str(unit.get("unit_id") or ""), "") if source == "label_description" else ""
 
-        role = label_roles.get((key, nct))
-        if not apply_label_roles:
-            rejection = ""
-        elif role is not None:
-            rejection = "" if role in review_role.LINKING else f"label_role_{role.lower()}"
-        elif (nct, str(unit["application"])) in refuted:
-            rejection = "judged_not_supporting"
-        else:
-            rejection = ""
+        if source == "label_description":
+            rejection = ""  # D46: a trial S9 identified has no role check
+        elif source == "label_nct":
+            role = label_roles.get((key, nct))
+            rejection = ("" if role in review_role.LINKING
+                         else f"label_role_{role.lower()}" if role else LABEL_ROLE_PENDING)
+        else:  # review_name_match: the review named it by id; its S6 role decides
+            named_roles = review_roles_of.get((str(unit["application"]), nct), set())
+            rejection = ("" if named_roles & review_role.LINKING
+                         else f"review_role_{sorted(named_roles)[0].lower()}" if named_roles
+                         else LABEL_ROLE_PENDING)
         if rejection:
             label_rejected.add((nct, key))
             unlinked.append(
@@ -925,8 +891,9 @@ def build(out_dir: Path, adjudication_dir: Path, *,
 
     # D29 role_disagrees: the label route links a trial the same submission's
     # review judged as *not* evidence for it (FAILED, NOT_FOR_THIS_APPROVAL…),
-    # or the review links one the label side rejected (D28 role, else old polarity). Either way
-    # the row stays, but not at tier A until someone resolves it.
+    # or the review links one the label's S6 role rejected. D46: the trial links
+    # if either FDA document's verdict is linking, keeps its tier, and carries
+    # the flag.
     non_linking = {(key, nct) for key, nct, role, _ in judged_reviews
                    if role not in review_role.LINKING}
     mismatched = indication_mismatches(out_dir)
@@ -947,9 +914,8 @@ def build(out_dir: Path, adjudication_dir: Path, *,
             conflict = add_conflict(conflict, ROLE_DISAGREES)
         if key in mismatched:
             conflict = add_conflict(conflict, INDICATION_MISMATCH)
-        tier = TIER_JUDGED if ROLE_DISAGREES in conflict.split(";") else link.evidence_tier
-        if (conflict, tier) != (link.conflict, link.evidence_tier):
-            links[i] = link._replace(conflict=conflict, evidence_tier=tier)
+        if conflict != link.conflict:
+            links[i] = link._replace(conflict=conflict)
 
     # Only submissions that produced **no unit at all** get a catch-all row.
     # A submission whose units each failed for a stated reason is already
@@ -992,12 +958,7 @@ def build(out_dir: Path, adjudication_dir: Path, *,
         attribution_moved=sum(
             1 for link in links if ATTRIBUTION_MOVED in link.conflict.split(";")
         ),
-        label_role_missing=sum(
-            1 for link in links
-            if set(link.sources.split(";")) & label_role.LABEL_SOURCES
-            and (f"{link.application}|{link.submission_type}|{link.submission_no}",
-                 link.nct_id) not in label_roles
-        ),
+        label_role_missing=sum(1 for row in unlinked if row.reason == LABEL_ROLE_PENDING),
         by_conflict=tuple(Counter(
             part for link in links for part in link.conflict.split(";") if part
         ).most_common()),
@@ -1071,7 +1032,7 @@ def render(report: AssembleReport) -> str:
         f"  links                                    {len(report.links):>9,}",
         f"    attribution moved between routes (D16) {report.attribution_moved:>9,}",
         f"  review-named trials kept as context      {len(report.review_context):>9,}",
-        f"  label links without a D28 role yet       {report.label_role_missing:>9,}",
+        f"  label-stated trials awaiting S6 role     {report.label_role_missing:>9,}",
         "",
         "  by evidence tier:",
     ]

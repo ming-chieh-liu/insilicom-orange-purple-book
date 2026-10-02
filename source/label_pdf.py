@@ -23,7 +23,10 @@ detected, counted and skipped.
 
 from __future__ import annotations
 
+import gzip
 import hashlib
+import json
+import os
 import urllib.error
 import urllib.request
 from collections.abc import Iterator
@@ -201,15 +204,57 @@ def fetch(url: str, root: Path) -> Path | None:
     return fetch_status(url, root)[0]
 
 
-def extract_text(path: Path) -> tuple[str, int, int] | None:
-    """``(text, pages, size)`` for one PDF, or ``None`` if it cannot be opened.
+#: Bumped whenever :func:`_extract_uncached` changes what it returns, so every
+#: stored text is re-extracted once; a processing fix (sections, cleanup, trial
+#: names) never needs it.
+EXTRACTOR_VERSION: int = 1
 
-    Split out from :func:`read_pdf` so it can run in a process pool: it takes a
-    path and returns plain data, both of which pickle. Parsing is where the
-    time goes — measured at ~3.7 s per label against a download that is already
-    threaded — and pdfplumber releases no GIL worth sharing, so processes are
-    the only thing that helps.
+
+def text_path(path: Path) -> Path:
+    """Where a PDF's extracted text is stored, beside the PDF.
+
+    >>> text_path(Path("/c/ab.pdf")).name
+    'ab.pdf.txt.gz'
     """
+    return path.with_name(path.name + ".txt.gz")
+
+
+def _stored_text(path: Path, size: int) -> tuple[bool, tuple[str, int, int] | None]:
+    """``(hit, result)`` from the stored text, a hit only when it was extracted
+    from a file of this size by this extractor version."""
+    stored = text_path(path)
+    try:
+        with gzip.open(stored, "rt", encoding="utf-8") as handle:
+            record = json.load(handle)
+    except (OSError, ValueError):
+        return False, None
+    if record.get("version") != EXTRACTOR_VERSION or record.get("size") != size:
+        return False, None
+    if record.get("unreadable"):
+        return True, None
+    return True, (str(record["text"]), int(record["pages"]), size)
+
+
+def _store_text(path: Path, size: int, got: tuple[str, int, int] | None) -> None:
+    """Write the extraction beside the PDF, atomically, so a parallel reader
+    never sees half a file. A store that cannot be written costs only time."""
+    record: dict[str, object] = {"version": EXTRACTOR_VERSION, "size": size}
+    if got is None:
+        record["unreadable"] = True
+    else:
+        record.update(text=got[0], pages=got[1])
+    stored = text_path(path)
+    partial = stored.with_name(f"{stored.name}.{os.getpid()}.part")
+    try:
+        with gzip.open(partial, "wt", encoding="utf-8") as handle:
+            json.dump(record, handle, ensure_ascii=False)
+        os.replace(partial, stored)
+    except OSError as error:
+        _log.warning("%s: text not stored (%s)", stored.name, error)
+        partial.unlink(missing_ok=True)
+
+
+def _extract_uncached(path: Path) -> tuple[str, int, int] | None:
     import pdfplumber
 
     try:
@@ -220,6 +265,35 @@ def extract_text(path: Path) -> tuple[str, int, int] | None:
         _log.warning("%s: unreadable (%s)", path.name, error)
         return None
     return text, pages, path.stat().st_size
+
+
+def extract_text(path: Path) -> tuple[str, int, int] | None:
+    """``(text, pages, size)`` for one PDF, or ``None`` if it cannot be opened.
+
+    Split out from :func:`read_pdf` so it can run in a process pool: it takes a
+    path and returns plain data, both of which pickle. Parsing is where the
+    time goes — measured at ~3.7 s per label against a download that is already
+    threaded — and pdfplumber releases no GIL worth sharing, so processes are
+    the only thing that helps.
+
+    **The text is extracted once and stored beside the PDF** (:func:`text_path`,
+    2026-10-02). S4's readers (labels, letters, reviews) all come through here,
+    and every fix to what they do with the text used to cost the full
+    extraction again — ~18 minutes for the labels. A stored text is used only
+    if it came from a file of the same size under the same
+    :data:`EXTRACTOR_VERSION`; an unreadable PDF is remembered as such.
+    """
+    try:
+        size = path.stat().st_size
+    except OSError as error:
+        _log.warning("%s: unreadable (%s)", path.name, error)
+        return None
+    hit, got = _stored_text(path, size)
+    if hit:
+        return got
+    got = _extract_uncached(path)
+    _store_text(path, size, got)
+    return got
 
 
 def read_pdf(path: Path, url: str = "") -> FetchedLabel | None:
@@ -250,7 +324,9 @@ __all__ = [
     "LabelDocument",
     "as_https",
     "cache_path",
+    "EXTRACTOR_VERSION",
     "extract_text",
+    "text_path",
     "fetch",
     "fetch_status",
     "is_cached",
