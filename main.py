@@ -234,11 +234,18 @@ def build_parser() -> argparse.ArgumentParser:
         "never comes) is sent again in the same run, as a fresh job",
     )
     parser.add_argument(
+        "--max-chars",
+        type=int,
+        default=prompt_render.JOB_CHARS,
+        help="render-prompts --task match --per-job N: a job stops growing at this many "
+        "characters (a longer tier goes alone)",
+    )
+    parser.add_argument(
         "--per-job",
         type=int,
         default=1,
-        help="render-prompts, role tasks: role units per pool job (role-case-batch "
-        "wrapper); written to <batch>.requests-x<N>.jsonl",
+        help="render-prompts: role units (role-case-batch) or S9 tiers (tier-case-batch) "
+        "per pool job; written to <batch>.requests-x<N>.jsonl",
     )
     parser.add_argument(
         "--requests",
@@ -798,9 +805,12 @@ def main(argv: list[str] | None = None) -> int:
             print(f"not rendered: {error}")
             return 1
         out = batch.with_suffix(".requests.jsonl")
-        if args.per_job > 1 and args.task != "match":
+        if args.per_job > 1:
             try:
-                rendered = prompt_render.group_role_requests(rendered, args.per_job)
+                rendered = (prompt_render.group_tier_requests(rendered, args.per_job,
+                                                              args.max_chars)
+                            if args.task == "match"
+                            else prompt_render.group_role_requests(rendered, args.per_job))
             except prompt_render.RenderError as error:
                 print(f"not rendered: {error}")
                 return 1
@@ -917,7 +927,7 @@ def main(argv: list[str] | None = None) -> int:
         # D46 (2026-10-02): so does one whose label states such a trial's NCT.
         linking_reviews = [
             (key, nct) for key, nct, role, _protocol
-            in assemble.review_judgements(Path(args.adjudication))
+            in review_role.review_judgements(Path(args.adjudication))
             if role in review_role.LINKING
         ]
         linking_labels = [

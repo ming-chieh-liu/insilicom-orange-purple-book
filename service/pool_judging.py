@@ -88,7 +88,10 @@ def answered_ids(raw_file: Path, requests: Iterable[prompt_render.Rendered]) -> 
             roles.add(role["unit"])
     done: set[str] = set()
     for request in requests:
-        if is_role(request.prompt):
+        if request.cases:
+            if all(set(ncts) <= tiers.get(tier_id, set()) for tier_id, ncts in request.cases):
+                done.add(request.request_id)
+        elif is_role(request.prompt):
             if set(request.expects or (request.request_id,)) <= roles:
                 done.add(request.request_id)
         elif set(request.expects) <= tiers.get(request.request_id, set()):
@@ -130,7 +133,9 @@ def judge(requests: list[prompt_render.Rendered], pool: Pool, raw_file: Path,
         reply = pool.run(request.text)
         lines: list[str] | None = None
         if reply.text:
-            if is_role(request.prompt) and request.expects:
+            if request.cases:
+                lines = prompt_render.tier_batch_reply_lines(request, reply.text)
+            elif is_role(request.prompt) and request.expects:
                 lines = prompt_render.role_batch_reply_lines(request, reply.text, ROLES)
             elif is_role(request.prompt):
                 line = prompt_render.role_reply_line(request, reply.text, ROLES)

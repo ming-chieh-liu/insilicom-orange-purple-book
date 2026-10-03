@@ -148,6 +148,41 @@ $PY main.py --mode pool-judge --judge C --requests $ADJ/candidate_match_tiebreak
 A tiebreak judge gets the same message plus the `"<tier_id> | <nct>"` lines it must answer, and
 answers only those candidates.
 
+### Several tiers per job, by rounds (2026-10-02)
+
+The full run sends **up to 5 tiers per pool job, about 100,000 characters at most** (a longer tier
+goes alone): `render-prompts --task match --per-job 5 [--max-chars 100000]` writes
+`<batch>.requests-x5.jsonl`, each job the `tier-case-batch` wrapper
+(`docs/prompts/tier-case-batch.md` v1) around the tiers' own prompts **verbatim**, numbered CASE
+1–n. The stop rule is per unit and each round batches at most one tier per unit, so the tiers in a
+job are independent; the packer also refuses two tiers of one unit in a job. A reply counts only if
+every candidate of every case is answered exactly once (`CASE n | NCT… = Yes|No`,
+`prompt_render.tier_batch_reply_lines`); otherwise nothing in the job is recorded and `pool-judge`
+re-sends it as a fresh job up to `--retries` (default 2) times. Judges A, B and C stay separate
+jobs; `match-combine` pairs them and lists disagreements, and the third judge receives the whole
+tier of each disagreed candidate, also packed 5 per job.
+
+One round, for each case set (`--case B`, `--case CD`, the same `--limit` every round):
+
+```bash
+$PY main.py --mode match-prepare --case B  [--limit N]   # writes candidate_match_batches/round-NN/
+$PY main.py --mode match-prepare --case CD [--limit N]
+cat <this round's *.ids> > <round>/all.ids
+$PY main.py --mode render-prompts --task match --per-job 5 --batch <round>/all.ids
+$PY main.py --mode pool-judge --judge A --requests <round>/all.requests-x5.jsonl \
+    --raw-file adjudication/candidate_match_raw/<round>/all-A.txt     # and --judge B, in parallel
+$PY main.py --mode match-combine                                      # two judges (D40)
+$PY main.py --mode render-prompts --task match --per-job 5 \
+    --batch adjudication/candidate_match_tiebreak_needed.txt           # if any
+$PY main.py --mode pool-judge --judge C --requests <…>.requests-x5.jsonl \
+    --raw-file adjudication/candidate_match_raw/<round>/tiebreak-C.txt
+$PY main.py --mode match-combine
+$PY main.py --mode match-record --case B [--limit N]; … --case CD [--limit N]
+```
+
+Repeat until `match-prepare` writes no batch for either case set. Most units are decided in round 1
+or 2. Literature v4 (2026-10-02) shows each abstract up to 4,500 characters (was 2,500).
+
 ## Answers are bound to what the judge saw (2026-09-30)
 
 A tier id carries a digest of every field its prompt shows the judge, and the prompt version:

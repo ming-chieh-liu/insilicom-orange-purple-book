@@ -17,7 +17,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from service import role_judging
+from service import judging, role_judging
 from service.role_judging import LINKING, ROLES, RoleReport, pair
 
 PROMPT_VERSION: int = 2
@@ -56,7 +56,28 @@ def render(report: RoleReport) -> str:
         report, "Review-trial roles (docs/runbooks/review-trial-role.md)", PROMPT_VERSION)
 
 
+
+def review_judgements(adjudication_dir: Path) -> list[tuple[str, str, str, str]]:
+    """``(submission key, nct, role, protocol id)`` for every review-route unit
+    decided under the current role prompt (D26, D27). Read by S8 (routing) and
+    S10 (assembly); kept here, with the task, so S8 imports no S9/S10 code."""
+    protocol = {
+        str(u["unit_id"]): str(u.get("protocol_id") or "")
+        for u in judging.read_jsonl(adjudication_dir / "review_role_units.jsonl")
+    }
+    out: list[tuple[str, str, str, str]] = []
+    for unit_id, row in judging.recorded(adjudication_dir / "review_role_verdicts.jsonl").items():
+        if row.get("prompt_version") != PROMPT_VERSION:
+            continue
+        role = str(row.get("final") or "")
+        if role not in ROLES or unit_id.count("|") != 3:
+            continue
+        key, nct = unit_id.rsplit("|", 1)
+        out.append((key, nct, role, protocol.get(unit_id, "")))
+    return out
+
 __all__ = [
+    "review_judgements",
     "CALIBRATION",
     "LINKING",
     "PROMPT_VERSION",

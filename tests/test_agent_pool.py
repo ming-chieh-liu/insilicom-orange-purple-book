@@ -228,6 +228,20 @@ def test_a_bad_reply_is_sent_again_until_valid_or_out_of_retries(tmp_path: Path)
     assert (none.resent, none.failed) == (0, 3)
 
 
+def test_a_several_tier_job_records_every_candidate_or_none(tmp_path: Path) -> None:
+    cases = (("U1#T1@a", ("NCT00000001", "NCT00000002")), ("U2#T1@b", ("NCT00000003",)))
+    jobs = [pr.Rendered("U1#T1@a+2", pr.TIER_BATCH, 1, "j1", (), cases)]
+    raw = tmp_path / "round-01" / "batch-001-B.txt"
+    pool = _SequencePool({"j1": ["CASE 1 | NCT00000001 = Yes\nCASE 2 | NCT00000003 = No",
+                                 "CASE 1 | NCT00000001 = Yes\nCASE 1 | NCT00000002 = No\n"
+                                 "CASE 2 | NCT00000003 = No"]})
+    report = pj.judge(jobs, pool, raw, "B", 1)
+    assert (report.answered, report.resent) == (1, 1)
+    assert raw.read_text().splitlines() == [
+        "U1#T1@a | NCT00000001 = Yes", "U1#T1@a | NCT00000002 = No", "U2#T1@b | NCT00000003 = No"]
+    assert pj.answered_ids(raw, jobs) == {"U1#T1@a+2"}
+
+
 def test_the_tiebreak_list_renders_each_tier_once(tmp_path: Path) -> None:
     tiers = tmp_path / "tiers.jsonl"
     tier = cm.TierUnit("U#T1@abc", "U", 1, "approval", "excerpt", "name", "616",

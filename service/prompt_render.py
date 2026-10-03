@@ -55,6 +55,14 @@ CASE_BATCH = "role-case-batch"
 CASE_BATCH_VERSION: int = 1
 _CASE_LINE = re.compile(r"^CASE\s+(\d+)\s*=\s*([A-Z_]+)$")
 
+#: The wrapper that puts several S9 tiers in one pool job, and its version.
+TIER_BATCH = "tier-case-batch"
+TIER_BATCH_VERSION: int = 1
+#: Tiers per job, and the size a job stops growing at (characters).
+TIERS_PER_JOB: int = 5
+JOB_CHARS: int = 100_000
+_TIER_CASE_LINE = re.compile(r"^CASE\s+(\d+)\s*\|\s*(NCT\d{8})\s*=\s*(Yes|No)$")
+
 
 class RenderError(ValueError):
     """A prompt that cannot be rendered faithfully; nothing is sent."""
@@ -84,6 +92,9 @@ class Rendered(NamedTuple):
     #: one unit; for several (:func:`group_role_requests`) the unit ids, in
     #: case order — case n answers ``expects[n-1]``.
     expects: tuple[str, ...] = ()
+    #: Several S9 tiers in one job (:func:`group_tier_requests`): per case,
+    #: ``(tier id, the NCT ids it must answer)``, in case order.
+    cases: tuple[tuple[str, tuple[str, ...]], ...] = ()
 
 
 def _text_block(doc: str, path: Path, heading: str) -> str:
@@ -289,6 +300,94 @@ def role_batch_reply_lines(rendered: Rendered, reply: str,
     return [f"{unit} = {answers[n]}" for n, unit in enumerate(rendered.expects, 1)]
 
 
+def _unit_of(tier_id: str) -> str:
+    """The unit a tier id belongs to (:func:`candidate_match.tier_id_for`).
+
+    >>> _unit_of("NDA1|ORIG|1|KEYNOTE-189#T2@ab12")
+    'NDA1|ORIG|1|KEYNOTE-189'
+    """
+    return tier_id.rsplit("#T", 1)[0]
+
+
+def group_tier_requests(rendered: list[Rendered], per_job: int = TIERS_PER_JOB,
+                        max_chars: int = JOB_CHARS,
+                        prompts_dir: Path = PROMPTS_DIR) -> list[Rendered]:
+    """S9 tiers packed into pool jobs inside the :data:`TIER_BATCH` wrapper,
+    each case one tier's prompt verbatim.
+
+    A job takes tiers in order until it holds ``per_job`` of them or the next
+    would push it past ``max_chars``; a tier longer than that goes alone. A job
+    never holds two tiers of one unit — a unit's tiers depend on each other
+    (the stop rule), different units' never do.
+
+    >>> t = [Rendered(f"U{i}#T1@x", "trial-candidate-match", 4, "p" * n, ("NCT00000001",))
+    ...      for i, n in ((1, 40), (2, 40), (3, 40))]
+    >>> [(j.request_id, len(j.cases)) for j in group_tier_requests(t, 5, 2_000)]
+    [('U1#T1@x+3', 3)]
+    >>> [len(j.cases) for j in group_tier_requests(t, 2, 2_000)]
+    [2, 1]
+    """
+    if per_job < 1:
+        raise RenderError(f"per_job must be at least 1, not {per_job}")
+    wrapper = _checked(TIER_BATCH, TIER_BATCH_VERSION, prompts_dir)
+    if any(r.prompt not in candidate_match.PROMPT_VERSIONS or not r.expects for r in rendered):
+        raise RenderError("only one-tier matching requests can be grouped")
+    jobs: list[Rendered] = []
+    group: list[Rendered] = []
+
+    def flush() -> None:
+        if not group:
+            return
+        cases = "\n\n".join(f"=== CASE {n} ===\n{r.text}\n=== END OF CASE {n} ==="
+                             for n, r in enumerate(group, 1))
+        jobs.append(Rendered(f"{group[0].request_id}+{len(group)}", TIER_BATCH,
+                             TIER_BATCH_VERSION,
+                             fill(wrapper, {"count": len(group), "cases": cases}),
+                             (), tuple((r.request_id, r.expects) for r in group)))
+        group.clear()
+
+    for request in rendered:
+        size = sum(len(r.text) for r in group) + len(request.text)
+        if group and (len(group) >= per_job or size > max_chars
+                      or _unit_of(request.request_id) in {_unit_of(r.request_id) for r in group}):
+            flush()
+        group.append(request)
+    flush()
+    return jobs
+
+
+def tier_batch_reply_lines(rendered: Rendered, reply: str) -> list[str] | None:
+    """The raw-file lines for a several-tier reply, or ``None`` unless every
+    candidate of every case is answered exactly once, Yes or No, and nothing
+    else is written (blank lines aside).
+
+    >>> r = Rendered("T1+2", "tier-case-batch", 1, "", (),
+    ...              (("U1#T1@a", ("NCT00000001", "NCT00000002")), ("U2#T1@b", ("NCT00000003",))))
+    >>> tier_batch_reply_lines(r, "CASE 1 | NCT00000001 = Yes\\nCASE 1 | NCT00000002 = No\\n"
+    ...                           "CASE 2 | NCT00000003 = No")
+    ['U1#T1@a | NCT00000001 = Yes', 'U1#T1@a | NCT00000002 = No', 'U2#T1@b | NCT00000003 = No']
+    >>> tier_batch_reply_lines(r, "CASE 1 | NCT00000001 = Yes\\nCASE 2 | NCT00000003 = No") is None
+    True
+    """
+    answers: dict[tuple[int, str], str] = {}
+    for raw in reply.splitlines():
+        line = raw.strip()
+        if not line:
+            continue
+        match = _TIER_CASE_LINE.match(line)
+        if match is None:
+            return None
+        key = (int(match.group(1)), match.group(2))
+        if key in answers:
+            return None
+        answers[key] = match.group(3)
+    wanted = {(n, nct) for n, (_, ncts) in enumerate(rendered.cases, 1) for nct in ncts}
+    if set(answers) != wanted:
+        return None
+    return [f"{tier_id} | {nct} = {answers[(n, nct)]}"
+            for n, (tier_id, ncts) in enumerate(rendered.cases, 1) for nct in ncts]
+
+
 def _ids(batch_file: Path) -> list[str]:
     """The ids a batch file names, in order, once each.
 
@@ -334,7 +433,8 @@ def write_requests(rendered: Iterable[Rendered], path: Path) -> int:
     count = 0
     with path.open("w", encoding="utf-8") as handle:
         for item in rendered:
-            handle.write(json.dumps({**item._asdict(), "expects": list(item.expects)}) + "\n")
+            handle.write(json.dumps({**item._asdict(), "expects": list(item.expects),
+                                     "cases": [[t, list(n)] for t, n in item.cases]}) + "\n")
             count += 1
     return count
 
@@ -344,14 +444,21 @@ def read_requests(path: Path) -> list[Rendered]:
     out: list[Rendered] = []
     for row in identification.iter_json_lines(path):
         expects = row.get("expects")
+        cases = row.get("cases")
         out.append(Rendered(
             str(row["request_id"]), str(row["prompt"]), int(str(row["version"])),
             str(row["text"]),
-            tuple(str(x) for x in expects) if isinstance(expects, list) else ()))
+            tuple(str(x) for x in expects) if isinstance(expects, list) else (),
+            tuple((str(c[0]), tuple(str(n) for n in c[1])) for c in cases)
+            if isinstance(cases, list) else ()))
     return out
 
 
 __all__ = [
+    "JOB_CHARS",
+    "TIERS_PER_JOB",
+    "TIER_BATCH",
+    "TIER_BATCH_VERSION",
     "CASE_BATCH",
     "CASE_BATCH_VERSION",
     "PROMPTS_DIR",
@@ -361,6 +468,7 @@ __all__ = [
     "Template",
     "fill",
     "group_role_requests",
+    "group_tier_requests",
     "load",
     "rendered_role",
     "read_requests",
@@ -370,6 +478,7 @@ __all__ = [
     "render_unit_batch",
     "role_batch_reply_lines",
     "role_reply_line",
+    "tier_batch_reply_lines",
     "tier_reply_lines",
     "write_requests",
 ]

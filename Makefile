@@ -48,7 +48,7 @@ STEPS := \
   indication_normalize=service/indication_normalize.py,service/indications.py,service/letter_locate.py,service/approval_events.py,source/trial_studies.py,dao/ikraph2_entities.py,dao/tsv_repository.py \
   graph_trials=service/graph_trials.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/ikraph2_api.py,dao/tsv_repository.py \
   graph_links=service/graph_links.py,service/indication_normalize.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/ikraph2_api.py,dao/tsv_repository.py \
-  candidates=service/candidates.py,service/assemble.py,service/review_role.py,service/registry_identity.py,source/mesh_descriptors.py,source/unii_bridge.py,source/unii_mesh.py,source/sponsor_families.py,dao/tsv_repository.py \
+  candidates=service/candidates.py,service/review_role.py,service/registry_identity.py,source/mesh_descriptors.py,source/unii_bridge.py,source/unii_mesh.py,source/sponsor_families.py,dao/tsv_repository.py \
   assemble=service/assemble.py,service/candidates.py,service/candidate_match.py,service/identification.py,service/approval_events.py,dao/tsv_repository.py
 
 # CODE_<step>: the step's entry modules (what main.py calls for that --mode)

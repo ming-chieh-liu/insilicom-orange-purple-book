@@ -337,7 +337,6 @@ __all__ = [
     "chosen_indications",
     "indication_mismatches",
     "LABEL_ROLE_PENDING",
-    "review_judgements",
     "tier_for",
 ]
 
@@ -434,25 +433,6 @@ def chosen_indications(out_dir: Path) -> dict[str, tuple[str, str]]:
     return {key: (";".join(v), ";".join(terms[key])) for key, v in ids.items()}
 
 
-def review_judgements(adjudication_dir: Path) -> list[tuple[str, str, str, str]]:
-    """``(submission key, nct, role, protocol id)`` for every review-route unit
-    decided under the current role prompt (D26, D27)."""
-    protocol = {
-        str(u["unit_id"]): str(u.get("protocol_id") or "")
-        for u in judging.read_jsonl(adjudication_dir / "review_role_units.jsonl")
-    }
-    out: list[tuple[str, str, str, str]] = []
-    for unit_id, row in judging.recorded(adjudication_dir / "review_role_verdicts.jsonl").items():
-        if row.get("prompt_version") != review_role.PROMPT_VERSION:
-            continue
-        role = str(row.get("final") or "")
-        if role not in review_role.ROLES or unit_id.count("|") != 3:
-            continue
-        key, nct = unit_id.rsplit("|", 1)
-        out.append((key, nct, role, protocol.get(unit_id, "")))
-    return out
-
-
 def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     """Join the candidate units, the verdicts and the spine into the map.
 
@@ -547,7 +527,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     # D16 across routes (D26): a trial a review names in a linking role counts
     # as appearing at that review's submission, so whichever route saw it
     # first decides where the link goes.
-    judged_reviews = review_judgements(adjudication_dir)
+    judged_reviews = review_role.review_judgements(adjudication_dir)
     review_roles_of: dict[tuple[str, str], set[str]] = {}
     for review_key, review_nct, review_role_name, _ in judged_reviews:
         review_roles_of.setdefault((review_key.split("|", 1)[0], review_nct), set()).add(

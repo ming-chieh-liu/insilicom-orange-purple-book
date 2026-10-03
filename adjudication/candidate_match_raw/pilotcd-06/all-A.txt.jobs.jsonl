@@ -1,0 +1,2 @@
+{"request_id": "NDA019910|SUPPL|18|indication#T6@02782202c770+4", "judge": "A", "prompt": "tier-case-batch", "version": 1, "job_id": 30257, "status": "done", "outcome": "answered", "error": "", "cost_usd": 0.17572600000000002, "attempt": 1, "at": "2026-10-03T04:26:58+00:00"}
+{"request_id": "NDA022417|ORIG|1|indication#T6@c39fe57fdec6+5", "judge": "A", "prompt": "tier-case-batch", "version": 1, "job_id": 30259, "status": "done", "outcome": "answered", "error": "", "cost_usd": 0.223794, "attempt": 1, "at": "2026-10-03T04:26:58+00:00"}

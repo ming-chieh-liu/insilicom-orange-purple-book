@@ -7,7 +7,7 @@ from pathlib import Path
 
 import pytest
 
-from service import assemble, label_role
+from service import assemble, candidate_match, label_role
 
 
 # ---------------------------------------------------------------------------
@@ -184,7 +184,7 @@ def test_a_judged_link_with_agreeing_counts_reaches_tier_a(
                 "judge_b": "NCT02578680",
                 "tiebreak": None,
                 "final": "NCT02578680",
-                "prompt_version": 3,
+                "prompt_version": candidate_match.IDENTIFY_VERSION,
             }
         )
         + "\n",
@@ -221,7 +221,7 @@ def test_a_judged_link_whose_counts_diverge_is_demoted(
                 "judge_b": "NCT01733316",
                 "tiebreak": None,
                 "final": "NCT01733316",
-                "prompt_version": 3,
+                "prompt_version": candidate_match.IDENTIFY_VERSION,
             }
         )
         + "\n",
@@ -245,7 +245,7 @@ def test_a_judged_none_is_recorded_as_unlinked(
                 "judge_b": "NONE",
                 "tiebreak": None,
                 "final": "NONE",
-                "prompt_version": 3,
+                "prompt_version": candidate_match.IDENTIFY_VERSION,
             }
         )
         + "\n",
@@ -627,7 +627,7 @@ def test_non_linking_roles_are_context_and_v1_is_ignored(workspace: tuple[Path, 
 def _identify(adj: Path, unit_id: str, final: str) -> None:
     (adj / "identify_verdicts.jsonl").write_text(json.dumps({
         "unit_id": unit_id, "judge_a": final, "judge_b": final, "tiebreak": None,
-        "final": final, "prompt_version": 3,
+        "final": final, "prompt_version": candidate_match.IDENTIFY_VERSION,
     }) + "\n", encoding="utf-8")
 
 
@@ -814,7 +814,7 @@ def _picks(adj: Path, rows: list[tuple[str, str]]) -> None:
     with (adj / "identify_verdicts.jsonl").open("a", encoding="utf-8") as handle:
         for unit_id, nct in rows:
             handle.write(json.dumps({"unit_id": unit_id, "judge_a": nct, "judge_b": "",
-                                     "final": nct, "prompt_version": 3}) + "\n")
+                                     "final": nct, "prompt_version": candidate_match.IDENTIFY_VERSION}) + "\n")
 
 
 def test_a_case_c_pick_is_a_tier_c_link_and_a_case_d_pick_tier_d(
@@ -932,7 +932,7 @@ def test_d37_routes_become_tiers_and_an_earlier_case_pick_moves_the_trial(
     _picks(adj, [(str(early["unit_id"]), "NCT02578680")])
     with (adj / "identify_verdicts.jsonl").open("a", encoding="utf-8") as handle:
         handle.write(json.dumps({"unit_id": early["unit_id"], "judge_a": "NCT02578680",
-                                 "final": "NCT02578680", "prompt_version": 3,
+                                 "final": "NCT02578680", "prompt_version": candidate_match.IDENTIFY_VERSION,
                                  "route": "C+"}) + "\n")
     report = assemble.build(out, adj)
     [link] = report.links
