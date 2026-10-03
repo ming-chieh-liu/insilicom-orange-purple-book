@@ -496,3 +496,12 @@ def test_a_new_form_of_an_earlier_drug_is_told_to_the_no_label_judges(tmp_path: 
     assert "THIS PRODUCT" not in cm.label_block(units[1])
     cm.attach_products(units, tmp_path / "absent")   # no spine: nothing changes
     assert units[0]["copy_of"]
+
+
+def test_every_tier_field_survives_the_tiers_file(tmp_path: Path) -> None:
+    """A field read_tiers drops renders as empty, and fill refuses it."""
+    tier = cm.TierUnit(*(f"v{i}" for i in range(9)), prompt=cm.NOLABEL_PROMPT,
+                       drug="d", indication="i", approval_date="a", label_block="l",
+                       product="p")._replace(tier=1, candidate_ids=("NCT00000001",))
+    cm.write_tiers([tier], tmp_path / "t.jsonl")
+    assert cm.read_tiers(tmp_path / "t.jsonl") == {tier.tier_id: tier}

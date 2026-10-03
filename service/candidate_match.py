@@ -548,6 +548,7 @@ def read_tiers(path: Path) -> dict[str, TierUnit]:
             indication=str(row.get("indication") or ""),
             approval_date=str(row.get("approval_date") or ""),
             label_block=str(row.get("label_block") or ""),
+            product=str(row.get("product") or ""),
         )
     return out
 
