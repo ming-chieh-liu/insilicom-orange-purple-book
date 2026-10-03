@@ -46,10 +46,12 @@ def test_a_tier_renders_with_no_placeholder_left() -> None:
 
 def test_each_route_renders_with_its_own_prompt() -> None:
     nolabel = pr.render_tier(_tier(prompt=cm.NOLABEL_PROMPT, drug="KEYTRUDA",
-                                   indication="NSCLC", approval_date="2018-08-20"), _REAL)
+                                   indication="NSCLC", approval_date="2018-08-20",
+                                   product=cm.NOT_A_COPY), _REAL)
     literature = pr.render_tier(_tier(prompt=cm.LITERATURE_PROMPT,
                                       label_block="Section 14 says …"), _REAL)
     assert "NSCLC" in nolabel.text and "Section 14 says …" in literature.text
+    assert "THIS PRODUCT: not a new form" in nolabel.text
     assert (nolabel.version, literature.version) == (cm.NOLABEL_PROMPT_VERSION,
                                                      cm.LITERATURE_PROMPT_VERSION)
 
@@ -218,3 +220,22 @@ def test_role_requests_are_grouped_verbatim_and_the_wrapper_version_is_checked(
         encoding="utf-8")
     with pytest.raises(pr.RenderError, match="v9"):
         pr.group_role_requests(one, 2, tmp_path)
+
+
+def test_tiers_are_packed_by_size_never_two_of_one_unit_and_round_trip(tmp_path: Path) -> None:
+    def tier(unit: str, n: int, size: int) -> pr.Rendered:
+        return pr.Rendered(f"{unit}#T{n}@d", "trial-candidate-match", 4, "x" * size,
+                           ("NCT00000001", "NCT00000002"))
+    tiers = [tier("U1", 1, 100), tier("U1", 2, 100), tier("U2", 1, 900), tier("U3", 1, 5000),
+             tier("U4", 1, 100)]
+    jobs = pr.group_tier_requests(tiers, 5, 2_000)
+    assert [[c[0] for c in j.cases] for j in jobs] == [
+        ["U1#T1@d"], ["U1#T2@d", "U2#T1@d"], ["U3#T1@d"], ["U4#T1@d"]]
+    assert jobs[0].prompt == pr.TIER_BATCH and "judge 1 separate cases" in jobs[0].text
+    path = tmp_path / "r.jsonl"
+    pr.write_requests(jobs, path)
+    assert pr.read_requests(path) == jobs
+    with pytest.raises(pr.RenderError, match="one-tier"):
+        pr.group_tier_requests([pr.Rendered("U1", "label-trial-role", 2, "t")], 2)
+    with pytest.raises(pr.RenderError, match="at least 1"):
+        pr.group_tier_requests(tiers, 0)

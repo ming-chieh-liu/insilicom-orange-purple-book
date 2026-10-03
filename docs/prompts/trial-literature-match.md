@@ -1,6 +1,6 @@
 # Prompt — is this literature-named trial the evidence for an approval? (per-candidate Yes/No)
 
-**Version:** 3 · **Created:** 2026-09-30 · **v2:** 2026-10-01 (D39) · **v3:** 2026-10-01 · **In code:** 2026-10-01 (`candidate_match.LITERATURE_PROMPT`) ·
+**Version:** 4 · **Created:** 2026-09-30 · **v2:** 2026-10-01 (D39) · **v3:** 2026-10-01 · **v4:** 2026-10-02 · **In code:** 2026-10-01 (`candidate_match.LITERATURE_PROMPT`) ·
 
 
 **v3 (2026-10-01):** for B+, Section 14 may describe several trials; the candidate must match THE TRIAL IN QUESTION (named and sized below the section), and a match to a different trial there is No. With neither a name nor a size, any one trial the section describes is enough.
@@ -88,8 +88,8 @@ v3 additions (D39): `{{approval}}` gains `Drug (normalised): …` and `Indicatio
 | Field | Built from |
 |---|---|
 | `{{approval}}` | `<brand> (<generic>) · <application> <submission type> <number> · approved <date>` — the drug from S2's `drug_names.tsv`; then `Drug (normalised): …` and `Indication (normalised): …` (v2). No §14 heading on any route (2026-10-01): B+'s subsection opens with it |
-| `{{label_block}}` | **B+ (v3):** `Section 14 (Clinical Studies) of this approval's label (it may describe more than one trial):` + the §14 subsection (up to 3,000 characters), then `THE TRIAL IN QUESTION: a program read its name as: <name> (may be wrong)` and `and its size as: <count> patients (may be wrong)` · **C+:** `No description of the trial is available. Approved for: <indication text>` (prefixed as in `-nolabel.md` when it is today's label) · **D:** `No description of the trial is available. Approved for: not recorded.` |
-| `{{candidates}}` | one block per candidate: the registry fields of `trial-candidate-match.md` v2 (status and why stopped included), then `Abstracts naming this trial (<n> found, up to 3 shown):` and for each: `PMID <pmid> — <title>` and the abstract; trial reports (publication type clinical trial / RCT) first, then by PMID. **D** adds `Named in literature on: <diseases>` |
+| `{{label_block}}` | **B+ (v3):** `Section 14 (Clinical Studies) of this approval's label (it may describe more than one trial):` + the §14 subsection (up to 3,000 characters), then `THE TRIAL IN QUESTION: a program read its name as: <name> (may be wrong)` and `and its size as: <count> patients (may be wrong)` · **C+:** `No description of the trial is available. Approved for: <indication text>` (prefixed as in `-nolabel.md` when it is today's label) · **D:** `No description of the trial is available. Approved for: not recorded.` · **C+/D, 2026-10-03:** where the approval is a new dosage form or formulation of an earlier-approved molecule, a line `THIS PRODUCT: <…>. Its evidence is a trial of this product …, not the trials of the original drug.` follows (`candidate_match.attach_products`, as in `-nolabel.md` v5); B+ is unchanged, so its answers stay valid |
+| `{{candidates}}` | one block per candidate: the registry fields of `trial-candidate-match.md` v2 (status and why stopped included), then `Abstracts naming this trial (<n> found, up to 3 shown):` and for each: `PMID <pmid> — <title>` and the abstract, up to 4,500 characters (v4; 2,500 before, which cut the NCT id from 9.2% of trial–abstract pairs); trial reports (publication type clinical trial / RCT) first, then by PMID. **D** adds `Named in literature on: <diseases>` |
 
 ## Why it is worded this way
 

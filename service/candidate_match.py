@@ -32,7 +32,9 @@ from collections.abc import Iterable, Iterator
 from pathlib import Path
 from typing import NamedTuple
 
-from service import graph_links, graph_trials, identification
+import csv
+
+from service import drug_names, graph_links, graph_trials, identification
 from utility.logging import get_logger
 
 _log = get_logger(__name__)
@@ -44,7 +46,7 @@ PROMPT_VERSION: int = 4
 #: The no-label prompt (D35) — cases C and D, where there is no §14 excerpt —
 #: ``docs/prompts/trial-candidate-match-nolabel.md``, with its own version.
 NOLABEL_PROMPT: str = "trial-candidate-match-nolabel"
-NOLABEL_PROMPT_VERSION: int = 4
+NOLABEL_PROMPT_VERSION: int = 5
 #: The excerpt prompt's name, stamped beside its version.
 EXCERPT_PROMPT: str = "trial-candidate-match"
 
@@ -52,7 +54,7 @@ EXCERPT_PROMPT: str = "trial-candidate-match"
 #: literature names and are shown with their abstracts —
 #: ``docs/prompts/trial-literature-match.md``.
 LITERATURE_PROMPT: str = "trial-literature-match"
-LITERATURE_PROMPT_VERSION: int = 3
+LITERATURE_PROMPT_VERSION: int = 4
 
 #: Every prompt's current version, for stamping answers.
 PROMPT_VERSIONS: dict[str, int] = {
@@ -66,16 +68,21 @@ CURRENT_PROMPTS: frozenset[tuple[str, int]] = frozenset(PROMPT_VERSIONS.items())
 
 #: Abstracts shown per literature candidate (D37).
 ABSTRACTS_SHOWN: int = 3
-#: Characters of one abstract shown.
-ABSTRACT_KEEP: int = 2500
+#: Characters of one abstract shown. 4,500 covers 99% of saved abstracts
+#: (2026-10-02, literature v4): at 2,500, 9.2% of trial–abstract pairs lost the
+#: NCT id the abstract writes at its end, and the conclusions with it.
+ABSTRACT_KEEP: int = 4500
 
 #: What a decided description is stamped with in ``identify_verdicts.jsonl``,
 #: which P5 reads. Above the pick-one prompt's version 1, so a D33 decision
 #: supersedes an older answer for the same unit (last row wins). **3 since
 #: D35**: version 2 was the first D33 pilot, judged on the pre-D35 shortlists,
 #: and P5 reads only decisions of this version or later
-#: (``assemble.MIN_IDENTIFY_VERSION``).
-IDENTIFY_VERSION: int = 3
+#: (``assemble.MIN_IDENTIFY_VERSION``). **4 since 2026-10-02**: the 100
+#: version-3 decisions were judged with older templates (registry v2/v3,
+#: literature v1-v3); the fresh run on registry v4, no-label v4 and
+#: literature v4 must not inherit them.
+IDENTIFY_VERSION: int = 4
 
 #: Candidates per tier.
 TIER_SIZE: int = 10
@@ -109,6 +116,9 @@ class TierUnit(NamedTuple):
     #: :data:`LITERATURE_PROMPT` tiers: what the FDA documents say about the
     #: approval — the §14 subsection (B+), the indication (C+) or nothing (D).
     label_block: str = ""
+    #: :data:`NOLABEL_PROMPT` tiers (v5): what this product is — a new form of an
+    #: earlier-approved drug, or not (:func:`attach_products`).
+    product: str = ""
 
 
 class CandidateAnswer(NamedTuple):
@@ -163,7 +173,7 @@ DIGEST_LENGTH: int = 12
 #: The tier fields each prompt shows its judge — the only ones the digest reads.
 VISIBLE_FIELDS: dict[str, tuple[str, ...]] = {
     EXCERPT_PROMPT: ("approval", "excerpt", "trial_name", "enrollment", "candidates"),
-    NOLABEL_PROMPT: ("drug", "indication", "approval_date", "candidates"),
+    NOLABEL_PROMPT: ("drug", "indication", "approval_date", "product", "candidates"),
     LITERATURE_PROMPT: ("approval", "label_block", "candidates"),
 }
 
@@ -329,11 +339,16 @@ def label_block(unit: dict[str, object]) -> str:
     'No description of the trial is available. Approved for: provides for asthma'
     """
     case = str(unit.get("case") or "B")
+    copy = str(unit.get("copy_of") or "")
+    product = (f"\nTHIS PRODUCT: {copy} Its evidence is a trial of this product — its new "
+               "form, route or formulation, or a new use — not the trials of the original "
+               "drug." if copy else "")
     if case == "D":
-        return "No description of the trial is available. Approved for: not recorded."
+        return ("No description of the trial is available. Approved for: not recorded."
+                + product)
     if case == "C":
         return ("No description of the trial is available. Approved for: "
-                + str(unit.get("indication_text") or "not recorded"))
+                + str(unit.get("indication_text") or "not recorded") + product)
     text = str(unit.get("subsection") or unit.get("excerpt") or "")
     name = str(unit.get("acronym") or "(none found)")
     size = str(unit.get("enrollment") or "(none found)")
@@ -397,6 +412,7 @@ def build_tier(unit: dict[str, object], tier: int) -> TierUnit:
                                 unit.get("indication_codes"))
                     if no_label else ""),
         approval_date=str(unit.get("approval_date") or "unknown") if no_label else "",
+        product=(str(unit.get("copy_of") or "") or NOT_A_COPY) if no_label else "",
         tier_id="",
         unit_id=unit_id,
         tier=tier,
@@ -730,7 +746,58 @@ def select_units(
         )
     ordered = sample_order(units, limit)
     attach_abstracts(ordered, candidates_path.parent)
+    attach_products(ordered, candidates_path.parent)
     return ordered
+
+
+#: ORIG submission classes that make a product a new version of a molecule
+#: an earlier application already brought to market (2026-10-03).
+NEW_VERSION_CLASSES: dict[str, str] = {
+    "TYPE 3": "a new dosage form",
+    "TYPE 5": "a new formulation or a new manufacturer's version",
+}
+#: The product line when it is not such a version.
+NOT_A_COPY: str = ("not a new form of an earlier-approved drug, as far as Drugs@FDA's "
+                   "records show.")
+
+
+def attach_products(units: list[dict[str, object]], out_dir: Path) -> None:
+    """Set ``copy_of`` on each unit whose application is a new dosage form or
+    formulation (ORIG class ``TYPE 3``/``TYPE 5``) of a molecule an earlier
+    application of the same moiety group already brought to market: the text
+    the C/D judges read, e.g. "a new dosage form of a drug first approved on
+    1991-06-12 as CARDIZEM (NDA020027)." Empty otherwise (2026-10-03).
+    """
+    events = out_dir / "approval_events.tsv"
+    if not events.is_file():
+        return
+    groups = drug_names.moiety_groups(out_dir / "drug_names.tsv")
+    brand: dict[str, str] = {}
+    names = out_dir / "drug_names.tsv"
+    if names.is_file():
+        with names.open(encoding="utf-8") as handle:
+            for row in csv.DictReader(handle, delimiter="\t"):
+                brand[row["application"]] = (row.get("brand_names") or "").split(";")[0].strip()
+    orig: dict[str, tuple[str, str]] = {}
+    with events.open(encoding="utf-8") as handle:
+        for row in csv.DictReader(handle, delimiter="\t"):
+            if row["submission_type"] == "ORIG" and row.get("approval_date"):
+                orig[row["application"]] = (row.get("class_code") or "", row["approval_date"])
+    first: dict[str, tuple[str, str]] = {}
+    for application, (_, approved) in orig.items():
+        group = groups.get(application, application)
+        if group not in first or approved < first[group][0]:
+            first[group] = (approved, application)
+    for unit in units:
+        application = str(unit.get("application") or "")
+        code, approved = orig.get(application, ("", ""))
+        earliest, original = first.get(groups.get(application, application), ("", application))
+        if code in NEW_VERSION_CLASSES and original != application and earliest < approved:
+            shown = brand.get(original) or "another product"
+            unit["copy_of"] = (f"{NEW_VERSION_CLASSES[code]} of a drug first approved on "
+                               f"{earliest} as {shown} ({original}).")
+        else:
+            unit["copy_of"] = ""
 
 
 def attach_abstracts(units: list[dict[str, object]], out_dir: Path) -> None:
@@ -958,6 +1025,7 @@ __all__ = [
     "LITERATURE_PROMPT_VERSION",
     "PROMPT_VERSIONS",
     "attach_abstracts",
+    "attach_products",
     "label_block",
     "literature_tiers",
     "route_of",

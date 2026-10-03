@@ -454,7 +454,7 @@ def test_prompt_v3_shows_normalised_codes_beside_the_raw_text() -> None:
     assert lines[at + 3] == "   Interventions (normalised): pembrolizumab [MeSH C582435]"
     bare = cm.render_candidate(1, {"nct_id": "NCT1"})
     assert "normalised" not in bare
-    assert (cm.PROMPT_VERSION, cm.NOLABEL_PROMPT_VERSION, cm.LITERATURE_PROMPT_VERSION) == (4, 4, 3)
+    assert (cm.PROMPT_VERSION, cm.NOLABEL_PROMPT_VERSION, cm.LITERATURE_PROMPT_VERSION) == (4, 5, 4)
 
 
 def test_a_no_label_tier_shows_codes_for_drug_and_indication() -> None:
@@ -470,3 +470,29 @@ def test_a_no_label_tier_shows_codes_for_drug_and_indication() -> None:
     registry = cm.build_tier(unit, 2)
     assert registry.drug.endswith("(normalised: zanubrutinib [MeSH C000629551])")
     assert registry.indication.endswith("(normalised: Waldenstrom Macroglobulinemia [MeSH D008258])")
+
+
+def test_a_new_form_of_an_earlier_drug_is_told_to_the_no_label_judges(tmp_path: Path) -> None:
+    """2026-10-03: a premixed bag of an old molecule has no trials of its own."""
+    (tmp_path / "approval_events.tsv").write_text(
+        "application\tsubmission_type\tsubmission_no\tapproval_date\tclass_code\n"
+        "NDA000001\tORIG\t1\t1991-06-12\tTYPE 1\n"
+        "NDA000002\tORIG\t1\t2021-10-28\tTYPE 5\n"
+        "NDA000003\tORIG\t1\t2022-01-01\tTYPE 1\n", encoding="utf-8")
+    header = "application\tbrand_names\tgeneric_name\tactive_ingredients\tmoieties\t" \
+             "ingredient_uniis\tmoiety_uniis\tsponsor\n"
+    (tmp_path / "drug_names.tsv").write_text(
+        header + "NDA000001\tCARDIZEM\tdiltiazem\tDILTIAZEM HYDROCHLORIDE\tDILTIAZEM\tU1\tM1\tX\n"
+        "NDA000002\tDILTIAZEM IN DEXTROSE\tdiltiazem\tDILTIAZEM HYDROCHLORIDE\tDILTIAZEM\tU1\tM1\tY\n"
+        "NDA000003\tNEWDRUG\tnewdrug\tNEWDRUG\tNEWDRUG\tU9\tM9\tZ\n", encoding="utf-8")
+    units: list[dict[str, object]] = [
+        {"application": "NDA000002", "case": "C", "indication_text": "AF"},
+        {"application": "NDA000003", "case": "D"}, {"application": "NDA000001", "case": "C"}]
+    cm.attach_products(units, tmp_path)
+    assert units[0]["copy_of"] == ("a new formulation or a new manufacturer's version of a drug "
+                                   "first approved on 1991-06-12 as CARDIZEM (NDA000001).")
+    assert units[1]["copy_of"] == "" and units[2]["copy_of"] == ""
+    assert "THIS PRODUCT: a new formulation" in cm.label_block(units[0])
+    assert "THIS PRODUCT" not in cm.label_block(units[1])
+    cm.attach_products(units, tmp_path / "absent")   # no spine: nothing changes
+    assert units[0]["copy_of"]

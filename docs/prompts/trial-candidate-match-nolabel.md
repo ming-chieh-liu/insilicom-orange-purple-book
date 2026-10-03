@@ -1,6 +1,6 @@
 # Prompt — is this candidate the evidence for an approval with no trial text? (per-candidate Yes/No)
 
-**Version:** 4 · **Created:** 2026-09-29 · **v2:** 2026-09-30 (D37) · **v3:** 2026-10-01 (D39) · **v4:** 2026-10-01 · **Decision:** D35 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
+**Version:** 5 · **Created:** 2026-09-29 · **v2:** 2026-09-30 (D37) · **v3:** 2026-10-01 (D39) · **v4:** 2026-10-01 · **v5:** 2026-10-03 · **Decision:** D35 · **Runbook:** `docs/runbooks/trial-candidate-match.md`
 
 **v4 (2026-10-01):** the "APPROVED FOR says not recorded" rule is removed. It served case D, which since D37 is judged with `trial-literature-match.md`; this prompt now serves only C−, which always has an indication.
 **v3 (2026-10-01, D39):** prompt wording unchanged; fields gain our normalised codes beside the raw text — `Conditions (normalised):` / `Interventions (normalised):` lines per candidate and the approved drug's and indication's codes, each as `Name [MeSH D…]` or `PubChem:CID…`. They are NLM's and our coding and may be incomplete; a missing line means no code, not a mismatch.
@@ -31,6 +31,7 @@ describes that trial, so you have only the approval itself to go on.
 APPROVED DRUG: {{drug}}
 APPROVED FOR: {{indication}}
 DATE OF APPROVAL: {{approval_date}}
+THIS PRODUCT: {{product}}
 
 CANDIDATE TRIALS (from ClinicalTrials.gov):
 <candidates>
@@ -55,6 +56,10 @@ RULES:
   that could not have produced results before the date of approval.
 - An enrollment in the tens of thousands is almost always a registry or an
   observational cohort, not a pivotal trial.
+- If THIS PRODUCT says it is a new form or version of a drug approved earlier,
+  answer Yes only for a trial that tested this product — its new form, route
+  or formulation, or a new use. A trial of the drug as it was first approved
+  is No: that drug's trials are not this product's evidence.
 - Each candidate's Status and Why stopped are the registry's today, not as of
   the approval. A trial still running today may have reported its primary
   results before the approval. A trial stopped early because it met its goal,
@@ -99,3 +104,15 @@ could not have been the evidence. That is why a Yes here is tier C or D, below a
 **Primary completion is shown, not enforced (v2).** A trial still collecting its primary endpoint
 cannot have supported the approval, but the registry's dates are revised after the fact, so the
 judge weighs the date with the status instead of a hard cut.
+
+## v5 (2026-10-03): the product line
+
+`{{product}}` says whether this approval is a new dosage form (ORIG class `TYPE 3`) or a new
+formulation / new manufacturer (`TYPE 5`) of a molecule an earlier application already brought to
+market (same moiety group, `drug_names.moiety_key`), and when and as what that molecule was first
+approved (`candidate_match.attach_products`); otherwise "not a new form of an earlier-approved
+drug, as far as Drugs@FDA's records show". Why: in the 2026-10-02 pilot the judges said Yes to old
+trials of the molecule for products that have no trials of their own (a premixed diltiazem bag,
+2021 → a 2011 rate-control study; zidovudine 60 mg tablets, 2009 → the Tshepo study). 2,264 of
+6,181 S9 units sit on such applications, but 259 of those applications have their own FDA-named
+trial that started after the molecule's first approval, so they are told, not routed out.
