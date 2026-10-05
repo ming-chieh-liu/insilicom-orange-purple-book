@@ -1,0 +1,20 @@
+NDA022148|ORIG|1|Major Depressive Disorder = NCT00105989
+NDA022516|ORIG|1|Major Depressive Disorder = NCT00105989
+NDA022519|ORIG|1|n=213 = NCT00450216
+NDA200795|ORIG|1|Breast Cancer = NCT00006459
+NDA201635|ORIG|1|Monotherapy Treatment in Patients with Partial Onset or Primary = NCT00231556
+NDA201635|SUPPL|17|Monotherapy Treatment in Patients with Partial Onset or Primary Generalized Tonic-Clonic = NCT00231556
+NDA204417|ORIG|1|Immediate-release Levetiracetam in Pediatric Patients 4 Years to 16 Years = NCT00615615
+NDA205572|ORIG|1|Complicated Intra-Abdominal Infections = NONE
+NDA206406|SUPPL|7|Clinical Studies in De Novo Kidney Transplant Recipients = NONE
+NDA207865|ORIG|1|Prevention of Nausea and Vomiting Associated with HEC or MEC in Pediatric Patients = NCT01362530
+NDA208658|ORIG|1|Combination Therapy = NONE
+NDA208658|SUPPL|21|LVEF 50 = NCT03057951
+NDA209191|ORIG|1|VBMCP 91 = NCT00048230
+NDA209310|ORIG|1|n=99 = NCT02291549
+NDA209381|ORIG|1|NER1006-01 = NCT02254486
+NDA210132|ORIG|1|Women’s Health Initiative Studies = NCT00000611
+NDA212516|ORIG|1|HAMD-17 = NCT00105989
+NDA212516|ORIG|1|Major Depressive Disorder = NCT00105989
+NDA212516|SUPPL|2|Major Depressive Disorder in Adults = NCT00105989
+NDA212849|ORIG|1|Bipolar Disorder - Adjunctive Therapy = NCT00094926

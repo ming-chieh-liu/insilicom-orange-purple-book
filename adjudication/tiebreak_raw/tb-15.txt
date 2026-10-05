@@ -1,0 +1,12 @@
+NDA204353|SUPPL|25|Glycemic Control Trials in Adults with Type 2 Diabetes Mellitus = NCT01106677
+NDA205879|ORIG|1|Canagliflozin Compared to Sitagliptin, Both as Add-on Combination Therapy = NONE
+NDA210132|ORIG|1|Effects on Vasomotor Symptoms = NCT01942668
+NDA210132|SUPPL|6|Effects on Vasomotor Symptoms in Postmenopausal Women = NCT01942668
+NDA212849|ORIG|1|Schizophrenia = NCT00253136
+BLA125377|SUPPL|108|Hepatocellular Carcinoma = NCT01658878
+NDA213690|ORIG|1|n=1522 = NONE
+BLA125554|SUPPL|41|Hepatocellular Carcinoma = NCT01658878
+NDA217514|ORIG|1|BRAF V600E Mutation-Positive Metastatic Non-Small Cell Lung Cancer = NONE
+NDA022264|SUPPL|15|Schizophrenia = NCT01157351
+NDA206073|ORIG|1|n=686 = NCT01422876
+NDA204629|SUPPL|26|n=1364 = NONE

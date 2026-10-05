@@ -1,0 +1,20 @@
+BLA761083|ORIG|1|n=13 = NCT02795767
+NDA022562|SUPPL|8|Acute Hyperammonemia due to PA and MMA = NCT01599286
+NDA215888|ORIG|1|n=219 = NONE
+NDA215888|ORIG|1|n=55 = NONE
+NDA022454|SUPPL|10|Suspected Parkinsonian Syndromes = NONE
+NDA202258|ORIG|1|RESPOND-2 = NONE
+NDA202811|ORIG|1|Irritable Bowel Syndrome with Constipation (IBS-C) = NONE
+NDA206488|ORIG|1|n=13 = NONE
+NDA021641|ORIG|1|n=159 = NCT00203034
+NDA210854|SUPPL|9|Post-Exposure Prophylaxis of Influenza (5 Years of Age and Older) = NONE
+NDA214410|ORIG|2|Post-Exposure Prophylaxis of Influenza (5 Years of Age and Older) = NONE
+NDA215596|ORIG|1|Treatment of Adults with Post-transplant CMV Infection/Disease That Is Refractory (with or = NCT02931539
+NDA022081|ORIG|1|ARIES-1 = NONE
+NDA022081|ORIG|1|ARIES-2 = NONE
+NDA022081|ORIG|1|Pulmonary Arterial Hypertension (PAH) = NCT00091598
+NDA204819|ORIG|1|Chronic-Thromboembolic Pulmonary Hypertension = NCT00855465
+NDA204819|ORIG|1|Pulmonary Arterial Hypertension = NCT00810693
+NDA209606|ORIG|1|Acute Myeloid Leukemia = NCT01915498
+NDA212327|ORIG|1|n=16 = NCT01437787
+BLA761033|ORIG|1|n=496 = NCT01508936

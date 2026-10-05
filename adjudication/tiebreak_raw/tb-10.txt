@@ -1,0 +1,20 @@
+NDA212849|ORIG|1|Bipolar Disorder - Monotherapy = NCT00132678
+NDA212994|ORIG|1|n=150 = NONE
+NDA213586|SUPPL|8|Bipolar Disorder – Adjunctive Therapy = NCT00094926
+NDA213586|SUPPL|8|Bipolar Disorder – Monotherapy = NCT00132678
+NDA215352|ORIG|1|MIST-2 = NONE
+NDA215441|ORIG|1|VBMCP 91 = NCT00048230
+NDA219920|ORIG|1|Breast Cancer = NONE
+NDA220073|ORIG|1|Treatment of DVT and PE and Reduction in the Risk of Recurrence of = NCT00633893
+BLA208583|ORIG|1|n=348 = NCT01664247
+BLA208583|SUPPL|10|Patients currently on basal insulin or GLP-1 receptor agonist = NCT01664247
+NDA022341|SUPPL|27|Glycemic Control trials in Adults with Type 2 Diabetes Mellitus = NCT00856986
+NDA022473|ORIG|1|n=277 = NCT00644605
+NDA203109|ORIG|1|n=277 = NCT00644605
+NDA204114|SUPPL|5|Lack of Clinical Activity in Metastatic Melanoma Following BRAF-Inhibitor Therapy = NCT01037127
+NDA206352|ORIG|1|AI424-034 = NCT00013897
+NDA206352|ORIG|1|Pediatric Patients = NONE
+NDA208843|ORIG|1|n=47 = NCT02516579
+NDA211875|ORIG|1|Metastatic Breast Cancer = NONE
+BLA125377|SUPPL|96|Microsatellite Instability-High (MSI-H) or Mismatch Repair = NONE
+NDA021462|SUPPL|51|Mesothelioma = NONE

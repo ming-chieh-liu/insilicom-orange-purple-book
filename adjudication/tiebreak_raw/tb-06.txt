@@ -1,0 +1,20 @@
+NDA202324|ORIG|1|n=389 = NCT00678392
+BLA761163|SUPPL|13|Lack of Efficacy in Relapsed or Refractory Marginal Zone = NCT04680052
+NDA204384|SUPPL|19|Pediatric Patients (5 years to less than 18 years of age) = NONE
+NDA204671|ORIG|1|Clinical Trials in Subjects Co-infected with HCV and HIV-1 = NCT01667731
+NDA204671|ORIG|1|PHOTON-1 = NCT01667731
+NDA201688|ORIG|1|n=61 = NCT00918957
+BLA125268|SUPPL|163|Pediatric Patients with ITP = NONE
+BLA761121|SUPPL|8|Relapsed or Refractory DLBCL, NOS = NCT02257567
+BLA761055|SUPPL|7|Atopic Dermatitis = NCT02260986
+NDA205552|SUPPL|1|Chronic Lymphocytic Leukemia = NCT01578707
+NDA022020|ORIG|1|n=35 = NONE
+NDA207917|ORIG|1|n=217 = NCT01880320
+NDA203469|SUPPL|37|n=232 = NCT03589326
+NDA205718|ORIG|1|n=309 = NCT01376297
+NDA216142|ORIG|1|Treatment of Esophageal Candidiasis in Adult and Pediatric Patients 4 Months of Age and Old = NCT00666185
+NDA210491|ORIG|1|Trial in Patients with CF Who Were Heterozygous for the F508del Mutation and a Second Mutat = NCT02392234
+NDA020634|SUPPL|61|Community-Acquired Pneumonia: 5-day Treatment Regimen = NCT00236821
+NDA206910|ORIG|1|n=133 = NCT01709838
+NDA206910|ORIG|1|n=55 = NCT00873041
+NDA211358|ORIG|1|n=76 = NCT01225211

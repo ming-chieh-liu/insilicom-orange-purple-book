@@ -1,0 +1,16 @@
+NDA208573|SUPPL|20|TP53 22 = NONE
+BLA103000|SUPPL|5310|n=109 = NCT01205451
+BLA761049|SUPPL|6|Metastatic Merkel Cell Carcinoma = NCT02155647
+BLA761069|SUPPL|35|ICCA 56 = NCT03875235
+NDA021366|SUPPL|33|Pediatric Patients with Homozygous Familial = NCT02226198
+NDA213593|ORIG|1|Reduction of Risk of Upper Gastrointestinal Bleeding in Critically Ill Patients = NONE
+NDA214218|ORIG|1|Mesothelioma = NONE
+BLA125360|SUPPL|67|Glabellar Lines = NONE
+BLA761034|SUPPL|9|Locally Advanced or Metastatic Urothelial Carcinoma = NCT02108652
+NDA209637|SUPPL|25|OZIMPIC 1767 = NCT03819153
+NDA216774|ORIG|1|Persistent or Chronic ITP = NCT00370331
+NDA216774|ORIG|1|Severe Aplastic Anemia = NCT00922883
+NDA218785|ORIG|2|Chronic Lymphocytic Leukemia or Small Lymphocytic Lymphoma = NCT03336333
+NDA205552|SUPPL|17|RESONATE 2 = NCT01722487
+NDA215859|ORIG|1|Reduction in the Risk of Recurrence of DVT and/or PE = NCT02064439
+NDA208294|ORIG|1|n=140 = NCT01566773
