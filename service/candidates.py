@@ -50,7 +50,7 @@ from config.settings import RawData, TrialArchive
 from service import (
     approval_events, drug_names, indications, normalize, registry_identity, section14,
 )
-from source import trial_studies, unii_bridge
+from source import purple_book, trial_studies, unii_bridge
 from source.sponsor_families import same_sponsor
 from utility.logging import get_logger
 
@@ -236,6 +236,10 @@ class Unit(NamedTuple):
     #: D41: candidates removed because an FDA document already names them for
     #: this submission or an earlier one of the same moiety (tier A).
     already_linked: tuple[str, ...] = ()
+    #: D49: the application is a Purple Book 351(k) biosimilar. Its §14 is the
+    #: reference product's, so S9 does not judge it and S10 links only trials
+    #: its own applicant ran.
+    biosimilar_app: bool = False
 
     @property
     def needs_judgement(self) -> bool:
@@ -269,6 +273,10 @@ class CandidatesReport(NamedTuple):
     #: D41: candidate slots removed as already identified, and units left with none.
     already_linked_removed: int = 0
     emptied_by_already_linked: int = 0
+    #: D49: every trial an FDA document names on a biosimilar application,
+    #: ``(application, nct, source, lead sponsor, own)`` — ``own`` when its lead
+    #: sponsor is the biosimilar's applicant (or its family).
+    biosimilar_trials: tuple[tuple[str, str, str, str, str], ...] = ()
 
     @property
     def to_judge(self) -> int:
@@ -489,6 +497,16 @@ ROUTE_BIOSIMILAR = "biosimilar_copied_label"
 ROUTE_REVIEW = "review"        # D35 (2026-09-30): the FDA review names a pivotal/supporting trial
 
 
+class BiosimilarTrial(NamedTuple):
+    """One FDA-named trial on a biosimilar application (D49)."""
+
+    application: str
+    nct_id: str
+    source: str
+    lead_sponsor: str
+    own: str
+
+
 class SubmissionRoute(NamedTuple):
     """One row of ``submission_routes.tsv``: which D35 case a submission is."""
 
@@ -530,16 +548,15 @@ def route(
     submissions: Iterable[tuple[str, str]],
     owned: set[str],
     chosen_ids: Mapping[str, list[str]],
-    drug_of_app: Mapping[str, set[str]],
-    borrowed: set[str],
+    biosimilar: frozenset[str],
     review_linked: frozenset[str] = frozenset(),
 ) -> list[tuple[str, str]]:
     """D35: which case each trial-relevant submission ``(key, trial_scope)`` is.
 
     ``label`` when it owns a §14 description (cases A/B, handled per
     description); ``guard`` for a D24 submission; ``biosimilar_copied_label``
-    for a 351(k) whose drug resolved only through its reference product's
-    stem, whose trials legally cannot be its evidence; ``review`` when its FDA
+    for a Purple Book 351(k) application (``biosimilar``, D49), whose
+    reference product's trials cannot be its evidence; ``review`` when its FDA
     review names a trial judged PIVOTAL or SUPPORTING (``review_linked``) — the
     evidence is already identified at tier A, so no weaker C/D search is run;
     otherwise ``C`` when it has a chosen indication and ``D`` when it has none.
@@ -547,7 +564,7 @@ def route(
 
     >>> route([("A|ORIG|1", "full"), ("B|ORIG|1", "guard"), ("C|ORIG|1", "full"),
     ...        ("D|ORIG|1", "full"), ("E|ORIG|1", "full")],
-    ...       {"A|ORIG|1"}, {"C|ORIG|1": ["MESH:D1"]}, {"E": {"MESH:REF"}}, {"MESH:REF"})
+    ...       {"A|ORIG|1"}, {"C|ORIG|1": ["MESH:D1"]}, frozenset({"E"}))
     [('A|ORIG|1', 'label'), ('B|ORIG|1', 'guard'), ('C|ORIG|1', 'C'), ('D|ORIG|1', 'D'), ('E|ORIG|1', 'biosimilar_copied_label')]
     """
     out: list[tuple[str, str]] = []
@@ -557,7 +574,7 @@ def route(
             case = ROUTE_LABEL
         elif scope == "guard":
             case = ROUTE_GUARD
-        elif drug_of_app.get(application, set()) & borrowed:
+        elif application in biosimilar:
             case = ROUTE_BIOSIMILAR
         elif key in review_linked:
             case = ROUTE_REVIEW
@@ -1423,6 +1440,8 @@ __all__ = [
     "CASE_D",
     "DRUG_ONLY_FILE",
     "ROUTE_BIOSIMILAR",
+    "biosimilar_trials",
+    "BiosimilarTrial",
     "ROUTE_GUARD",
     "ROUTE_LABEL",
     "ROUTE_REVIEW",
@@ -1609,14 +1628,10 @@ def build(
     nlm_keys = read_keys(out_dir / "nlm_id_map.tsv")
     drug_rows = list(_read_tsv(out_dir / "drug_map.tsv"))
     fda_drug = fda_keys(drug_rows, _read_tsv(out_dir / "drug_identity.tsv"))
-    # Ingredients whose id came from the suffix-stripped stem rather than the
-    # name itself. For those the pool is the reference product's trials, so the
-    # shortlist is ordered to put biosimilar-looking studies first.
-    via_stem = {
-        row["source_name"]
-        for row in drug_rows
-        if row.get("basis") == "stem"
-    }
+    # D49: biosimilars are the Purple Book's 351(k) licences, not every name
+    # whose suffix was stripped — that also caught novel biologics
+    # (ravulizumab-cwvz) and the reference products themselves (Humira).
+    biosimilar = purple_book.biosimilar_applications(data.purplebook)
 
     spine = approval_events.build(data)
     approval_of = {
@@ -1699,7 +1714,7 @@ def build(
         application_names = ingredients.get(row["application"], ())
         drug_mesh = with_bridged(
             k for name in application_names for k in fda_drug.get(name, ()))
-        stem_sourced = any(name in via_stem for name in application_names)
+        stem_sourced = row["application"] in biosimilar
         heading = (row.get("heading") or "").strip()
         indication_mesh = pick_indication(
             heading_ids.get((key, heading), []), chosen_ids.get(key, [])
@@ -1788,11 +1803,10 @@ def build(
                 subsection=row.get("subsection", ""),
                 drug_codes=coded(sorted(drug_mesh), names),
                 indication_codes=coded(indication_ids, names),
+                biosimilar_app=stem_sourced,
             )
         )
     # D35: route every trial-relevant submission, then add the C and D units.
-    borrowed = {row["mesh_id"] for row in drug_rows
-                if row["source_name"] in via_stem and row.get("mesh_id")}
     drug_of_app = {
         application: with_bridged(k for n in app_names for k in fda_drug.get(n, ()))
         for application, app_names in ingredients.items()
@@ -1800,7 +1814,7 @@ def build(
     routes = route(
         [(f"{r.application}|{r.submission_type}|{r.submission_no}", r.trial_scope)
          for r in spine.rows if r.trial_relevant == "true"],
-        owned_submissions(units), chosen_ids, drug_of_app, borrowed, review_linked,
+        owned_submissions(units), chosen_ids, biosimilar, review_linked,
     )
     chosen_text = read_chosen_text(out_dir)
     drug_only = read_drug_only(out_dir)
@@ -1874,6 +1888,7 @@ def build(
                 literature=literature,
                 drug_codes=coded(sorted(drugs), names),
                 indication_codes=coded(ids, names),
+                biosimilar_app=event.application in biosimilar,
             )
         )
     sizes.sort()
@@ -1882,8 +1897,10 @@ def build(
     # earlier one of the same moiety) is linked at tier A; judging it again
     # could only re-identify it, so it is taken out of every judged unit.
     group_of = drug_names.moiety_groups(out_dir / "drug_names.tsv")
+    review_trials = list(review_trials)
     units, removed, emptied = drop_already_linked(
         units, identified_trials(units, review_trials, approval_of, group_of), group_of)
+    biosimilar_named = biosimilar_trials(units, review_trials, biosimilar, studies, applicant_of)
     return CandidatesReport(
         units=tuple(units),
         already_linked_removed=removed,
@@ -1899,7 +1916,42 @@ def build(
         routes=tuple(routes),
         case_c_with_candidates=with_c,
         case_d_with_candidates=with_d,
+        biosimilar_trials=biosimilar_named,
     )
+
+
+def biosimilar_trials(
+    units: Iterable[Unit],
+    review_trials: Iterable[tuple[str, str]],
+    biosimilar: frozenset[str],
+    studies: Mapping[str, Candidate],
+    applicant_of: Mapping[str, str],
+) -> tuple[tuple[str, str, str, str, str], ...]:
+    """Every trial an FDA document names on a biosimilar application (D49),
+    ``(application, nct, source, lead sponsor, own)``: label-stated NCTs and
+    review-named trials; ``own`` is ``yes`` when the trial's lead sponsor is the
+    biosimilar's applicant or of its family, else ``no``.
+
+    >>> c = Candidate("NCT1", "", "", "", "", "", "", "", "", lead_sponsor="Celltrion")
+    >>> u = Unit("BLA9|ORIG|1|X", "BLA9", "ORIG", "1", "", "", "", "", "NCT2", "", "", "", ())
+    >>> biosimilar_trials([u], [("BLA9|ORIG|1", "NCT1")], frozenset({"BLA9"}),
+    ...                   {"NCT1": c}, {"BLA9": "CELLTRION INC"})
+    (('BLA9', 'NCT1', 'review', 'Celltrion', 'yes'), ('BLA9', 'NCT2', 'label', '', 'no'))
+    """
+    named: set[tuple[str, str, str]] = set()
+    for unit in units:
+        if unit.application in biosimilar and unit.stated_nct:
+            named.add((unit.application, unit.stated_nct, "label"))
+    for key, nct in review_trials:
+        application = key.split("|", 1)[0]
+        if application in biosimilar:
+            named.add((application, nct, "review"))
+    out = []
+    for application, nct, source in sorted(named):
+        sponsor = studies[nct].lead_sponsor if nct in studies else ""
+        own = bool(sponsor) and same_sponsor(applicant_of.get(application, ""), sponsor)
+        out.append((application, nct, source, sponsor, "yes" if own else "no"))
+    return tuple(out)
 
 
 def render(report: CandidatesReport) -> str:

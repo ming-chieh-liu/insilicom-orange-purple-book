@@ -48,7 +48,7 @@ STEPS := \
   indication_normalize=service/indication_normalize.py,service/indications.py,service/letter_locate.py,service/approval_events.py,source/trial_studies.py,dao/ikraph2_entities.py,dao/tsv_repository.py \
   graph_trials=service/graph_trials.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/ikraph2_api.py,dao/tsv_repository.py \
   graph_links=service/graph_links.py,service/indication_normalize.py,service/review_trials.py,service/normalize.py,service/approval_events.py,source/trial_studies.py,dao/graph_evidence.py,dao/ikraph2_api.py,dao/tsv_repository.py \
-  candidates=service/candidates.py,service/review_role.py,service/registry_identity.py,source/mesh_descriptors.py,source/unii_bridge.py,source/unii_mesh.py,source/sponsor_families.py,dao/tsv_repository.py \
+  candidates=service/candidates.py,service/review_role.py,service/registry_identity.py,source/mesh_descriptors.py,source/unii_bridge.py,source/unii_mesh.py,source/sponsor_families.py,dao/tsv_repository.py,source/purple_book.py \
   assemble=service/assemble.py,service/candidates.py,service/candidate_match.py,service/identification.py,service/approval_events.py,dao/tsv_repository.py
 
 # CODE_<step>: the step's entry modules (what main.py calls for that --mode)
@@ -116,7 +116,7 @@ $(OUT)/drug_only_trials.tsv $(OUT)/drug_only_abstracts.jsonl &: $(CODE_graph_lin
 	$(MAIN) --mode graph-links
 
 # ---- P3 route + candidates (D35, D36) -------------------------------------------------
-$(OUT)/candidates.jsonl $(OUT)/submission_routes.tsv &: $(CODE_candidates) \
+$(OUT)/candidates.jsonl $(OUT)/submission_routes.tsv $(OUT)/biosimilar_trials.tsv &: $(CODE_candidates) \
 		$(OUT)/submission_indications.tsv \
 		$(OUT)/label_trials.tsv $(OUT)/graph_trials.tsv $(OUT)/drug_only_trials.tsv \
 		$(OUT)/review_trial_mentions.tsv $(ADJ)/review_role_verdicts.jsonl \
@@ -124,7 +124,8 @@ $(OUT)/candidates.jsonl $(OUT)/submission_routes.tsv &: $(CODE_candidates) \
 		$(OUT)/trial_drug_map.tsv $(OUT)/trial_condition_map.tsv $(OUT)/drug_map.tsv \
 		$(OUT)/drug_names.tsv $(OUT)/id_bridge.tsv $(OUT)/nlm_id_map.tsv \
 		$(OUT)/drug_identity.tsv $(ADJ)/review_role_units.jsonl \
-		$(DRUGSFDA) $(TRIAL_MANIFEST) $(MESH_DESC) fda_raw/mesh/supp2026.xml
+		$(DRUGSFDA) $(TRIAL_MANIFEST) $(MESH_DESC) fda_raw/mesh/supp2026.xml \
+		$(RAW)/purplebook/purplebook-2026-08.csv
 	$(MAIN) --mode candidates
 
 # ---- P5 assemble ------------------------------------------------------------------------
@@ -132,7 +133,8 @@ $(OUT)/trial_submission_map.tsv $(OUT)/unlinked_submissions.tsv &: $(CODE_assemb
 		$(OUT)/approval_events.tsv $(OUT)/candidates.jsonl $(OUT)/drug_map.tsv \
 		$(OUT)/graph_trials.tsv $(OUT)/submission_indications.tsv \
 		$(ADJ)/identify_verdicts.jsonl $(ADJ)/review_role_units.jsonl \
-		$(ADJ)/review_role_verdicts.jsonl $(ADJ)/label_role_verdicts.jsonl
+		$(ADJ)/review_role_verdicts.jsonl $(ADJ)/label_role_verdicts.jsonl \
+		$(OUT)/biosimilar_trials.tsv
 	$(MAIN) --mode assemble
 
 # ---- stages S1-S11 (D38) ------------------------------------------------------------------

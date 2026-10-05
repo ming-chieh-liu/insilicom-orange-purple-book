@@ -741,10 +741,7 @@ def select_units(
         ]
     else:
         units = identification.read_units(
-            candidates_path,
-            identification.borrowed_ids(drug_map),
-            identification.guard_submissions(approval_events),
-        )
+            candidates_path, identification.guard_submissions(approval_events))
     ordered = sample_order(units, limit)
     attach_abstracts(ordered, candidates_path.parent)
     attach_products(ordered, candidates_path.parent)

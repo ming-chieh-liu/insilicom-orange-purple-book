@@ -415,6 +415,20 @@ code says `not yet implemented` until it lands.
   lose them; trials completing more than 10 years before approval are mostly copies citing an
   original product's trials (biosimilars, 505(b)(2)), so they get no penalty here.
 
+- **D49 — a biosimilar is a Purple Book 351(k) licence, and it links only its own applicant's trials**
+  (2026-10-04, **implemented in code 2026-10-04**). (1) Biosimilar = the application's Purple Book type
+  `351(k) Biosimilar` / `351(k) Interchangeable` (`source/purple_book.py`), set per unit in S8
+  (`Unit.biosimilar_app`); not "an ingredient reached by stripping a four-letter suffix" — since 2017 every
+  new biologic has a suffix, and keying on the stripped MeSH id also caught the reference products sharing
+  it. Of 230 applications the suffix rule flagged, 142 were 351(a): 112 novel biologics (Ultomiris, Aduhelm,
+  Uplizna…) and 30 reference products (Humira, Remicade, Herceptin); their 950 §14 descriptions were never
+  judged and their C/D submissions were routed `biosimilar_copied_label`. (2) S8 routes and S9 skips only
+  true biosimilars. (3) S10: on a biosimilar application a trial named by its label or review links only if
+  its lead sponsor is the applicant or of its family (`biosimilar_trials.tsv`, written by S8); otherwise
+  `biosimilar_reference_trial` (D11 keeps biosimilar moieties apart, so D16 never moved these). Why: the
+  user's decision after the check; 467 label-stated units on biosimilars carried the reference product's
+  trials, 360 judged PIVOTAL in S6.
+
 ## Current status and to-do
 
 Full detail, evidence and commands: **`docs/STATUS.md`** — read it at the start of a session and

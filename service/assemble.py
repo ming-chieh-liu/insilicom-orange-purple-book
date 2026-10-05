@@ -257,6 +257,11 @@ def tier_for(
 
 #: Unlinked reason of a label-stated trial whose S6 role is not decided yet (D46).
 LABEL_ROLE_PENDING = "label_role_pending"
+#: D49: a trial an FDA document names on a 351(k) biosimilar application that
+#: its own applicant did not run — the reference product's evidence.
+BIOSIMILAR_REFERENCE_TRIAL = "biosimilar_reference_trial"
+#: Written by S8: every FDA-named trial on a biosimilar application.
+BIOSIMILAR_TRIALS_FILE = "biosimilar_trials.tsv"
 
 
 def _submission_sort(number: str) -> tuple[int, str]:
@@ -471,6 +476,18 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
             for row in csv.DictReader(handle, delimiter="\t"):
                 if row.get("basis") == "stem" and row.get("mesh_id"):
                     stem_ids.add(row["mesh_id"])
+    # D49: on a Purple Book 351(k) application only a trial its own applicant
+    # ran can be evidence; S8 lists every FDA-named trial there with ``own``.
+    biosimilar_apps: set[str] = set()
+    own_trials: set[tuple[str, str]] = set()
+    for row in _read_tsv(out_dir / BIOSIMILAR_TRIALS_FILE):
+        biosimilar_apps.add(row["application"])
+        if row.get("own") == "yes":
+            own_trials.add((row["application"], row["nct_id"]))
+
+    def reference_trial(application: str, nct: str) -> bool:
+        return application in biosimilar_apps and (application, nct) not in own_trials
+
     # A 351(k) copies the originator's section 14 verbatim, so its prose
     # describes a trial that legally cannot have supported it. P4 does not
     # judge those units at all (see identification.read_units), and they are
@@ -535,7 +552,16 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     review_links = [
         (key, nct, protocol) for key, nct, role, protocol in judged_reviews
         if role in review_role.LINKING and key in spine
+        and not reference_trial(key.split("|", 1)[0], nct)
     ]
+    # D49: a biosimilar's review naming the reference product's trial.
+    for ref_key, ref_nct, ref_role, ref_protocol in judged_reviews:
+        if ref_role in review_role.LINKING and ref_key in spine and reference_trial(
+                ref_key.split("|", 1)[0], ref_nct):
+            ref_app, ref_type, ref_no = ref_key.split("|")
+            unlinked.append(Unlinked(ref_app, ref_type, ref_no,
+                                     spine[ref_key].get("approval_date", ""), ref_protocol,
+                                     BIOSIMILAR_REFERENCE_TRIAL))
     review_earliest: dict[tuple[str, str], str] = {}
     for key, nct, _protocol in review_links:
         pair = (group(key.split("|", 1)[0]), nct)
@@ -631,9 +657,7 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                         str(unit.get("approval_date") or ""),
                         name,
                         "biosimilar_copied_label"
-                        if stem_ids
-                        and set(str(unit.get("drug_mesh") or "").split(";"))
-                        & stem_ids
+                        if unit.get("biosimilar_app")
                         else "label_change_not_judged"
                         if key in guard
                         else "later_appearance_of_the_same_trial"
@@ -689,7 +713,10 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         )
         route = routes.get(str(unit.get("unit_id") or ""), "") if source == "label_description" else ""
 
-        if source == "label_description":
+        rejection: str
+        if unit.get("biosimilar_app") and (str(unit["application"]), nct) not in own_trials:
+            rejection = BIOSIMILAR_REFERENCE_TRIAL  # D49
+        elif source == "label_description":
             rejection = ""  # D46: a trial S9 identified has no role check
         elif source == "label_nct":
             role = label_roles.get((key, nct))

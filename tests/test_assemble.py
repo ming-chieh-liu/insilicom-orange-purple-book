@@ -970,3 +970,42 @@ def test_a_unit_emptied_by_d41_says_why() -> None:
     assert asm._why({"drug_mesh": "MESH:D1", "already_linked": ["NCT1"]}) == "candidates_already_linked"
     assert asm._why({"drug_mesh": "MESH:D1"}) == "no_candidates"
     assert asm._why({}) == "no_drug_resolved"
+
+
+# ---------------------------------------------------------------------------
+# D49 — a biosimilar links only trials its own applicant ran
+# ---------------------------------------------------------------------------
+
+
+def _biosimilar_trials(out: Path, rows: list[tuple[str, str, str]]) -> None:
+    (out / "biosimilar_trials.tsv").write_text(
+        "application\tnct_id\tsource\tlead_sponsor\town\n" + "".join(
+            f"{a}\t{n}\tlabel\tX\t{own}\n" for a, n, own in rows), encoding="utf-8")
+
+
+def test_a_biosimilar_does_not_take_its_reference_products_trial(
+        workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit(biosimilar_app=True)])
+    _biosimilar_trials(out, [("BLA125514", "NCT02578680", "no")])
+    report = assemble.build(out, adj)
+    assert report.links == ()
+    assert assemble.BIOSIMILAR_REFERENCE_TRIAL in {u.reason for u in report.unlinked}
+
+
+def test_a_biosimilar_keeps_a_trial_its_own_applicant_ran(workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit(biosimilar_app=True)])
+    _biosimilar_trials(out, [("BLA125514", "NCT02578680", "yes")])
+    assert [link.nct_id for link in assemble.build(out, adj).links] == ["NCT02578680"]
+
+
+def test_a_biosimilars_review_naming_the_reference_trial_does_not_link(
+        workspace: tuple[Path, Path]) -> None:
+    out, adj = workspace
+    _write_units(out, [_unit(stated_nct="", acronym="X", unit_id="BLA125514|SUPPL|35|X")])
+    _reviews(adj, [("BLA125514|SUPPL|35|NCT00000777", "PIVOTAL", 2)])
+    _biosimilar_trials(out, [("BLA125514", "NCT00000777", "no")])
+    report = assemble.build(out, adj)
+    assert "NCT00000777" not in {link.nct_id for link in report.links}
+    assert assemble.BIOSIMILAR_REFERENCE_TRIAL in {u.reason for u in report.unlinked}

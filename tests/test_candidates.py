@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+from types import SimpleNamespace
 from typing import NamedTuple
 
 import pytest
@@ -539,8 +540,9 @@ def _run_pass(
         (out / "review_trial_mentions.tsv").write_text(mentions, encoding="utf-8")
     for name, text in (files or {}).items():
         (out / name).write_text(text, encoding="utf-8")
+    data = SimpleNamespace(purplebook=out / "purplebook.csv")  # D49: 351(k) licences
     return candidates.build(
-        object(), object(), out, ancestors=ancestors,  # type: ignore[arg-type]
+        data, object(), out, ancestors=ancestors,  # type: ignore[arg-type]
         review_trials=review_trials,
     )
 
@@ -635,16 +637,16 @@ def test_a_literature_trial_for_another_disease_reaches_neither_route(
 def test_a_review_with_a_linking_trial_routes_to_review_not_c_or_d() -> None:
     """D35, 2026-09-30: the FDA review already names the evidence."""
     got = candidates.route([("R|ORIG|1", "full"), ("S|ORIG|1", "full")], set(),
-                           {"R|ORIG|1": ["MESH:D1"], "S|ORIG|1": ["MESH:D1"]}, {}, set(),
+                           {"R|ORIG|1": ["MESH:D1"], "S|ORIG|1": ["MESH:D1"]}, frozenset(),
                            frozenset({"R|ORIG|1"}))
     assert got == [("R|ORIG|1", "review"), ("S|ORIG|1", "C")]
     # owning a §14 description still wins: B is judged regardless of the review
-    assert candidates.route([("R|ORIG|1", "full")], {"R|ORIG|1"}, {}, {}, set(),
+    assert candidates.route([("R|ORIG|1", "full")], {"R|ORIG|1"}, {}, frozenset(),
                             frozenset({"R|ORIG|1"})) == [("R|ORIG|1", "label")]
 
 
 def test_route_and_ownership_edge_cases() -> None:
-    assert candidates.route([("X|ORIG|1", "full")], set(), {}, {}, set()) == [("X|ORIG|1", "D")]
+    assert candidates.route([("X|ORIG|1", "full")], set(), {}, frozenset()) == [("X|ORIG|1", "D")]
     assert candidates.read_drug_only(Path("/nonexistent")) == {}
     assert candidates.read_chosen_text(Path("/nonexistent")) == {}
 
@@ -1333,3 +1335,12 @@ def test_only_the_named_trial_leaves_a_unit() -> None:
     other = {"NCT2": [candidates.Identified("m", "2010-01-01", "B|ORIG|1")]}
     [moved], removed, emptied = candidates.drop_already_linked([unit("NCT2")], other, same_moiety)
     assert moved.candidates == () and (removed, emptied) == (1, 0)  # NCT9 literature stays
+
+
+def test_biosimilars_come_from_the_purple_book_not_the_suffix(tmp_path: Path,
+                                                               monkeypatch: pytest.MonkeyPatch) -> None:
+    """D49: a 351(k) licence is flagged and routed out of C/D; nothing else is."""
+    assert candidates.route([("BLA1|ORIG|1", "full"), ("BLA2|ORIG|1", "full")], set(),
+                            {"BLA1|ORIG|1": ["MESH:D1"], "BLA2|ORIG|1": ["MESH:D1"]},
+                            frozenset({"BLA1"})) == [("BLA1|ORIG|1", "biosimilar_copied_label"),
+                                                     ("BLA2|ORIG|1", "C")]

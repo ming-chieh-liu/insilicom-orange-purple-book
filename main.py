@@ -833,11 +833,10 @@ def main(argv: list[str] | None = None) -> int:
         id_decided = identification.read_verdicts(
             adjudication_dir / "identify_verdicts.jsonl"
         )
-        id_borrowed = identification.borrowed_ids(out_dir / "drug_map.tsv")
         id_guard = identification.guard_submissions(out_dir / "approval_events.tsv")
         id_prepare_pending = [
             unit
-            for unit in identification.read_units(units_source, id_borrowed, id_guard)
+            for unit in identification.read_units(units_source, id_guard)
             if unit["unit_id"] not in id_decided
         ]
         id_chosen = identification.prioritise(id_prepare_pending, args.limit)
@@ -953,6 +952,10 @@ def main(argv: list[str] | None = None) -> int:
             diseases=frozenset(f"MESH:{d.ui}" for d in mesh_descriptors.diseases(cand_vocabulary)),
             # D41: trials a review names PIVOTAL/SUPPORTING are not judged again.
             review_trials=linking_reviews,
+        )
+        TsvRepository(args.out).save(
+            "biosimilar_trials", candidates.BiosimilarTrial._fields,
+            [candidates.BiosimilarTrial(*row) for row in candidates_report.biosimilar_trials],
         )
         TsvRepository(args.out).save(
             "submission_routes", ("submission", "route"),

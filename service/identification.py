@@ -93,7 +93,6 @@ def unit_id_for(
 
 def read_units(
     path: Path,
-    borrowed: frozenset[str] = frozenset(),
     guard: frozenset[str] = frozenset(),
 ) -> list[dict[str, object]]:
     """Every unit P3 wrote that still needs a judge, one per trial.
@@ -114,8 +113,10 @@ def read_units(
     drops 4,963 units to 3,007 and is the more defensible attribution: see D16.
 
     **A biosimilar's section 14 is its reference product's, so it is not
-    judged at all.** ``borrowed`` holds the MeSH ids that were reached only by
-    stripping a four-letter biologic suffix. A 351(k) application copies the
+    judged at all.** S8 marks a unit ``biosimilar_app`` when its application is
+    a Purple Book 351(k) licence (D49; the four-letter suffix, used until
+    2026-10-04, also caught novel biologics and the reference products
+    themselves). A 351(k) application copies the
     originator's Clinical Studies section verbatim, so the excerpt truthfully
     describes the originator's trial and a judge identifies it correctly —
     then the link asserts that the biosimilar was approved on evidence that
@@ -154,7 +155,7 @@ def read_units(
         if not (isinstance(candidates, list) and candidates) and not (
                 isinstance(literature, list) and literature):
             continue
-        if borrowed and set(str(row.get("drug_mesh") or "").split(";")) & borrowed:
+        if row.get("biosimilar_app"):
             skipped += 1
             continue
         seen += 1
@@ -212,22 +213,6 @@ def guard_submissions(approval_events: Path) -> frozenset[str]:
             f"{row['application']}|{row['submission_type']}|{row['submission_no']}"
             for row in csv.DictReader(handle, delimiter="\t")
             if row.get("trial_scope") == "guard"
-        )
-
-
-def borrowed_ids(drug_map: Path) -> frozenset[str]:
-    """MeSH ids reached only by stripping a four-letter biologic suffix.
-
-    Read from ``drug_map.tsv`` rather than recomputed, so P4 and P5 cannot
-    disagree about which drugs are stem-sourced.
-    """
-    if not drug_map.is_file():
-        return frozenset()
-    with drug_map.open(encoding="utf-8") as handle:
-        return frozenset(
-            row["mesh_id"]
-            for row in csv.DictReader(handle, delimiter="\t")
-            if row.get("basis") == "stem" and row.get("mesh_id")
         )
 
 
