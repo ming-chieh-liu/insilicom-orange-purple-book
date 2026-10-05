@@ -1,0 +1,2 @@
+{"request_id": "NDA207968|ORIG|1|n=195#T5@b744a0644117+4", "judge": "C", "prompt": "tier-case-batch", "version": 1, "job_id": 37236, "status": "done", "outcome": "answered", "error": "", "cost_usd": 0.22355, "attempt": 1, "at": "2026-10-04T01:43:36+00:00"}
+{"request_id": "NDA207930|ORIG|1|NEOHALER 249#T5@2614ef88d615+5", "judge": "C", "prompt": "tier-case-batch", "version": 1, "job_id": 37235, "status": "done", "outcome": "answered", "error": "", "cost_usd": 0.34670599999999996, "attempt": 1, "at": "2026-10-04T01:43:36+00:00"}
