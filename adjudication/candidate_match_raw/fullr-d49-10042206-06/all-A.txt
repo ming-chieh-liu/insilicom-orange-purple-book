@@ -1,0 +1,729 @@
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT01263782 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT01649947 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT01327612 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT00955305 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT01116219 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT01137968 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT01047059 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT01344824 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT02179567 = No
+BLA125085|SUPPL|332|First-Line Non–Squamous Non–Small Cell Lung Cancer#T6@1c1f911c3074 | NCT00976677 = No
+BLA761139|SUPPL|28|HER2-Positive (IHC 3+) Unresectable or Metastatic Solid Tumors#T6@a6c6eb5be38c | NCT04538742 = No
+BLA761139|SUPPL|28|HER2-Positive (IHC 3+) Unresectable or Metastatic Solid Tumors#T6@a6c6eb5be38c | NCT04553770 = No
+BLA761139|SUPPL|28|HER2-Positive (IHC 3+) Unresectable or Metastatic Solid Tumors#T6@a6c6eb5be38c | NCT04379596 = No
+BLA761139|SUPPL|28|HER2-Positive (IHC 3+) Unresectable or Metastatic Solid Tumors#T6@a6c6eb5be38c | NCT03742102 = No
+BLA761139|SUPPL|28|HER2-Positive (IHC 3+) Unresectable or Metastatic Solid Tumors#T6@a6c6eb5be38c | NCT03424005 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01435616 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01272193 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01075282 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01045707 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01076647 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01045447 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01068665 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01068678 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01051011 = No
+BLA205692|ORIG|1|Clinical Studies in Adults with Type 2 Diabetes#T6@f61bce58c26f | NCT01135992 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01845844 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01565148 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01610557 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01823965 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01112085 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01248117 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01205035 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01025232 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT01325181 = No
+BLA125156|SUPPL|106|Diabetic Retinopathy in patients with Diabetic Macular Edema (DME)#T6@8f3224e5ac46 | NCT00815360 = No
+BLA761089|SUPPL|31|AJOVV 225#T6@b34bc2b4b157 | NCT02174861 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT00967330 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01115491 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01183663 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01067469 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01260506 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT02898012 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01290263 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01113398 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01209442 = No
+BLA125085|SUPPL|332|Recurrent Glioblastoma#T6@d86465fcc6a7 | NCT01189240 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT01848990 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT01755416 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT01678235 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT01526733 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT01194245 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT01269034 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT00841087 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT01269047 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT00913497 = No
+BLA203313|SUPPL|2|Type 1 Diabetes – Adult#T6@cbde813afa2b | NCT00607087 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT02364479 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT01927757 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT01604629 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT01298531 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT00848354 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT00726804 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT00420303 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT00523692 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT00581100 = No
+BLA103795|SUPPL|5552|Ankylosing Spondylitis#T6@9c0389e0b41a | NCT01303874 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT00433511 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT00337389 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT00370669 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT00227617 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT00115765 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT00109239 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT02645734 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT05318443 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT03768063 = No
+BLA125085|SUPPL|332|Hepatocellular Carcinoma#T6@03a2100694c3 | NCT03802240 = No
+BLA125057|SUPPL|62|n=100#T6@059cd8be7bda | NCT00696059 = No
+BLA125057|SUPPL|62|n=100#T6@059cd8be7bda | NCT00646178 = No
+BLA125057|SUPPL|62|n=100#T6@059cd8be7bda | NCT00646386 = No
+BLA125057|SUPPL|62|n=100#T6@059cd8be7bda | NCT00296894 = No
+BLA125057|SUPPL|62|n=100#T6@059cd8be7bda | NCT00477893 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT04240054 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT05665140 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT05558319 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT06356571 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT04661033 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT04614558 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT04294459 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT03637764 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT07053436 = No
+BLA761445|ORIG|1|ESCENA 1#T6@6e0b44d205b0 | NCT07045909 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT02097745 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00268983 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00088530 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00227695 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00112931 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00075946 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00991211 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00140582 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00090051 = No
+BLA103705|SUPPL|5211|n=60#T6@0fd11dbb2fb5 | NCT00281918 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT03635021 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT02885753 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT02563002 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT02934529 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT02394795 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT02162563 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT03303495 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT03711240 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT03368859 = No
+BLA125085|SUPPL|332|Metastatic Colorectal Cancer#T6@310eec3532de | NCT03511183 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00314353 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00323011 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00602329 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00601198 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00106054 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00118755 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00114946 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT02582970 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00159432 = No
+BLA125085|SUPPL|168|Metastatic Colorectal Cancer (mCRC)#T6@b52a1fce2981 | NCT00120172 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT02033889 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT02767596 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT02453685 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT03226210 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT02004366 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT01845831 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT02680457 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT01524705 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT01407289 = No
+BLA203313|SUPPL|2|Type 2 Diabetes – Adult#T6@fd98c77ac2af | NCT01486966 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00363636 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00060671 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00355199 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00697996 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT01144364 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00140582 = Yes
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00991211 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00078598 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00180882 = No
+BLA103705|SUPPL|5367|Previously Untreated, Low-Grade or Follicular, CD20-Positive, B-Cell NHL#T6@41333e3026f6 | NCT00088530 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00754559 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00773461 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00848120 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00810277 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00531817 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00535782 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00380601 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00721123 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00720798 = No
+BLA125276|SUPPL|138|Rheumatoid Arthritis – Subcutaneous Administration#T6@f394050a70c3 | NCT00144586 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05877001 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05877820 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05267054 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05441046 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05515315 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT04985721 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05316246 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05466474 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05299476 = No
+BLA761232|SUPPL|11|Gastric Cancer#T6@114de7521680 | NCT05350917 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00095082 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00600626 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00097084 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00097071 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00605020 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00082407 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00604656 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00228878 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00595374 = No
+BLA208751|ORIG|1|Overview of Clinical Studies#T6@0185f1cee027 | NCT00228865 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02857920 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02469987 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02462304 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02663141 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02348918 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02031991 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02036424 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02200354 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT02096874 = No
+BLA125085|SUPPL|319|Persistent, Recurrent, or Metastatic Cervical Cancer#T6@801065a8c960 | NCT01898130 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT02112097 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT02274792 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT02960035 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT02364479 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT01927757 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT01543204 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT01604629 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT01989689 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT01132235 = No
+BLA103795|SUPPL|5552|Psoriatic Arthritis#T6@25f48d722da1 | NCT01237262 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT01707134 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT03874715 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT03377699 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT03981627 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT03816761 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT04409587 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT03554486 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT03260868 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT02685449 = No
+BLA208751|SUPPL|10|Type 1 Diabetes - Pediatric Patients#T6@eab989ab6996 | NCT02680054 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT00144521 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT00144534 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT00144508 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT01768572 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT01664598 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT01772316 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT01665430 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT01655381 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT01730456 = No
+BLA125472|ORIG|1|Rheumatoid Arthritis–Subcutaneous Administration#T6@17159d0738f3 | NCT01649804 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT02302079 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT02462304 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT02107131 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT02646670 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT02684084 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT01986907 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT02050828 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT01945866 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT02131350 = No
+BLA125156|SUPPL|114|Diabetic Retinopathy (DR)#T6@d3e7f364cfe8 | NCT01982435 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00892177 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00720356 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT01102595 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT01004874 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00805961 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00906516 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00939991 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00979017 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00879437 = No
+BLA125085|SUPPL|319|Recurrent Glioblastoma (GBM)#T6@b67eef8aa04f | NCT00921167 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT02173873 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT02441816 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT02689518 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT02142296 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT02002377 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT01796964 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT01824225 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT01918878 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT01414153 = No
+BLA761355|ORIG|1|Neovascular (Wet) Age-Related Macular Degeneration (nAMD)#T6@5bc1270d6b16 | NCT02118831 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT06063018 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT05823987 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT05893056 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT05897268 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT06032845 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT05941481 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT05877001 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT05400902 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT06132698 = No
+BLA761232|SUPPL|18|Gastric, Gastroesophageal Junction, or Esophageal Adenocarcinoma (GEA)#T6@df72d0cd59b1 | NCT05877820 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT05515315 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT05316246 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT05466474 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT05299476 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT05350917 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT05401279 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT05581719 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT04952597 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT04948697 = No
+BLA761417|ORIG|1|Gastric Cancer#T6@5a64c4f4195d | NCT04716634 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT00476619 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT00312871 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT00338000 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT00744445 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT00423020 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT01102218 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT00773513 = No
+BLA103234|SUPPL|5166|Patients With Chronic Kidney Disease#T6@d008ae8d60fe | NCT00334737 = No
+BLA761113|SUPPL|14|n=446#T6@295e208ef394 | NCT04294459 = No
+BLA761113|SUPPL|14|n=446#T6@295e208ef394 | NCT03637764 = No
+BLA761113|SUPPL|14|n=446#T6@295e208ef394 | NCT04643002 = No
+BLA761113|SUPPL|14|n=446#T6@295e208ef394 | NCT04891809 = No
+BLA761113|SUPPL|14|n=446#T6@295e208ef394 | NCT04614558 = No
+BLA761139|SUPPL|28|NSCLC 17#T6@49a5d79caef5 | NCT04379596 = No
+BLA761139|SUPPL|28|NSCLC 17#T6@49a5d79caef5 | NCT04538742 = No
+BLA761139|SUPPL|28|NSCLC 17#T6@49a5d79caef5 | NCT04553770 = No
+BLA761139|SUPPL|28|NSCLC 17#T6@49a5d79caef5 | NCT03424005 = No
+BLA761139|SUPPL|28|NSCLC 17#T6@49a5d79caef5 | NCT03742102 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01819129 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT02033889 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01952145 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01755156 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01894568 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01779362 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01779375 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01959529 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01689142 = No
+BLA206538|SUPPL|12|Clinical Studies in Adult Patients with Type 2 Diabetes#T6@82825fd9de0f | NCT01648582 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT03414502 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT00564512 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT00645606 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT00384150 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT00578565 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT02079532 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT00502996 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT01126541 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT00422383 = No
+BLA103705|SUPPL|5256|Non"Progressing, Low.Grade, CD20-Positìve, B-Cell NIl FollowingFirst-LineCVP Chemotherapy#T6@b5c907f9672b | NCT01272908 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT03522012 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT02767557 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT03215407 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT02678988 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT02324257 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT01991990 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT02206035 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT01603355 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT01757197 = No
+BLA125276|SUPPL|138|COVID-19 – Intravenous Administration#T6@bf948b03fe75 | NCT01418989 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT03397264 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT03709745 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT03405376 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT04153253 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT04087746 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT03866746 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT02432547 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT03085784 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT03453281 = No
+BLA761355|ORIG|1|Diabetic Macular Edema (DME)#T6@76cd52644b16 | NCT02712008 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT03885713 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT04898231 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT01551290 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT01580670 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT00629772 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT00336492 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT05280405 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT04982172 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT05340764 = No
+BLA761358|ORIG|1|Adult Crohn’s Disease#T6@f8251378d204 | NCT04114188 = No
+BLA125057|SUPPL|417|Adult Ulcerative Colitis#T6@7a0efac2d958 | NCT01505491 = No
+BLA125057|SUPPL|417|Adult Ulcerative Colitis#T6@7a0efac2d958 | NCT00296894 = No
+BLA125057|SUPPL|417|Adult Ulcerative Colitis#T6@7a0efac2d958 | NCT03917303 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT00450203 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT02645734 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT02031991 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT02096874 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT01610557 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT01588704 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT01554059 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT01366131 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT01641406 = No
+BLA125085|SUPPL|301|Persistent, Recurrent, or Metastatic Carcinoma of the Cervix#T6@61305727ef97 | NCT01838538 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00644371 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00372905 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00974792 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00301821 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00039195 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00971763 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT01527422 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00509379 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00392834 = No
+BLA103705|SUPPL|5332|Relapsed or Refractory, Low-Grade or Follcular, CD20-Positive, B-Cell NHL#T6@0ab80d12f885 | NCT00427557 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT03885713 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT03629379 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT03881059 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT02763969 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT02319759 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT01999868 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT02187172 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT02054481 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT02144857 = No
+BLA761044|SUPPL|20|n=101#T6@5a657b5a6994 | NCT01511315 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT05246514 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT05097599 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT04014075 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT07497386 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT06311214 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT06771622 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT06486883 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT06832202 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT06750484 = No
+BLA761139|SUPPL|41|DESTINY-Breast05#T6@00311634326c | NCT06731803 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT02097745 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00268983 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00088530 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00227695 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00112931 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00075946 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00991211 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00140582 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00090051 = No
+BLA103705|SUPPL|5211|n=37#T6@09c462f77ab2 | NCT00281918 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03949153 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT04017897 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT04021420 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03259425 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03347123 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03435640 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03511391 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03544723 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03618641 = No
+BLA761234|ORIG|1|CTLA-4#T6@95449ff57df3 | NCT03633110 = No
+BLA125057|SUPPL|62|n=413#T6@7ef065b65963 | NCT00696059 = No
+BLA125057|SUPPL|62|n=413#T6@7ef065b65963 | NCT00646178 = No
+BLA125057|SUPPL|62|n=413#T6@7ef065b65963 | NCT00646386 = No
+BLA125057|SUPPL|62|n=413#T6@7ef065b65963 | NCT00296894 = No
+BLA125057|SUPPL|62|n=413#T6@7ef065b65963 | NCT00477893 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00298272 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT01303874 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00115219 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00678782 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00688103 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00099554 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00094341 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00252668 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00195494 = No
+BLA103795|SUPPL|5552|Adult Rheumatoid Arthritis#T6@f5b8681f57d8 | NCT00259610 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT01012973 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT00637377 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT00509795 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT06864988 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT07064759 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT05407636 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT06196840 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT06708637 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT05473715 = No
+BLA761355|SUPPL|10|indication#T6@d4497e30e20d | NCT06011798 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01588184 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01633970 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01552434 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01295944 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01386710 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01269853 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT00741195 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT00741221 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01823081 = No
+BLA125085|SUPPL|305|indication#T6@74dc216c9fd6 | NCT01663727 = No
+BLA125294|ORIG|1|indication#T6@e164d3629327 | NCT01010217 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02019472 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02114931 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02150473 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02163759 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02167139 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02171429 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02207231 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02207244 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT02260791 = No
+BLA125057|SUPPL|419|indication#T6@51cb66a4effa | NCT01808118 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT04381832 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT03964727 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT03725761 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT06167317 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT06028932 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT06040970 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT06055465 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT06102824 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT06123468 = No
+BLA761115|SUPPL|58|indication#T6@0337ef325ef1 | NCT06161532 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00038064 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00246597 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00350090 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00354341 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00364455 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00017004 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00036400 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00310232 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00004917 = No
+BLA103234|SUPPL|5166|PROCRIT 300#T6@aaf070f8e6f7 | NCT00211133 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT02767557 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT03215407 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT03282851 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT03522012 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT02678988 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT01991990 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT02324257 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT02206035 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT01603355 = No
+BLA125276|SUPPL|138|COVID-19#T6@c8cb6e1c6ae3 | NCT01757197 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01894568 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01959529 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01517412 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01632163 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01676220 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01462266 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01570751 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01582451 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01584232 = No
+BLA208673|ORIG|1|SGLT-2#T6@6a88f3e6026e | NCT01621178 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT05807542 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT05581719 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT04952597 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT04948697 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT04716634 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT04974047 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT05014828 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT05086627 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT04813107 = No
+BLA761232|ORIG|1|Esophageal Squamous Cell Cancer#T6@39b8183fbedf | NCT05418309 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT04371185 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT03885713 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT03881059 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT03629379 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT02763969 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT02319759 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT01999868 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT02054481 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT02187172 = No
+BLA761044|SUPPL|21|n=112#T6@25d846cee8e9 | NCT02144857 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT01971346 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT02144857 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT02134210 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT01901185 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT01729754 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT01891864 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT00691964 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT00710580 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT00789997 = No
+BLA103795|SUPPL|5552|PASI 75#T6@768004e8fab0 | NCT00141921 = No
+BLA761270|ORIG|1|Metastatic NSCLC#T6@eb8df0d7ba47 | NCT03994393 = No
+BLA761270|ORIG|1|Metastatic NSCLC#T6@eb8df0d7ba47 | NCT03212469 = No
+BLA761270|ORIG|1|Metastatic NSCLC#T6@eb8df0d7ba47 | NCT02938793 = No
+BLA761270|ORIG|1|Metastatic NSCLC#T6@eb8df0d7ba47 | NCT02029001 = No
+BLA761270|ORIG|1|Metastatic NSCLC#T6@eb8df0d7ba47 | NCT00378482 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00384176 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00469443 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00130728 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00115765 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00208546 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00227617 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00252564 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00265824 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00265850 = No
+BLA125085|SUPPL|317|indication#T6@44ac99edcfb8 | NCT00294359 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01232556 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01299857 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01321541 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01324596 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01516580 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01701232 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01014208 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01073163 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01197560 = No
+BLA103705|SUPPL|5450|indication#T6@e9483f3bdaee | NCT01200589 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01494857 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01562951 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01564823 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01629628 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01670240 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01695239 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01710358 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01235689 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01114880 = No
+BLA125057|SUPPL|408|indication#T6@7509d34764df | NCT01166282 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00216164 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00290498 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00577629 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00927797 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00081861 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00085696 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00180895 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00169195 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00588094 = No
+BLA103705|SUPPL|5465|DLBCL 8#T6@3c9147b79524 | NCT00048737 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00761514 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT01465438 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00298272 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00234234 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00216177 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00696059 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00646178 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00646386 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00477893 = No
+BLA125057|SUPPL|71|n=36#T6@07541bd54790 | NCT00274352 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00079326 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00250874 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00095706 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00107393 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00429247 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00193076 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT02748213 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00043394 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00401427 = No
+BLA103792|SUPPL|5175|Adjuvant Breast Cancer#T6@6912ddcfeb25 | NCT00191373 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00874107 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00970684 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00998166 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00924209 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00960297 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00700180 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00531960 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00766246 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00600821 = No
+BLA125085|SUPPL|319|First-Line Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@2d24d87ece2d | NCT00741988 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00656422 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00331851 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00360334 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00115570 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00135941 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00106366 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00097877 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00151697 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00095082 = No
+BLA206538|SUPPL|12|Overview of Clinical Studies#T6@a536962b0831 | NCT00097084 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT04240054 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT05665140 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT05558319 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT06356571 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT04661033 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT04614558 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT04294459 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT03637764 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT07053436 = No
+BLA761445|ORIG|1|n=531#T6@4786b99dbd82 | NCT07045909 = No
+BLA761358|ORIG|1|Adult Ulcerative Colitis#T6@a2c1136dbf4c | NCT05180994 = No
+BLA761358|ORIG|1|Adult Ulcerative Colitis#T6@a2c1136dbf4c | NCT04797325 = No
+BLA761358|ORIG|1|Adult Ulcerative Colitis#T6@a2c1136dbf4c | NCT03819296 = No
+BLA761358|ORIG|1|Adult Ulcerative Colitis#T6@a2c1136dbf4c | NCT04407247 = No
+BLA761358|ORIG|1|Adult Ulcerative Colitis#T6@a2c1136dbf4c | NCT04305145 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05909904 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05900921 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05638984 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05840835 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05586061 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05360277 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05982834 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT06134193 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT05807776 = No
+BLA761232|SUPPL|11|Esophageal Squamous Cell Carcinoma#T6@9b32c8c2b09e | NCT06063018 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05638984 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05840835 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05586061 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05360277 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05982834 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT06134193 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05807776 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05941481 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05877001 = No
+BLA761417|ORIG|1|Esophageal Squamous Cell Carcinoma#T6@246143c5116a | NCT05877820 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT03481660 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT03610646 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT03622580 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT03622593 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT03321513 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT04288232 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT01813773 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT01909791 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT02157077 = No
+BLA761355|SUPPL|5|DRSS 29#T6@34c87041f6d7 | NCT01571284 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00531817 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00535782 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00380601 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00106535 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00721123 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00720798 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00144586 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00144547 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00144521 = No
+BLA125276|SUPPL|114|Rheumatoid Arthritis—Subcutaneous Administration#T6@85eece2f28b4 | NCT00144534 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT01170767 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00599222 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00710229 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00885794 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00559715 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00593450 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00637377 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00469352 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00433017 = No
+BLA125156|SUPPL|76|Macular Edema Following Retinal Vein Occlusion#T6@93f51f42b236 | NCT00470678 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01596127 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01516567 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01556347 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01086540 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01718691 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01514344 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01266317 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01370772 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT01145495 = No
+BLA103705|SUPPL|5451|Granulomatosis with Polyangiitis (GPA) (Wegener’s Granulomatosis) and Microscopic#T6@888c03188041 | NCT00972478 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT01214733 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT01256736 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT00883753 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT00891020 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT00754572 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT00951275 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT00977106 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT00996606 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT01044498 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T6@4d89905fbfc3 | NCT01211834 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT02582697 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT01933932 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT01533207 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT01046825 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT00887536 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT00118209 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT00301925 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT02385851 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT02418104 = No
+BLA125031|SUPPL|180|Patients with Cancer Receiving Myelosuppressive Chemotherapy#T6@003a776ae4d6 | NCT02479646 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT02416765 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT02276859 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT01848990 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT01755416 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT01678235 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT01526733 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT01194245 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT01269034 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT00841087 = No
+BLA208751|ORIG|1|Type 1 Diabetes - Adults#T6@bfed71f97358 | NCT01269047 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01603641 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01776606 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01603602 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01603615 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01603459 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01600716 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01591746 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01682148 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT02557737 = No
+BLA761085|ORIG|1|n=654#T6@0beb1e73b201 | NCT01224015 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00533429 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00400803 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00553800 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00378573 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00312728 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00404703 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00508625 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00343291 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00368992 = No
+BLA125085|SUPPL|301|Unresectable Non–Squamous Non–Small Cell Lung Cancer (NSCLC)#T6@120f4789080d | NCT00354549 = No
+BLA761089|SUPPL|31|n=235#T6@aa19ff705035 | NCT02066415 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT03885713 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT04898231 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT01551290 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT01580670 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT00629772 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT00336492 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT04982172 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT05280405 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT05340764 = No
+BLA761358|ORIG|1|CDAI-100#T6@0a3be7a5bb43 | NCT02566889 = No

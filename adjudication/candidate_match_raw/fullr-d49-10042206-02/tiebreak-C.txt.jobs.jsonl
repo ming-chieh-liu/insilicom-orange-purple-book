@@ -1,0 +1,2 @@
+{"request_id": "BLA125085|SUPPL|85|indication#T2@942d701d3057+5", "judge": "C", "prompt": "tier-case-batch", "version": 1, "job_id": 40240, "status": "done", "outcome": "answered", "error": "", "cost_usd": 0.2657496, "attempt": 1, "at": "2026-10-05T04:27:47+00:00"}
+{"request_id": "BLA125057|SUPPL|16|DN0828V 4#T2@d1f7b6caa585+5", "judge": "C", "prompt": "tier-case-batch", "version": 1, "job_id": 40239, "status": "done", "outcome": "answered", "error": "", "cost_usd": 0.2697862, "attempt": 1, "at": "2026-10-05T04:36:49+00:00"}

@@ -1,0 +1,15 @@
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T13@e2d4fcccdd0a | NCT01757197 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T13@e2d4fcccdd0a | NCT01418989 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T13@e2d4fcccdd0a | NCT01002781 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T13@e2d4fcccdd0a | NCT03193190 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T13@e2d4fcccdd0a | NCT03282851 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T13@e2d4fcccdd0a | NCT02767557 = No
+BLA125472|SUPPL|28|Rheumatoid Arthritis—Subcutaneous Administration#T13@e2d4fcccdd0a | NCT02324257 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02752828 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02787551 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02855684 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02501161 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02623998 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02738879 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02752113 = No
+BLA208673|ORIG|1|SGLT-2#T13@3c7e9bd23389 | NCT02906917 = No
