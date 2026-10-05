@@ -1631,7 +1631,7 @@ def build(
     # D49: biosimilars are the Purple Book's 351(k) licences, not every name
     # whose suffix was stripped — that also caught novel biologics
     # (ravulizumab-cwvz) and the reference products themselves (Humira).
-    biosimilar = purple_book.biosimilar_applications(data.purplebook)
+    biosimilar = purple_book.biosimilar_applications(purple_book.snapshot_path(data))
 
     spine = approval_events.build(data)
     approval_of = {

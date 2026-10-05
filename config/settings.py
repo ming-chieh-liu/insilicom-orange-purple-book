@@ -111,8 +111,6 @@ class RawData:
     #: exact UNII bridge (D39). Not part of the Drugs@FDA tree's checks.
     unii_records: Path = field(init=False)
     mesh_supplementary: Path = field(init=False)
-    #: The Purple Book snapshot: the BLA type (351(a) or 351(k)) of each licence.
-    purplebook: Path = field(init=False)
     #: The UNII registry, inside ``UNIIs.zip``. Tab-delimited and **LF-only**,
     #: unlike every FDA file above. 1,050,022 data rows; line 1 is the header.
     #: Names are stored mixed case, so matching must case-fold.
@@ -123,7 +121,6 @@ class RawData:
         drugsfda_zip = self.root / "drugsfda" / "drugsatfda.zip"
         object.__setattr__(self, "unii_records", self.root / "unii" / "UNII_Data.zip")
         object.__setattr__(self, "mesh_supplementary", self.root / "mesh" / "supp2026.xml")
-        object.__setattr__(self, "purplebook", self.root / "purplebook" / self.purplebook_snapshot)
         unii_zip = self.root / "unii" / "UNIIs.zip"
         orangebook = self.root / "orangebook" / "x"
         object.__setattr__(self, "drugsfda_zip", drugsfda_zip)

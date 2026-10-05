@@ -540,7 +540,7 @@ def _run_pass(
         (out / "review_trial_mentions.tsv").write_text(mentions, encoding="utf-8")
     for name, text in (files or {}).items():
         (out / name).write_text(text, encoding="utf-8")
-    data = SimpleNamespace(purplebook=out / "purplebook.csv")  # D49: 351(k) licences
+    data = SimpleNamespace(root=out, purplebook_snapshot="pb.csv")  # D49: no 351(k) file
     return candidates.build(
         data, object(), out, ancestors=ancestors,  # type: ignore[arg-type]
         review_trials=review_trials,
