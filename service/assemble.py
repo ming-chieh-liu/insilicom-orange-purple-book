@@ -522,6 +522,20 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
     units = [u for u in all_units if str(u.get("case") or "B") not in CASE_SOURCE]
     case_units = [u for u in all_units if str(u.get("case") or "B") in CASE_SOURCE]
     guard_led = _guard_led_units(units, guard)
+    # The units S9 judges: each (application, trial) once, at its earliest
+    # submission. A description with candidates outside this set is a later
+    # appearance of one S9 already judged, never "not yet judged".
+    s9_selected = {
+        str(u.get("unit_id") or "")
+        for u in identification.read_units(out_dir / "candidates.jsonl", frozenset(guard))
+    }
+    # S6 judged a label-stated trial once per (application, NCT), at its earliest
+    # submission; FDA approves sibling supplements on the same day off different
+    # labels, and the role judged on one holds for its same-day sibling.
+    label_role_same_day: dict[tuple[str, str, str], str] = {}
+    for (role_key, role_nct), judged in label_roles.items():
+        day = spine.get(role_key, {}).get("approval_date", "")
+        label_role_same_day.setdefault((role_key.split("|", 1)[0], role_nct, day), judged)
 
     # D16, in two steps, and over **both** branches together. A trial can be
     # named in prose on an early submission and by id on a later one --
@@ -662,8 +676,10 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
                         if key in guard
                         else "later_appearance_of_the_same_trial"
                         if str(unit.get("unit_id") or "") in guard_led
+                        or ((unit.get("candidates") or unit.get("literature"))
+                            and str(unit.get("unit_id") or "") not in s9_selected)
                         else "not_yet_judged"
-                        if unit.get("candidates")
+                        if unit.get("candidates") or unit.get("literature")
                         else _why(unit),
                     )
                 )
@@ -719,7 +735,8 @@ def build(out_dir: Path, adjudication_dir: Path) -> AssembleReport:
         elif source == "label_description":
             rejection = ""  # D46: a trial S9 identified has no role check
         elif source == "label_nct":
-            role = label_roles.get((key, nct))
+            role = label_roles.get((key, nct)) or label_role_same_day.get(
+                (str(unit["application"]), nct, spine.get(key, {}).get("approval_date", "")))
             rejection = ("" if role in review_role.LINKING
                          else f"label_role_{role.lower()}" if role else LABEL_ROLE_PENDING)
         else:  # review_name_match: the review named it by id; its S6 role decides

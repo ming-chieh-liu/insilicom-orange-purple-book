@@ -1009,3 +1009,31 @@ def test_a_biosimilars_review_naming_the_reference_trial_does_not_link(
     report = assemble.build(out, adj)
     assert "NCT00000777" not in {link.nct_id for link in report.links}
     assert assemble.BIOSIMILAR_REFERENCE_TRIAL in {u.reason for u in report.unlinked}
+
+
+def test_a_same_day_sibling_uses_the_role_s6_judged_on_its_twin(
+        workspace: tuple[Path, Path]) -> None:
+    """S6 judged the trial once, on SUPPL 36; SUPPL 38 (same day, its own label)
+    keeps the link with that role instead of waiting for a role forever."""
+    out, adj = workspace
+    (out / "candidates.jsonl").write_text("".join(json.dumps(u) + "\n" for u in (
+        _temodar("36", "sha-a"), _temodar("38", "sha-b"))), encoding="utf-8")
+    _label_roles(adj, [("NDA021029|SUPPL|36|NCT00006353", "PIVOTAL")])
+    report = assemble.build(out, adj)
+    assert sorted(l.submission_no for l in report.links
+                  if l.application == "NDA021029") == ["36", "38"]
+    assert assemble.LABEL_ROLE_PENDING not in {u.reason for u in report.unlinked}
+
+
+def test_a_later_repeat_of_a_judged_description_is_a_later_appearance(
+        workspace: tuple[Path, Path]) -> None:
+    """S9 judges each (application, trial) once, at its earliest submission;
+    the repeat on a later label is not "not yet judged"."""
+    out, adj = workspace
+    first = _unit(stated_nct="", acronym="STUDY 7", unit_id="BLA125514|SUPPL|35|STUDY 7")
+    later = _unit(stated_nct="", acronym="STUDY 7", unit_id="BLA125514|SUPPL|45|STUDY 7",
+                  submission_no="45", approval_date="2018-12-19")
+    _write_units(out, [first, later])
+    reasons = {(u.submission_no, u.reason) for u in assemble.build(out, adj).unlinked}
+    assert ("35", "not_yet_judged") in reasons
+    assert ("45", "later_appearance_of_the_same_trial") in reasons
