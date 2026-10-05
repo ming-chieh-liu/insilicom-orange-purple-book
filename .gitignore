@@ -58,3 +58,6 @@ adjudication/letter_candidate_units.jsonl
 # Rendered pool prompts — rebuilt from the units by render-prompts
 adjudication/**/*.requests.jsonl
 adjudication/**/*.requests-x*.jsonl
+
+# S9 tier prompts as judged (~240 MB): rebuilt by match-prepare, kept on disk only
+adjudication/candidate_match_tiers.jsonl
